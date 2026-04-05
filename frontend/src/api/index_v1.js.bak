@@ -1,0 +1,71 @@
+import request from '@/utils/request'
+
+// 仪表板
+export const getDashboardStats = () => {
+  return request.get('/dashboard/stats')
+}
+
+export const getDashboardTrends = () => {
+  return request.get('/dashboard/trends')
+}
+
+// 政策
+export const getPolicies = (params) => {
+  return request.get('/policies', { params })
+}
+
+export const getPolicyDetail = (id) => {
+  return request.get(`/policies/${id}`)
+}
+
+export const getPolicyCategories = () => {
+  return request.get('/policies/categories/list')
+}
+
+// 标准
+export const getStandards = (params) => {
+  return request.get('/standards', { params })
+}
+
+export const getStandardDetail = (id) => {
+  return request.get(`/standards/${id}`)
+}
+
+export const getStandardCategories = () => {
+  return request.get('/standards/categories/list')
+}
+
+// 抽样检查
+export const getInspections = (params) => {
+  return request.get('/inspections', { params })
+}
+
+export const getInspectionDetail = (id) => {
+  return request.get(`/inspections/${id}`)
+}
+
+export const getInspectionStats = () => {
+  return request.get('/inspections/stats/overview')
+}
+
+// 督查
+export const getSupervisions = (params) => {
+  return request.get('/supervisions', { params })
+}
+
+export const getSupervisionDetail = (id) => {
+  return request.get(`/supervisions/${id}`)
+}
+
+export const getSupervisionStats = () => {
+  return request.get('/supervisions/stats/overview')
+}
+
+// 公告
+export const getAnnouncements = (params) => {
+  return request.get('/announcements', { params })
+}
+
+export const getAnnouncementDetail = (id) => {
+  return request.get(`/announcements/${id}`)
+}

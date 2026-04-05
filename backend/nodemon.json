@@ -1,0 +1,9 @@
+{
+  "watch": ["*.js", "routes/", "config/"],
+  "ext": "js,json",
+  "ignore": ["node_modules/", "*.test.js"],
+  "exec": "node server_v2.js",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}
