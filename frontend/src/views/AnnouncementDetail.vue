@@ -7,9 +7,7 @@
         <div class="header">
           <h1 class="title">{{ announcement.title }}</h1>
           <div class="meta">
-            <el-tag :type="statusType">
-              {{ statusText }}
-            </el-tag>
+            <el-tag :type="statusType">{{ statusText }}</el-tag>
             <span class="date">{{ formatDate(announcement.publish_date) }}</span>
             <span v-if="announcement.announcement_no" class="announcement-no">
               {{ announcement.announcement_no }}
@@ -29,9 +27,9 @@
               {{ announcement.inspection_count || 0 }} 批次
             </el-descriptions-item>
             <el-descriptions-item label="检验时间">
-              {{ announcement.inspection_start_date && announcement.inspection_end_date 
-                  ? `${formatDate(announcement.inspection_start_date)} 至 ${formatDate(announcement.inspection_end_date)}`
-                  : '暂无' }}
+              {{ announcement.inspection_start_date && announcement.inspection_end_date
+                ? `${formatDate(announcement.inspection_start_date)} 至 ${formatDate(announcement.inspection_end_date)}`
+                : '暂无' }}
             </el-descriptions-item>
             <el-descriptions-item label="发布日期">
               {{ formatDate(announcement.publish_date) }}
@@ -88,7 +86,7 @@
                 />
               </el-form-item>
               <el-form-item label="是否涉嫌假冒">
-                <el-select v-model="productDetailFilters.is_counterfeit" clearable placeholder="全部">
+                <el-select v-model="productDetailFilters.is_counterfeit" style="width: 100px" clearable placeholder="全部">
                   <el-option label="全部" value="" />
                   <el-option label="涉嫌假冒" value="1" />
                   <el-option label="非假冒" value="0" />
@@ -115,7 +113,7 @@
                     <el-descriptions-item label="生产许可证号">{{ row.production_license_no || '暂无' }}</el-descriptions-item>
                     <el-descriptions-item label="检验结果">{{ row.inspection_result || '暂无' }}</el-descriptions-item>
                     <el-descriptions-item label="规定要求">{{ row.requirement || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="备注">{{ row.remarks || '暂无' }}</el-descriptions-item>
+                    <el-descriptions-item label="备注" :span="2">{{ row.remarks || '暂无' }}</el-descriptions-item>
                   </el-descriptions>
                 </template>
               </el-table-column>
@@ -133,16 +131,20 @@
                   <span v-else class="remark-text">{{ row.remarks && row.remarks !== '/' ? '有备注' : '无' }}</span>
                 </template>
               </el-table-column>
+              <el-table-column label="操作" width="140" fixed="right" align="center">
+                <template #default="{ row }">
+                  <el-button link type="primary" @click="openEditProductDetail(row)">编辑</el-button>
+                  <el-button link type="danger" @click="handleDeleteProductDetail(row)">删除</el-button>
+                </template>
+              </el-table-column>
             </el-table>
             <el-empty v-else-if="!productDetailsLoading" description="当前条件下暂无可展示的批次明细" />
           </div>
-
         </div>
 
         <el-divider />
 
         <div class="related-inspections" v-if="relatedInspections.length > 0">
-
           <h3>相关检查记录</h3>
           <el-table :data="relatedInspections" stripe>
             <el-table-column prop="product_name" label="产品名称" min-width="200" />
@@ -159,7 +161,6 @@
             <el-table-column label="操作" width="100">
               <template #default="{ row }">
                 <el-button type="primary" size="small" link @click="viewDetail(row.inspection_id || row.id)">
-
                   查看详情
                 </el-button>
               </template>
@@ -168,63 +169,215 @@
         </div>
       </template>
     </el-card>
+
+    <el-dialog
+      v-model="editDialogVisible"
+      title="编辑不符合规定化妆品明细"
+      width="900px"
+      :close-on-click-modal="false"
+    >
+      <el-form ref="productDetailFormRef" :model="productDetailForm" :rules="productDetailRules" label-width="120px">
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item label="序号" prop="sequence_no">
+              <el-input-number v-model="productDetailForm.sequence_no" :min="1" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="16">
+            <el-form-item label="产品名称" prop="product_name">
+              <el-input v-model="productDetailForm.product_name" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="注册人/备案人等名称" prop="company_names">
+              <el-input v-model="productDetailForm.company_names" type="textarea" :rows="3" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="注册人/备案人等地址" prop="company_addresses">
+              <el-input v-model="productDetailForm.company_addresses" type="textarea" :rows="3" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="被抽样单位名称" prop="sample_unit_name">
+              <el-input v-model="productDetailForm.sample_unit_name" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="被抽样单位地址" prop="sample_unit_address">
+              <el-input v-model="productDetailForm.sample_unit_address" type="textarea" :rows="2" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item label="包装规格">
+              <el-input v-model="productDetailForm.package_spec" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="标示批号">
+              <el-input v-model="productDetailForm.batch_no" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="生产日期">
+              <el-input v-model="productDetailForm.production_date" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item label="限期使用日期/保质期">
+              <el-input v-model="productDetailForm.expiry_date" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="所在地/进口地区">
+              <el-input v-model="productDetailForm.product_region" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="注册/备案编号">
+              <el-input v-model="productDetailForm.registration_no" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="生产许可证号">
+              <el-input v-model="productDetailForm.production_license_no" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="检验机构">
+              <el-input v-model="productDetailForm.inspection_institution" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="不符合规定项目" prop="unqualified_items" >
+          <el-input v-model="productDetailForm.unqualified_items" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="检验结果" prop="inspection_result" >
+          <el-input v-model="productDetailForm.inspection_result" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="规定要求" prop="requirement" >
+          <el-input v-model="productDetailForm.requirement" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="productDetailForm.remarks" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="涉嫌假冒">
+          <el-switch v-model="productDetailForm.is_counterfeit" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="closeEditDialog">取消</el-button>
+        <el-button type="primary" :loading="savingProductDetail" @click="handleSaveProductDetail">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
-import { getAnnouncementById, getRelatedInspections, getAnnouncementProductDetails } from '@/api/index'
-
+import {
+  deleteAnnouncementProductDetail,
+  getAnnouncementById,
+  getAnnouncementProductDetails,
+  getRelatedInspections,
+  updateAnnouncementProductDetail
+} from '@/api/index'
 import dayjs from 'dayjs'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const productDetailsLoading = ref(false)
+const savingProductDetail = ref(false)
 const announcement = ref(null)
 const relatedInspections = ref([])
 const productDetails = ref([])
+const editDialogVisible = ref(false)
+const productDetailFormRef = ref(null)
 const productDetailFilters = ref({
   unqualified_item: '',
   company_keyword: '',
   sample_unit_keyword: '',
   is_counterfeit: ''
 })
-const productDetailsSummary = ref({
-  total: 0,
-  counterfeit_count: 0,
-  filtered_total: 0,
-  filtered_counterfeit_count: 0,
-  has_filters: false
-})
-
-
-
-const goBack = () => {
-  router.push('/announcements')
+const productDetailsSummary = ref(createEmptySummary())
+const productDetailForm = reactive(createEmptyProductDetailForm())
+const productDetailRules = {
+  sequence_no: [{ required: true, message: '请输入序号', trigger: 'change' }],
+  product_name: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  company_names: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  company_addresses: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  sample_unit_name: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  sample_unit_address: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  unqualified_items: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  inspection_result: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  requirement: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
 }
 
-const formatDate = (date) => {
-  return dayjs(date).format('YYYY年MM月DD日')
-}
-
-const formatContent = (content) => {
-  if (!content) return '暂无内容'
-  return content.replace(/\n/g, '<br>')
-}
-
-const downloadAttachment = () => {
-  if (announcement.value?.attachment_path) {
-    window.open(`http://localhost:3000${announcement.value.attachment_path}`, '_blank')
+function createEmptySummary () {
+  return {
+    total: 0,
+    counterfeit_count: 0,
+    filtered_total: 0,
+    filtered_counterfeit_count: 0,
+    has_filters: false
   }
 }
 
-const viewDetail = (id) => {
-  router.push(`/inspections/${id}`)
+function createEmptyProductDetailForm () {
+  return {
+    id: null,
+    sequence_no: 1,
+    product_name: '',
+    company_names: '',
+    company_addresses: '',
+    sample_unit_name: '',
+    sample_unit_address: '',
+    package_spec: '',
+    batch_no: '',
+    production_date: '',
+    expiry_date: '',
+    product_region: '',
+    registration_no: '',
+    production_license_no: '',
+    inspection_institution: '',
+    unqualified_items: '',
+    inspection_result: '',
+    requirement: '',
+    remarks: '',
+    is_counterfeit: false
+  }
 }
+
+const currentAnnouncementId = computed(() => announcement.value?.id || route.params.id)
+
+const activeCounterfeitCount = computed(() => {
+  return productDetailsSummary.value.has_filters
+    ? Number(productDetailsSummary.value.filtered_counterfeit_count || 0)
+    : Number(productDetailsSummary.value.counterfeit_count || 0)
+})
 
 const statusType = computed(() => {
   const map = {
@@ -244,29 +397,49 @@ const statusText = computed(() => {
   return map[announcement.value?.status] || '未知状态'
 })
 
-const fetchAnnouncement = async () => {
-  const id = route.params.id
-  if (!id) {
-    ElMessage.error('公告ID不存在')
-    goBack()
-    return
-  }
+const goBack = () => {
+  router.push('/announcements')
+}
 
-  loading.value = true
-  try {
-    const [announcementRes] = await Promise.all([
-      getAnnouncementById(id),
-      fetchRelatedInspections(id),
-      fetchProductDetails(id)
-    ])
+const formatDate = (date) => {
+  if (!date) return '暂无'
+  const value = dayjs(date)
+  return value.isValid() ? value.format('YYYY年MM月DD日') : date
+}
 
-    announcement.value = announcementRes.data
-  } catch (error) {
-    ElMessage.error('获取公告详情失败')
-    console.error(error)
-  } finally {
-    loading.value = false
+const formatContent = (content) => {
+  if (!content) return '暂无内容'
+  return content.replace(/\n/g, '<br>')
+}
+
+const downloadAttachment = () => {
+  if (announcement.value?.attachment_path) {
+    window.open(`http://localhost:3000${announcement.value.attachment_path}`, '_blank')
   }
+}
+
+const viewDetail = (id) => {
+  router.push(`/inspections/${id}`)
+}
+
+const applyProductDetailRow = (row = {}) => {
+  Object.assign(productDetailForm, createEmptyProductDetailForm(), {
+    ...row,
+    sequence_no: Number(row.sequence_no || 1),
+    is_counterfeit: Boolean(row.is_counterfeit)
+  })
+}
+
+const closeEditDialog = () => {
+  editDialogVisible.value = false
+  applyProductDetailRow()
+  productDetailFormRef.value?.clearValidate()
+}
+
+const fetchAnnouncementOnly = async (announcementId) => {
+  const res = await getAnnouncementById(announcementId)
+  announcement.value = res.data
+  return res.data
 }
 
 const fetchRelatedInspections = async (announcementId) => {
@@ -286,31 +459,52 @@ const fetchProductDetails = async (announcementId) => {
       ...productDetailFilters.value
     })
     productDetails.value = res.data || []
-    productDetailsSummary.value = res.summary || {
-      total: 0,
-      counterfeit_count: 0,
-      filtered_total: 0,
-      filtered_counterfeit_count: 0,
-      has_filters: false
-    }
+    productDetailsSummary.value = res.summary || createEmptySummary()
   } catch (error) {
     console.error('获取公告批次明细失败:', error)
     productDetails.value = []
-    productDetailsSummary.value = {
-      total: 0,
-      counterfeit_count: 0,
-      filtered_total: 0,
-      filtered_counterfeit_count: 0,
-      has_filters: false
-    }
+    productDetailsSummary.value = createEmptySummary()
   } finally {
     productDetailsLoading.value = false
   }
 }
 
+const fetchAnnouncement = async () => {
+  const id = route.params.id
+  if (!id) {
+    ElMessage.error('公告ID不存在')
+    goBack()
+    return
+  }
+
+  loading.value = true
+  try {
+    await Promise.all([
+      fetchAnnouncementOnly(id),
+      fetchRelatedInspections(id),
+      fetchProductDetails(id)
+    ])
+  } catch (error) {
+    ElMessage.error('获取公告详情失败')
+    console.error(error)
+  } finally {
+    loading.value = false
+  }
+}
+
+const refreshAnnouncementData = async () => {
+  const announcementId = currentAnnouncementId.value
+  if (!announcementId) return
+
+  await Promise.all([
+    fetchAnnouncementOnly(announcementId),
+    fetchProductDetails(announcementId)
+  ])
+}
+
 const handleProductDetailSearch = () => {
-  if (announcement.value?.id || route.params.id) {
-    fetchProductDetails(announcement.value?.id || route.params.id)
+  if (currentAnnouncementId.value) {
+    fetchProductDetails(currentAnnouncementId.value)
   }
 }
 
@@ -324,7 +518,83 @@ const resetProductDetailFilters = () => {
   handleProductDetailSearch()
 }
 
+const openEditProductDetail = (row) => {
+  applyProductDetailRow(row)
+  editDialogVisible.value = true
+}
 
+const handleSaveProductDetail = async () => {
+  if (!productDetailFormRef.value || !currentAnnouncementId.value || !productDetailForm.id) {
+    return
+  }
+
+  const valid = await productDetailFormRef.value.validate().catch(() => false)
+  if (!valid) {
+    return
+  }
+
+  savingProductDetail.value = true
+  try {
+    await updateAnnouncementProductDetail(currentAnnouncementId.value, productDetailForm.id, {
+      sequence_no: productDetailForm.sequence_no,
+      product_name: productDetailForm.product_name,
+      company_names: productDetailForm.company_names,
+      company_addresses: productDetailForm.company_addresses,
+      sample_unit_name: productDetailForm.sample_unit_name,
+      sample_unit_address: productDetailForm.sample_unit_address,
+      package_spec: productDetailForm.package_spec,
+      batch_no: productDetailForm.batch_no,
+      production_date: productDetailForm.production_date,
+      expiry_date: productDetailForm.expiry_date,
+      product_region: productDetailForm.product_region,
+      registration_no: productDetailForm.registration_no,
+      production_license_no: productDetailForm.production_license_no,
+      inspection_institution: productDetailForm.inspection_institution,
+      unqualified_items: productDetailForm.unqualified_items,
+      inspection_result: productDetailForm.inspection_result,
+      requirement: productDetailForm.requirement,
+      remarks: productDetailForm.remarks,
+      is_counterfeit: productDetailForm.is_counterfeit ? 1 : 0
+    })
+
+    ElMessage.success('批次明细更新成功')
+    closeEditDialog()
+    await refreshAnnouncementData()
+  } catch (error) {
+    console.error('更新公告批次明细失败:', error)
+    ElMessage.error('更新公告批次明细失败')
+  } finally {
+    savingProductDetail.value = false
+  }
+}
+
+const handleDeleteProductDetail = async (row) => {
+  if (!currentAnnouncementId.value || !row?.id) {
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确认删除“${row.product_name || '该批次明细'}”吗？删除后会同步更新不符合规定化妆品库。`,
+      '删除确认',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消'
+      }
+    )
+
+    await deleteAnnouncementProductDetail(currentAnnouncementId.value, row.id)
+    ElMessage.success('批次明细删除成功')
+    await refreshAnnouncementData()
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    console.error('删除公告批次明细失败:', error)
+    ElMessage.error('删除公告批次明细失败')
+  }
+}
 
 onMounted(() => {
   fetchAnnouncement()
@@ -358,6 +628,7 @@ onMounted(() => {
   gap: 15px;
   color: #909399;
   font-size: 14px;
+  flex-wrap: wrap;
 }
 
 .date,
@@ -426,4 +697,15 @@ onMounted(() => {
   margin-top: 30px;
 }
 
+@media (max-width: 768px) {
+  .announcement-detail {
+    padding: 12px;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
 </style>
+

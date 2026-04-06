@@ -15,6 +15,11 @@ const {
   syncCompaniesFromAnnouncementDetails,
   removeAnnouncementCompanySampling
 } = require('../utils/companySamplingSync');
+const {
+  ensureUnqualifiedProductsTable,
+  replaceUnqualifiedProductsFromAnnouncementDetails
+} = require('../utils/unqualifiedProducts');
+
 
 
 
@@ -83,7 +88,92 @@ function normalizeInspectionCount(value, fallback = 0) {
   return Number.isNaN(count) ? fallback : count;
 }
 
+function normalizeNullableText(value) {
+
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized ? normalized : null;
+}
+
+function deriveCounterfeitFlag(remarks, explicitValue) {
+  if (explicitValue === '0' || explicitValue === 0 || explicitValue === false) {
+    return 0;
+  }
+
+  if (explicitValue === '1' || explicitValue === 1 || explicitValue === true) {
+    return 1;
+  }
+
+  return /假冒|真实性异议|未生产或者进口过该批次抽检不符合规定产品/.test(String(remarks || '')) ? 1 : 0;
+}
+
+function buildAnnouncementProductDetailPayload(body = {}) {
+  const sequenceNo = Number.parseInt(body.sequence_no, 10);
+
+  return {
+    sequence_no: Number.isNaN(sequenceNo) ? 1 : sequenceNo,
+    product_name: normalizeNullableText(body.product_name),
+    company_names: normalizeNullableText(body.company_names),
+    company_addresses: normalizeNullableText(body.company_addresses),
+    sample_unit_name: normalizeNullableText(body.sample_unit_name),
+    sample_unit_address: normalizeNullableText(body.sample_unit_address),
+    package_spec: normalizeNullableText(body.package_spec),
+    batch_no: normalizeNullableText(body.batch_no),
+    production_date: normalizeNullableText(body.production_date),
+    expiry_date: normalizeNullableText(body.expiry_date),
+    product_region: normalizeNullableText(body.product_region),
+    registration_no: normalizeNullableText(body.registration_no),
+    production_license_no: normalizeNullableText(body.production_license_no),
+    inspection_institution: normalizeNullableText(body.inspection_institution),
+    unqualified_items: normalizeNullableText(body.unqualified_items),
+    inspection_result: normalizeNullableText(body.inspection_result),
+    requirement: normalizeNullableText(body.requirement),
+    remarks: normalizeNullableText(body.remarks),
+    is_counterfeit: deriveCounterfeitFlag(body.remarks, body.is_counterfeit)
+  };
+}
+
+async function refreshAnnouncementInspectionCount(connection, announcementId, fallbackInspectionCount = null) {
+  const [rows] = await connection.query(
+    'SELECT COUNT(*) AS total FROM announcement_product_details WHERE announcement_id = ?',
+    [announcementId]
+  );
+  const detailCount = Number(rows[0]?.total || 0);
+  const hasFallback = fallbackInspectionCount !== null && fallbackInspectionCount !== undefined;
+  const inspectionCount = detailCount > 0 ? detailCount : (hasFallback ? normalizeInspectionCount(fallbackInspectionCount, 0) : 0);
+
+  await connection.query(
+    'UPDATE announcements SET inspection_count = ? WHERE id = ?',
+    [inspectionCount, announcementId]
+  );
+
+  return inspectionCount;
+}
+
+async function syncAnnouncementDerivedData(connection, announcementId, fallbackInspectionCount = null) {
+  const [announcementRows] = await connection.query(
+    'SELECT publish_date FROM announcements WHERE id = ? LIMIT 1',
+    [announcementId]
+  );
+  const publishDate = announcementRows[0]?.publish_date || null;
+
+  const companySyncResult = await syncCompaniesFromAnnouncementDetails(connection, announcementId, publishDate);
+  const unqualifiedSyncResult = await replaceUnqualifiedProductsFromAnnouncementDetails(connection, announcementId);
+  const inspectionCount = await refreshAnnouncementInspectionCount(connection, announcementId, fallbackInspectionCount);
+
+  return {
+    companySyncResult,
+    unqualifiedSyncResult,
+    inspectionCount
+  };
+}
+
+
 async function parseAttachmentSafely(file) {
+
   if (!file) {
     return {
       supported: false,
@@ -112,9 +202,11 @@ async function parseAttachmentSafely(file) {
 
 ensureAnnouncementProductDetailsTable(pool)
   .then(() => ensureCompaniesSamplingSchema(pool))
+  .then(() => ensureUnqualifiedProductsTable(pool))
   .catch((error) => {
     console.error('初始化公告相关数据表失败:', error);
   });
+
 
 
 // 获取所有公告列表
@@ -255,7 +347,9 @@ router.get('/:announcementId/product-details', async (req, res) => {
 
           if (parsedAttachment.rows.length > 0) {
             await replaceAnnouncementProductDetails(pool, announcementId, parsedAttachment.rows);
+            await syncAnnouncementDerivedData(pool, announcementId);
           }
+
         }
       }
     }
@@ -321,9 +415,151 @@ router.get('/:announcementId/product-details', async (req, res) => {
   }
 });
 
+// 更新公告关联的批次不符合规定化妆品明细
+router.put('/:announcementId/product-details/:detailId', async (req, res) => {
+  let connection;
+
+  try {
+    const { announcementId, detailId } = req.params;
+    const payload = buildAnnouncementProductDetailPayload(req.body || {});
+
+    if (!payload.product_name) {
+      return res.status(400).json({ success: false, message: '产品名称不能为空' });
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [existingRows] = await connection.query(
+      'SELECT id FROM announcement_product_details WHERE id = ? AND announcement_id = ? LIMIT 1',
+      [detailId, announcementId]
+    );
+
+    if (existingRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '批次明细不存在' });
+    }
+
+    await connection.query(
+      `
+        UPDATE announcement_product_details
+        SET sequence_no = ?, product_name = ?, company_names = ?, company_addresses = ?,
+            sample_unit_name = ?, sample_unit_address = ?, package_spec = ?, batch_no = ?,
+            production_date = ?, expiry_date = ?, product_region = ?, registration_no = ?,
+            production_license_no = ?, inspection_institution = ?, unqualified_items = ?,
+            inspection_result = ?, requirement = ?, remarks = ?, is_counterfeit = ?
+        WHERE id = ? AND announcement_id = ?
+      `,
+      [
+        payload.sequence_no,
+        payload.product_name,
+        payload.company_names,
+        payload.company_addresses,
+        payload.sample_unit_name,
+        payload.sample_unit_address,
+        payload.package_spec,
+        payload.batch_no,
+        payload.production_date,
+        payload.expiry_date,
+        payload.product_region,
+        payload.registration_no,
+        payload.production_license_no,
+        payload.inspection_institution,
+        payload.unqualified_items,
+        payload.inspection_result,
+        payload.requirement,
+        payload.remarks,
+        payload.is_counterfeit,
+        detailId,
+        announcementId
+      ]
+    );
+
+    const syncResult = await syncAnnouncementDerivedData(connection, announcementId);
+
+    const [updatedRows] = await connection.query(
+      'SELECT * FROM announcement_product_details WHERE id = ? AND announcement_id = ? LIMIT 1',
+      [detailId, announcementId]
+    );
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: '批次明细更新成功',
+      data: updatedRows[0] || null,
+      meta: {
+        synced_company_count: syncResult.companySyncResult.company_count,
+        synced_unqualified_count: syncResult.unqualifiedSyncResult.synced_count,
+        inspection_count: syncResult.inspectionCount
+      }
+    });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('更新公告批次明细失败:', error);
+    res.status(500).json({ success: false, message: '更新公告批次明细失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+// 删除公告关联的批次不符合规定化妆品明细
+router.delete('/:announcementId/product-details/:detailId', async (req, res) => {
+  let connection;
+
+  try {
+    const { announcementId, detailId } = req.params;
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [existingRows] = await connection.query(
+      'SELECT id FROM announcement_product_details WHERE id = ? AND announcement_id = ? LIMIT 1',
+      [detailId, announcementId]
+    );
+
+    if (existingRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '批次明细不存在' });
+    }
+
+    await connection.query(
+      'DELETE FROM announcement_product_details WHERE id = ? AND announcement_id = ?',
+      [detailId, announcementId]
+    );
+
+    const syncResult = await syncAnnouncementDerivedData(connection, announcementId);
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: '批次明细删除成功',
+      meta: {
+        synced_company_count: syncResult.companySyncResult.company_count,
+        synced_unqualified_count: syncResult.unqualifiedSyncResult.synced_count,
+        inspection_count: syncResult.inspectionCount
+      }
+    });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('删除公告批次明细失败:', error);
+    res.status(500).json({ success: false, message: '删除公告批次明细失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
 
 // 上传公告（带附件和自动解析）
 router.post('/', upload.single('attachment'), async (req, res) => {
+
   let connection;
 
   try {
@@ -364,11 +600,8 @@ router.post('/', upload.single('attachment'), async (req, res) => {
       await replaceAnnouncementProductDetails(connection, result.insertId, parsedAttachment.rows);
     }
 
-    const companySyncResult = await syncCompaniesFromAnnouncementDetails(
-      connection,
-      result.insertId,
-      publish_date || null
-    );
+    const syncResult = await syncAnnouncementDerivedData(connection, result.insertId, finalInspectionCount);
+
 
     await connection.commit();
 
@@ -376,18 +609,19 @@ router.post('/', upload.single('attachment'), async (req, res) => {
       success: true,
       data: {
         id: result.insertId,
-
         extracted_info: {
           inspection_unit: finalInspectionUnit,
-          inspection_count: finalInspectionCount
+          inspection_count: syncResult.inspectionCount || finalInspectionCount
         },
         parsed_detail_count: parsedAttachment.parsedCount,
         counterfeit_count: parsedAttachment.counterfeitCount,
-        synced_company_count: companySyncResult.company_count,
+        synced_company_count: syncResult.companySyncResult.company_count,
+        synced_unqualified_count: syncResult.unqualifiedSyncResult.synced_count,
         parse_message: parsedAttachment.message,
         parse_supported: parsedAttachment.supported
       }
     });
+
   } catch (error) {
     if (connection) {
       await connection.rollback();
@@ -459,26 +693,25 @@ router.put('/:id', upload.single('attachment'), async (req, res) => {
       ]);
     }
 
-    const companySyncResult = await syncCompaniesFromAnnouncementDetails(
-      connection,
-      id,
-      publish_date || null
-    );
+    const syncResult = await syncAnnouncementDerivedData(connection, id, finalInspectionCount);
+
 
     await connection.commit();
 
     res.json({
       success: true,
-
       message: '更新成功',
       data: {
         parsed_detail_count: parsedAttachment.parsedCount,
         counterfeit_count: parsedAttachment.counterfeitCount,
-        synced_company_count: companySyncResult.company_count,
+        synced_company_count: syncResult.companySyncResult.company_count,
+        synced_unqualified_count: syncResult.unqualifiedSyncResult.synced_count,
+        inspection_count: syncResult.inspectionCount || finalInspectionCount,
         parse_message: parsedAttachment.message,
         parse_supported: parsedAttachment.supported
       }
     });
+
   } catch (error) {
     if (connection) {
       await connection.rollback();
@@ -506,7 +739,9 @@ router.delete('/:id', async (req, res) => {
 
     await connection.query('DELETE FROM inspection_details WHERE inspection_id IN (SELECT id FROM inspections WHERE announcement_id = ?)', [id]);
     await connection.query('DELETE FROM inspections WHERE announcement_id = ?', [id]);
+    await connection.query('DELETE FROM unqualified_products WHERE announcement_id = ?', [id]);
     await connection.query('DELETE FROM announcements WHERE id = ?', [id]);
+
 
     await connection.commit();
     res.json({ success: true, message: '删除成功' });

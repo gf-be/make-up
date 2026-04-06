@@ -30,8 +30,16 @@ export const getAnnouncementProductDetails = (announcementId, params) => {
   return request.get(`/announcements/${announcementId}/product-details`, { params })
 }
 
+export const updateAnnouncementProductDetail = (announcementId, detailId, data) => {
+  return request.put(`/announcements/${announcementId}/product-details/${detailId}`, data)
+}
+
+export const deleteAnnouncementProductDetail = (announcementId, detailId) => {
+  return request.delete(`/announcements/${announcementId}/product-details/${detailId}`)
+}
 
 export const createAnnouncement = (formData) => {
+
 
   return request.post('/announcements', formData, {
     headers: {

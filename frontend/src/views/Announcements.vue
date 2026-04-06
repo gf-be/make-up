@@ -117,7 +117,8 @@
             <el-button type="primary">选择文件</el-button>
             <template #tip>
               <div class="el-upload__tip">
-                支持 PDF、Word、Excel 文件，大小不超过 10MB，其中 Word/Excel 会自动解析批次明细并入库
+                支持 PDF、Word、Excel 文件，大小不超过 10MB，其中 Word/Excel 会自动解析批次明细并写入明细表与 `unqualified_products` 表
+
               </div>
 
             </template>
@@ -280,8 +281,14 @@ const handleUpload = async () => {
       const res = await createAnnouncement(formData)
 
       const parsedCount = res?.data?.parsed_detail_count || 0
+      const syncedUnqualifiedCount = res?.data?.synced_unqualified_count || 0
       const parseMessage = res?.data?.parse_message
-      ElMessage.success(parsedCount > 0 ? `公告上传成功，已解析 ${parsedCount} 条批次明细` : '公告上传成功')
+      ElMessage.success(
+        parsedCount > 0
+          ? `公告上传成功，已解析 ${parsedCount} 条批次明细，并同步 ${syncedUnqualifiedCount} 条到不符合规定化妆品库`
+          : '公告上传成功'
+      )
+
       if (parseMessage) {
         ElMessage.warning(parseMessage)
       }

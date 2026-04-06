@@ -24,6 +24,12 @@ const UNQUALIFIED_PRODUCT_FIELDS = [
   'remarks'
 ];
 
+const ANNOUNCEMENT_LINK_FIELDS = [
+  'announcement_id',
+  'announcement_detail_id',
+  'is_counterfeit'
+];
+
 function getDefaultUnqualifiedProducts() {
   return [
     {
@@ -71,6 +77,12 @@ function getDefaultUnqualifiedProducts() {
       remarks: '/'
     }
   ];
+}
+
+function buildAnnouncementBatchTitle(announcement = {}) {
+  const title = String(announcement.title || '').trim();
+  const announcementNo = String(announcement.announcement_no || '').trim();
+  return [announcementNo, title].filter(Boolean).join(' - ') || title || announcementNo || DEFAULT_BATCH_TITLE;
 }
 
 async function ensureColumn(connection, columnName, definition) {
@@ -135,11 +147,16 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'inspection_result', 'LONGTEXT NULL');
   await ensureColumn(connection, 'requirement', 'LONGTEXT NULL');
   await ensureColumn(connection, 'remarks', 'LONGTEXT NULL');
+  await ensureColumn(connection, 'announcement_id', 'INT NULL AFTER remarks');
+  await ensureColumn(connection, 'announcement_detail_id', 'INT NULL AFTER announcement_id');
+  await ensureColumn(connection, 'is_counterfeit', 'TINYINT(1) DEFAULT 0 AFTER announcement_detail_id');
   await ensureColumn(connection, 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
   await ensureColumn(connection, 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
 
   await ensureIndex(connection, 'idx_unqualified_products_sample_unit_name', 'INDEX idx_unqualified_products_sample_unit_name (sample_unit_name)');
   await ensureIndex(connection, 'idx_unqualified_products_inspection_institution', 'INDEX idx_unqualified_products_inspection_institution (inspection_institution)');
+  await ensureIndex(connection, 'idx_unqualified_products_announcement', 'INDEX idx_unqualified_products_announcement (announcement_id)');
+  await ensureIndex(connection, 'idx_unqualified_products_counterfeit', 'INDEX idx_unqualified_products_counterfeit (is_counterfeit)');
 }
 
 async function seedDefaultUnqualifiedProducts(connection) {
@@ -150,7 +167,7 @@ async function seedDefaultUnqualifiedProducts(connection) {
       `
         SELECT id
         FROM unqualified_products
-        WHERE sequence_no = ? AND product_name = ?
+        WHERE announcement_id IS NULL AND sequence_no = ? AND product_name = ?
         LIMIT 1
       `,
       [row.sequence_no, row.product_name]
@@ -164,7 +181,8 @@ async function seedDefaultUnqualifiedProducts(connection) {
               sample_unit_name = ?, sample_unit_address = ?, package_spec = ?, batch_no = ?,
               production_date = ?, expiry_date = ?, product_region = ?, registration_no = ?,
               production_license_no = ?, inspection_institution = ?, unqualified_items = ?,
-              inspection_result = ?, requirement = ?, remarks = ?
+              inspection_result = ?, requirement = ?, remarks = ?, is_counterfeit = 0,
+              announcement_id = NULL, announcement_detail_id = NULL
           WHERE id = ?
         `,
         [
@@ -192,17 +210,105 @@ async function seedDefaultUnqualifiedProducts(connection) {
       continue;
     }
 
-    const placeholders = UNQUALIFIED_PRODUCT_FIELDS.map(() => '?').join(', ');
+    const placeholders = [...UNQUALIFIED_PRODUCT_FIELDS, ...ANNOUNCEMENT_LINK_FIELDS].map(() => '?').join(', ');
     await connection.query(
       `
-        INSERT INTO unqualified_products (${UNQUALIFIED_PRODUCT_FIELDS.join(', ')})
+        INSERT INTO unqualified_products (${[...UNQUALIFIED_PRODUCT_FIELDS, ...ANNOUNCEMENT_LINK_FIELDS].join(', ')})
         VALUES (${placeholders})
       `,
-      UNQUALIFIED_PRODUCT_FIELDS.map((field) => row[field] ?? null)
+      [...UNQUALIFIED_PRODUCT_FIELDS.map((field) => row[field] ?? null), null, null, 0]
     );
   }
 
   return rows.length;
+}
+
+async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, announcementId) {
+  await ensureUnqualifiedProductsTable(connection);
+
+  const [announcementRows] = await connection.query(
+    'SELECT id, title, announcement_no FROM announcements WHERE id = ? LIMIT 1',
+    [announcementId]
+  );
+  const announcement = announcementRows[0];
+
+  await connection.query('DELETE FROM unqualified_products WHERE announcement_id = ?', [announcementId]);
+
+  if (!announcement) {
+    return {
+      synced_count: 0,
+      batch_title: DEFAULT_BATCH_TITLE,
+      total_batches: 0
+    };
+  }
+
+  const [detailRows] = await connection.query(
+    `
+      SELECT id, sequence_no, product_name, company_names, company_addresses, sample_unit_name,
+             sample_unit_address, package_spec, batch_no, production_date, expiry_date,
+             product_region, registration_no, production_license_no, inspection_institution,
+             unqualified_items, inspection_result, requirement, remarks, is_counterfeit
+      FROM announcement_product_details
+      WHERE announcement_id = ?
+      ORDER BY sequence_no ASC, id ASC
+    `,
+    [announcementId]
+  );
+
+  if (detailRows.length === 0) {
+    return {
+      synced_count: 0,
+      batch_title: buildAnnouncementBatchTitle(announcement),
+      total_batches: 0
+    };
+  }
+
+  const batchTitle = buildAnnouncementBatchTitle(announcement);
+  const totalBatches = detailRows.length;
+  const insertFields = [...UNQUALIFIED_PRODUCT_FIELDS, ...ANNOUNCEMENT_LINK_FIELDS];
+  const placeholders = insertFields.map(() => '?').join(', ');
+
+  for (const row of detailRows) {
+    const payload = {
+      batch_title: batchTitle,
+      total_batches: totalBatches,
+      sequence_no: row.sequence_no,
+      product_name: row.product_name,
+      company_names: row.company_names,
+      company_addresses: row.company_addresses,
+      sample_unit_name: row.sample_unit_name,
+      sample_unit_address: row.sample_unit_address,
+      package_spec: row.package_spec,
+      batch_no: row.batch_no,
+      production_date: row.production_date,
+      expiry_date: row.expiry_date,
+      product_region: row.product_region,
+      registration_no: row.registration_no,
+      production_license_no: row.production_license_no,
+      inspection_institution: row.inspection_institution,
+      unqualified_items: row.unqualified_items,
+      inspection_result: row.inspection_result,
+      requirement: row.requirement,
+      remarks: row.remarks,
+      announcement_id: Number(announcementId),
+      announcement_detail_id: row.id,
+      is_counterfeit: row.is_counterfeit ? 1 : 0
+    };
+
+    await connection.query(
+      `
+        INSERT INTO unqualified_products (${insertFields.join(', ')})
+        VALUES (${placeholders})
+      `,
+      insertFields.map((field) => payload[field] ?? null)
+    );
+  }
+
+  return {
+    synced_count: detailRows.length,
+    batch_title: batchTitle,
+    total_batches: totalBatches
+  };
 }
 
 module.exports = {
@@ -211,5 +317,7 @@ module.exports = {
   UNQUALIFIED_PRODUCT_FIELDS,
   getDefaultUnqualifiedProducts,
   ensureUnqualifiedProductsTable,
-  seedDefaultUnqualifiedProducts
+  seedDefaultUnqualifiedProducts,
+  replaceUnqualifiedProductsFromAnnouncementDetails
 };
+
