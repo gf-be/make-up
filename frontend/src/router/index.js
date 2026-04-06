@@ -36,10 +36,16 @@ const routes = [
     component: () => import('../views/Companies.vue')
   },
   {
-    path: '/companies/stats',
-    name: 'CompanyStats',
-    component: () => import('../views/Companies.vue')
+    path: '/unqualified-products',
+    name: 'UnqualifiedProducts',
+    component: () => import('../views/UnqualifiedProducts.vue')
   },
+  {
+    path: '/companies/stats',
+    redirect: '/companies/unqualified'
+  },
+
+
   {
     path: '/companies/:id',
     name: 'CompanyDetail',

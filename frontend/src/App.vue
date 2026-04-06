@@ -18,8 +18,9 @@
           </el-menu-item>
           <el-menu-item index="/announcements">
             <el-icon><Bell /></el-icon>
-            <span>公告管理</span>
+            <span>抽检通告</span>
           </el-menu-item>
+
           <el-menu-item index="/inspections">
             <el-icon><Checked /></el-icon>
             <span>抽样检查</span>
@@ -28,14 +29,20 @@
             <el-icon><OfficeBuilding /></el-icon>
             <span>企业管理</span>
           </el-menu-item>
-          <el-menu-item index="/companies/stats">
+          <el-menu-item index="/companies/unqualified">
             <el-icon><TrendCharts /></el-icon>
-            <span>统计分析</span>
+            <span>不合格企业</span>
+          </el-menu-item>
+          <el-menu-item index="/unqualified-products">
+            <el-icon><Document /></el-icon>
+            <span>不合格产品</span>
           </el-menu-item>
           <el-menu-item index="/supervisions">
             <el-icon><Warning /></el-icon>
-            <span>督查结果</span>
+            <span>飞行检查</span>
           </el-menu-item>
+
+
         </el-menu>
       </div>
     </el-header>
@@ -52,7 +59,17 @@ import { useRoute } from 'vue-router'
 
 const route = useRoute()
 
-const activeMenu = computed(() => route.path)
+const activeMenu = computed(() => {
+  if (route.path.startsWith('/announcements')) return '/announcements'
+  if (route.path.startsWith('/inspections')) return '/inspections'
+  if (route.path.startsWith('/companies/unqualified')) return '/companies/unqualified'
+  if (route.path.startsWith('/unqualified-products')) return '/unqualified-products'
+  if (route.path.startsWith('/companies')) return '/companies'
+  if (route.path.startsWith('/supervisions')) return '/supervisions'
+
+  return route.path
+})
+
 </script>
 
 <style scoped>

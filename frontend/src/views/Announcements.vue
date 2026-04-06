@@ -14,7 +14,7 @@
       <!-- 筛选栏 -->
       <el-form :model="filters" inline class="filter-form">
         <el-form-item label="状态">
-          <el-select v-model="filters.status" placeholder="选择状态" clearable @change="loadData">
+          <el-select v-model="filters.status" style="width: 240px" placeholder="选择状态" clearable @change="loadData">
             <el-option label="已发布" value="published" />
             <el-option label="草稿" value="draft" />
             <el-option label="已归档" value="archived" />
@@ -66,15 +66,18 @@
 
       <!-- 分页 -->
       <el-pagination
-        v-model:page-size="pagination.limit"
-        v-model:current-page="pagination.page"
+        :page-size="pagination.limit"
+        :current-page="pagination.page"
         :total="pagination.total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
+        class="pagination"
+        @update:page-size="(value) => { pagination.limit = value }"
+        @update:current-page="(value) => { pagination.page = value }"
         @size-change="loadData"
         @current-change="loadData"
-        class="pagination"
       />
+
     </el-card>
 
     <!-- 上传对话框 -->
@@ -114,8 +117,9 @@
             <el-button type="primary">选择文件</el-button>
             <template #tip>
               <div class="el-upload__tip">
-                支持 PDF、Word、Excel 文件，大小不超过 10MB
+                支持 PDF、Word、Excel 文件，大小不超过 10MB，其中 Word/Excel 会自动解析批次明细并入库
               </div>
+
             </template>
           </el-upload>
           <div v-if="form.file" class="file-info">
@@ -273,9 +277,15 @@ const handleUpload = async () => {
         formData.append('attachment', form.file)
       }
 
-      await createAnnouncement(formData)
+      const res = await createAnnouncement(formData)
 
-      ElMessage.success('公告上传成功')
+      const parsedCount = res?.data?.parsed_detail_count || 0
+      const parseMessage = res?.data?.parse_message
+      ElMessage.success(parsedCount > 0 ? `公告上传成功，已解析 ${parsedCount} 条批次明细` : '公告上传成功')
+      if (parseMessage) {
+        ElMessage.warning(parseMessage)
+      }
+
       showUploadDialog.value = false
       resetForm()
       loadData()

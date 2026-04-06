@@ -26,7 +26,13 @@ export const getRelatedInspections = (announcementId) => {
   return request.get(`/announcements/${announcementId}/inspections`)
 }
 
+export const getAnnouncementProductDetails = (announcementId, params) => {
+  return request.get(`/announcements/${announcementId}/product-details`, { params })
+}
+
+
 export const createAnnouncement = (formData) => {
+
   return request.post('/announcements', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
@@ -76,6 +82,14 @@ export const getUnqualifiedCompanies = (params) => {
   return request.get('/companies/unqualified/list', { params })
 }
 
+export const getUnqualifiedProducts = (params) => {
+  return request.get('/unqualified-products', { params })
+}
+
+export const getUnqualifiedProductStats = () => {
+  return request.get('/unqualified-products/stats/overview')
+}
+
 export const createCompany = (data) => {
   return request.post('/companies', data)
 }
@@ -97,6 +111,27 @@ export const getSupervisionDetail = (id) => {
   return request.get(`/supervisions/${id}`)
 }
 
+export const createSupervision = (formData) => {
+  return request.post('/supervisions', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+export const updateSupervision = (id, formData) => {
+  return request.put(`/supervisions/${id}`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+export const deleteSupervision = (id) => {
+  return request.delete(`/supervisions/${id}`)
+}
+
 export const getSupervisionStats = () => {
   return request.get('/supervisions/stats/overview')
 }
+

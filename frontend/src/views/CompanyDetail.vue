@@ -36,10 +36,11 @@
       <el-row :gutter="20" class="stats-row">
         <el-col :span="6">
           <div class="stat-item">
-            <div class="stat-value">{{ detail.stats.inspection_count || 0 }}</div>
-            <div class="stat-label">被检次数</div>
+            <div class="stat-value">{{ detail.stats.sampled_count || 0 }}</div>
+            <div class="stat-label">被抽查次数</div>
           </div>
         </el-col>
+
         <el-col :span="6">
           <div class="stat-item product">
             <div class="stat-value">{{ detail.stats.product_count || 0 }}</div>
@@ -105,8 +106,14 @@
         <el-table :data="detail.history" stripe border>
           <el-table-column type="index" label="序号" width="60" />
           <el-table-column prop="title" label="检查批次" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="source_type" label="来源" width="100">
+            <template #default="{ row }">
+              {{ row.source_type === 'announcement' ? '抽检通告' : '抽样检查' }}
+            </template>
+          </el-table-column>
           <el-table-column prop="product_name" label="产品名称" min-width="150" show-overflow-tooltip />
           <el-table-column prop="brand" label="品牌" width="120" />
+
           <el-table-column prop="inspection_date" label="检查日期" width="110" />
           <el-table-column prop="level" label="级别" width="80">
             <template #default="{ row }">

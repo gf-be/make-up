@@ -4,10 +4,11 @@
       <template #header>
         <div class="card-header">
           <span>企业列表</span>
-          <el-button type="primary" @click="$router.push('/companies/stats')">
+          <el-button type="primary" @click="$router.push('/companies/unqualified')">
             <el-icon><DataAnalysis /></el-icon>
-            统计分析
+            不合格企业
           </el-button>
+
         </div>
       </template>
 
@@ -70,7 +71,9 @@
       <el-table :data="tableData" stripe v-loading="loading">
         <el-table-column prop="name" label="企业名称" min-width="200" show-overflow-tooltip />
         <el-table-column prop="brand" label="品牌" width="120" />
+        <el-table-column prop="sampled_count" label="抽查次数" width="100" align="center" />
         <el-table-column prop="type" label="类型" width="100">
+
           <template #default="{ row }">
             <el-tag :type="getTypeType(row.type)" size="small">
               {{ getTypeText(row.type) }}
@@ -90,15 +93,18 @@
 
       <!-- 分页 -->
       <el-pagination
-        v-model:page-size="pagination.limit"
-        v-model:current-page="pagination.page"
+        :page-size="pagination.limit"
+        :current-page="pagination.page"
         :total="pagination.total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
+        class="pagination"
+        @update:page-size="(value) => { pagination.limit = value }"
+        @update:current-page="(value) => { pagination.page = value }"
         @size-change="loadData"
         @current-change="loadData"
-        class="pagination"
       />
+
     </el-card>
   </div>
 </template>

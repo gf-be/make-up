@@ -20,6 +20,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/announcements', require('./routes/announcements_v2'));
 app.use('/api/inspections', require('./routes/inspections_v2'));
 app.use('/api/companies', require('./routes/companies'));
+app.use('/api/unqualified-products', require('./routes/unqualified_products'));
 app.use('/api/supervisions', require('./routes/supervisions'));
 app.use('/api/dashboard', require('./routes/dashboard_v2'));
 
@@ -38,6 +39,7 @@ app.get('/', (req, res) => {
       announcements: '/api/announcements',
       inspections: '/api/inspections',
       companies: '/api/companies',
+      unqualifiedProducts: '/api/unqualified-products',
       supervisions: '/api/supervisions',
       dashboard: '/api/dashboard'
     }

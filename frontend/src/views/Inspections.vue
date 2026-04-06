@@ -38,7 +38,7 @@
       <!-- 筛选栏 -->
       <el-form :model="filters" inline class="filter-form">
         <el-form-item label="级别">
-          <el-select v-model="filters.level" placeholder="选择级别" clearable @change="loadData">
+          <el-select v-model="filters.level" style="width: 240px" placeholder="选择级别" clearable @change="loadData">
             <el-option label="国家级" value="national" />
             <el-option label="省级" value="provincial" />
             <el-option label="市级" value="municipal" />

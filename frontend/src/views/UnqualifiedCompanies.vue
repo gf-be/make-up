@@ -14,7 +14,9 @@
         <el-table-column prop="name" label="企业名称" min-width="200" show-overflow-tooltip />
         <el-table-column prop="brand" label="品牌" width="120" />
         <el-table-column prop="province" label="省份" width="100" />
+        <el-table-column prop="sampled_count" label="抽查次数" width="100" align="center" />
         <el-table-column prop="unqualified_count" label="不合格次数" width="120" align="center" sortable>
+
           <template #default="{ row }">
             <el-tag type="danger" size="large">{{ row.unqualified_count }}</el-tag>
           </template>
@@ -38,11 +40,13 @@
 
       <!-- 分页 -->
       <el-pagination
-        v-model:page-size="pagination.limit"
-        v-model:current-page="pagination.page"
+        :page-size="pagination.limit"
+        :current-page="pagination.page"
         :total="pagination.total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
+        @update:page-size="(value) => { pagination.limit = value }"
+        @update:current-page="(value) => { pagination.page = value }"
         @size-change="loadData"
         @current-change="loadData"
         class="pagination"
