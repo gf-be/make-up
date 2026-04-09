@@ -85,7 +85,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="defects_and_problems" label="检查发现缺陷和问题" min-width="260" show-overflow-tooltip />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="viewDetail(row.id)">
               查看详情
@@ -93,8 +93,17 @@
             <el-button v-if="row.attachment_count > 0 || row.attachment_path" link type="success" @click="openAttachments(row)">
               {{ row.attachment_count > 1 ? '查看附件' : '下载附件' }}
             </el-button>
+            <el-button
+              link
+              type="danger"
+              :loading="deletingId === row.id"
+              @click="handleDelete(row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
+
 
       </el-table>
 
@@ -188,15 +197,18 @@
 <script setup>
 import { reactive, ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { createSupervision, getSupervisions, getSupervisionStats } from '@/api/index'
-import { ElMessage } from 'element-plus'
+import { createSupervision, getSupervisions, getSupervisionStats, deleteSupervision } from '@/api/index'
+import { ElMessage, ElMessageBox } from 'element-plus'
+
 
 const router = useRouter()
 const formRef = ref(null)
 const loading = ref(false)
 const uploading = ref(false)
+const deletingId = ref(null)
 const showUploadDialog = ref(false)
 const tableData = ref([])
+
 const stats = ref({})
 const filters = ref({
   level: '',
@@ -384,8 +396,47 @@ const openAttachments = (row) => {
   downloadAttachment(row)
 }
 
+const handleDelete = async (row) => {
+  if (!row?.id || deletingId.value) {
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确认删除“${row.title || '该通告'}”吗？删除后将同步清理该通告关联的企业及明细数据。`,
+      '删除确认',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消'
+      }
+    )
+
+    deletingId.value = row.id
+    await deleteSupervision(row.id)
+
+    if (tableData.value.length === 1 && pagination.value.page > 1) {
+      pagination.value.page -= 1
+    }
+
+    await Promise.all([loadData(), loadStats()])
+    ElMessage.success('飞行检查通告删除成功')
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+
+    console.error('删除飞行检查通告失败:', error)
+    ElMessage.error('删除飞行检查通告失败')
+  } finally {
+    if (deletingId.value === row?.id) {
+      deletingId.value = null
+    }
+  }
+}
 
 const getLevelType = (level) => {
+
   const map = { national: 'danger', provincial: 'warning', municipal: 'info' }
   return map[level] || 'info'
 }

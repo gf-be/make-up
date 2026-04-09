@@ -106,11 +106,12 @@
         <el-table :data="detail.history" stripe border>
           <el-table-column type="index" label="序号" width="60" />
           <el-table-column prop="title" label="检查批次" min-width="200" show-overflow-tooltip />
-          <el-table-column prop="source_type" label="来源" width="100">
+          <el-table-column prop="source_type" label="来源" width="120">
             <template #default="{ row }">
-              {{ row.source_type === 'announcement' ? '抽检通告' : '抽样检查' }}
+              {{ getSourceTypeText(row.source_type) }}
             </template>
           </el-table-column>
+
           <el-table-column prop="product_name" label="产品名称" min-width="150" show-overflow-tooltip />
           <el-table-column prop="brand" label="品牌" width="120" />
 
@@ -183,7 +184,17 @@ const getResultText = (result) => {
   return map[result] || result
 }
 
+const getSourceTypeText = (sourceType) => {
+  const map = {
+    announcement: '抽检通告',
+    inspection: '抽样检查',
+    supervision: '飞行检查'
+  }
+  return map[sourceType] || sourceType || '-'
+}
+
 const getLevelType = (level) => {
+
   const map = { national: 'danger', provincial: 'warning', municipal: 'info' }
   return map[level] || 'info'
 }

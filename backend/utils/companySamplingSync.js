@@ -51,7 +51,67 @@ async function ensureCompaniesSamplingSchema(connection) {
       INDEX idx_company_sampling_announcement (announcement_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS company_supervision_records (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      company_id INT NOT NULL,
+      supervision_id INT NOT NULL,
+      supervision_detail_id INT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_company_supervision_company (supervision_id, company_id),
+      INDEX idx_company_supervision_company (company_id),
+      INDEX idx_company_supervision_supervision (supervision_id),
+      INDEX idx_company_supervision_detail (supervision_detail_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await ensureForeignKey(
+    connection,
+    'company_sampling_records',
+    'fk_company_sampling_company',
+    'FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE'
+  );
+  if (await tableExists(connection, 'announcements')) {
+    await ensureForeignKey(
+      connection,
+      'company_sampling_records',
+      'fk_company_sampling_announcement',
+      'FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE'
+    );
+  }
+  if (await tableExists(connection, 'announcement_product_details')) {
+    await ensureForeignKey(
+      connection,
+      'company_sampling_records',
+      'fk_company_sampling_detail',
+      'FOREIGN KEY (announcement_detail_id) REFERENCES announcement_product_details(id) ON DELETE CASCADE'
+    );
+  }
+  await ensureForeignKey(
+    connection,
+    'company_supervision_records',
+    'fk_company_supervision_company',
+    'FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE'
+  );
+  if (await tableExists(connection, 'supervisions')) {
+    await ensureForeignKey(
+      connection,
+      'company_supervision_records',
+      'fk_company_supervision_supervision',
+      'FOREIGN KEY (supervision_id) REFERENCES supervisions(id) ON DELETE CASCADE'
+    );
+  }
+  if (await tableExists(connection, 'flight_inspection_detail')) {
+    await ensureForeignKey(
+      connection,
+      'company_supervision_records',
+      'fk_company_supervision_detail',
+      'FOREIGN KEY (supervision_detail_id) REFERENCES flight_inspection_detail(id) ON DELETE SET NULL'
+    );
+  }
 }
+
 
 async function recalculateCompanySampledCount(connection, companyIds = []) {
   if (!companyIds || companyIds.length === 0) {
@@ -76,7 +136,151 @@ async function recalculateCompanySampledCount(connection, companyIds = []) {
   );
 }
 
+async function tableExists(connection, tableName) {
+  const [rows] = await connection.query('SHOW TABLES LIKE ?', [tableName]);
+  return rows.length > 0;
+}
+
+async function ensureForeignKey(connection, tableName, constraintName, definitionSql) {
+  const [rows] = await connection.query(
+    `
+      SELECT CONSTRAINT_NAME
+      FROM information_schema.TABLE_CONSTRAINTS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND CONSTRAINT_NAME = ?
+        AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+      LIMIT 1
+    `,
+    [tableName, constraintName]
+  );
+
+  if (rows.length === 0) {
+    await connection.query(`ALTER TABLE ${tableName} ADD CONSTRAINT ${constraintName} ${definitionSql}`);
+  }
+}
+
+async function cleanupOrphanSupervisionArtifacts(connection) {
+  const result = {
+    deleted_relation_count: 0,
+    deleted_detail_count: 0,
+    deleted_attachment_count: 0
+  };
+
+  if (!(await tableExists(connection, 'supervisions'))) {
+    return result;
+  }
+
+  if (await tableExists(connection, 'company_supervision_records')) {
+    const [deleteRelations] = await connection.query(`
+      DELETE csr
+      FROM company_supervision_records csr
+      LEFT JOIN supervisions s ON s.id = csr.supervision_id
+      WHERE s.id IS NULL
+    `);
+    result.deleted_relation_count = Number(deleteRelations.affectedRows || 0);
+  }
+
+  if (await tableExists(connection, 'flight_inspection_detail')) {
+    const [deleteDetails] = await connection.query(`
+      DELETE fid
+      FROM flight_inspection_detail fid
+      LEFT JOIN supervisions s ON s.id = fid.supervision_id
+      WHERE s.id IS NULL
+    `);
+    result.deleted_detail_count = Number(deleteDetails.affectedRows || 0);
+  }
+
+  if (await tableExists(connection, 'supervision_attachments')) {
+    const [deleteAttachments] = await connection.query(`
+      DELETE sa
+      FROM supervision_attachments sa
+      LEFT JOIN supervisions s ON s.id = sa.supervision_id
+      WHERE s.id IS NULL
+    `);
+    result.deleted_attachment_count = Number(deleteAttachments.affectedRows || 0);
+  }
+
+  return result;
+}
+
+async function deleteOrphanCompanies(connection, companyIds = []) {
+  await cleanupOrphanSupervisionArtifacts(connection);
+
+  const normalizedCompanyIds = Array.from(new Set(companyIds.map((item) => Number(item)).filter(Boolean)));
+
+  if (normalizedCompanyIds.length === 0) {
+    return {
+      deleted_count: 0,
+      deleted_company_ids: []
+    };
+  }
+
+  const conditions = [];
+
+  if (await tableExists(connection, 'company_sampling_records')) {
+    conditions.push('NOT EXISTS (SELECT 1 FROM company_sampling_records csr WHERE csr.company_id = c.id)');
+  }
+
+  if (await tableExists(connection, 'inspection_details')) {
+    conditions.push('NOT EXISTS (SELECT 1 FROM inspection_details id WHERE id.company_id = c.id)');
+  }
+
+  if (await tableExists(connection, 'company_supervision_records')) {
+    conditions.push('NOT EXISTS (SELECT 1 FROM company_supervision_records csr WHERE csr.company_id = c.id)');
+  }
+
+  if (await tableExists(connection, 'flight_inspection_detail')) {
+    conditions.push("NOT EXISTS (SELECT 1 FROM flight_inspection_detail fid JOIN supervisions s2 ON s2.id = fid.supervision_id WHERE CONVERT(TRIM(COALESCE(fid.company_name, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_unicode_ci)");
+  }
+
+
+
+  if (await tableExists(connection, 'supervisions')) {
+    conditions.push("NOT EXISTS (SELECT 1 FROM supervisions s WHERE CONVERT(TRIM(COALESCE(s.company_name, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_unicode_ci)");
+  }
+
+
+  if (conditions.length === 0) {
+    return {
+      deleted_count: 0,
+      deleted_company_ids: []
+    };
+  }
+
+  const placeholders = normalizedCompanyIds.map(() => '?').join(', ');
+  const [rows] = await connection.query(
+    `
+      SELECT c.id
+      FROM companies c
+      WHERE c.id IN (${placeholders})
+        AND ${conditions.join('\n        AND ')}
+    `,
+    normalizedCompanyIds
+  );
+
+  const orphanCompanyIds = rows.map((item) => Number(item.id)).filter(Boolean);
+  if (orphanCompanyIds.length === 0) {
+    return {
+      deleted_count: 0,
+      deleted_company_ids: []
+    };
+  }
+
+  const deletePlaceholders = orphanCompanyIds.map(() => '?').join(', ');
+  await connection.query(
+    `DELETE FROM companies WHERE id IN (${deletePlaceholders})`,
+    orphanCompanyIds
+  );
+
+  return {
+    deleted_count: orphanCompanyIds.length,
+    deleted_company_ids: orphanCompanyIds
+  };
+}
+
 async function upsertCompany(connection, companyName, companyAddress, province) {
+
   const [existingRows] = await connection.query(
     'SELECT id, address, province FROM companies WHERE name = ? LIMIT 1',
     [companyName]
@@ -112,6 +316,7 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
     [announcementId]
   );
   const affectedCompanyIds = new Set(oldCompanyRows.map((item) => Number(item.company_id)).filter(Boolean));
+  const currentCompanyIds = new Set();
 
   await connection.query('DELETE FROM company_sampling_records WHERE announcement_id = ?', [announcementId]);
 
@@ -134,7 +339,9 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
       const companyAddress = companyAddresses[index] || defaultAddress;
       const province = deriveProvince(detail.product_region, companyAddress);
       const companyId = await upsertCompany(connection, companyName, companyAddress, province);
-      affectedCompanyIds.add(Number(companyId));
+      const normalizedCompanyId = Number(companyId);
+      affectedCompanyIds.add(normalizedCompanyId);
+      currentCompanyIds.add(normalizedCompanyId);
 
       await connection.query(
         `
@@ -148,9 +355,11 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
   }
 
   await recalculateCompanySampledCount(connection, Array.from(affectedCompanyIds));
+  const cleanupResult = await deleteOrphanCompanies(connection, Array.from(affectedCompanyIds));
 
   return {
-    company_count: affectedCompanyIds.size,
+    company_count: currentCompanyIds.size,
+    deleted_company_count: cleanupResult.deleted_count,
     detail_count: detailRows.length
   };
 }
@@ -158,19 +367,45 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
 async function syncCompaniesFromFlightInspectionDetails(connection, supervisionId) {
   await ensureCompaniesSamplingSchema(connection);
 
+  const [oldCompanyRows] = await connection.query(
+    'SELECT DISTINCT company_id FROM company_supervision_records WHERE supervision_id = ?',
+    [supervisionId]
+  );
+  const affectedCompanyIds = new Set(oldCompanyRows.map((item) => Number(item.company_id)).filter(Boolean));
+  const currentCompanyIds = new Set();
+  const linkedCompanyIds = new Set();
+
+  await connection.query('DELETE FROM company_supervision_records WHERE supervision_id = ?', [supervisionId]);
+
   const [detailRows] = await connection.query(
     `
-      SELECT company_name, company_address
+      SELECT id, company_name, company_address
       FROM flight_inspection_detail
       WHERE supervision_id = ?
       ORDER BY sequence_no ASC, id ASC
     `,
     [supervisionId]
   );
+  const [supervisionRows] = await connection.query(
+    `
+      SELECT company_name, company_address
+      FROM supervisions
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [supervisionId]
+  );
 
-  const companyIds = new Set();
+  const sourceRows = [...detailRows];
+  if (supervisionRows[0]?.company_name) {
+    sourceRows.push({
+      id: null,
+      company_name: supervisionRows[0].company_name,
+      company_address: supervisionRows[0].company_address
+    });
+  }
 
-  for (const detail of detailRows) {
+  for (const detail of sourceRows) {
     const companyName = normalizeText(detail.company_name);
     if (!companyName) {
       continue;
@@ -179,17 +414,92 @@ async function syncCompaniesFromFlightInspectionDetails(connection, supervisionI
     const companyAddress = normalizeText(detail.company_address) || null;
     const province = deriveProvince(null, companyAddress);
     const companyId = await upsertCompany(connection, companyName, companyAddress, province);
-    companyIds.add(Number(companyId));
+    const normalizedCompanyId = Number(companyId);
+    affectedCompanyIds.add(normalizedCompanyId);
+    currentCompanyIds.add(normalizedCompanyId);
+
+    if (linkedCompanyIds.has(normalizedCompanyId)) {
+      continue;
+    }
+
+    await connection.query(
+      `
+        INSERT INTO company_supervision_records (company_id, supervision_id, supervision_detail_id)
+        VALUES (?, ?, ?)
+      `,
+      [companyId, supervisionId, detail.id || null]
+    );
+    linkedCompanyIds.add(normalizedCompanyId);
   }
 
+  const cleanupResult = await deleteOrphanCompanies(connection, Array.from(affectedCompanyIds));
+
   return {
-    company_count: companyIds.size,
+    company_count: currentCompanyIds.size,
+    deleted_company_count: cleanupResult.deleted_count,
     detail_count: detailRows.length
   };
 }
 
-async function removeAnnouncementCompanySampling(connection, announcementId) {
 
+async function getSupervisionRelatedCompanyIds(connection, supervisionId) {
+  await ensureCompaniesSamplingSchema(connection);
+
+  const [relationRows] = await connection.query(
+    'SELECT DISTINCT company_id FROM company_supervision_records WHERE supervision_id = ?',
+    [supervisionId]
+  );
+  const relationCompanyIds = relationRows.map((item) => Number(item.company_id)).filter(Boolean);
+
+  if (relationCompanyIds.length > 0) {
+    return relationCompanyIds;
+  }
+
+  const [detailRows] = await connection.query(
+    `
+      SELECT DISTINCT TRIM(company_name) AS company_name
+      FROM flight_inspection_detail
+      WHERE supervision_id = ? AND company_name IS NOT NULL AND TRIM(company_name) != ''
+    `,
+    [supervisionId]
+  );
+  const [supervisionRows] = await connection.query(
+    `
+      SELECT DISTINCT TRIM(company_name) AS company_name
+      FROM supervisions
+      WHERE id = ? AND company_name IS NOT NULL AND TRIM(company_name) != ''
+    `,
+    [supervisionId]
+  );
+
+  const companyNames = Array.from(
+    new Set(
+      [...detailRows, ...supervisionRows]
+        .map((item) => normalizeText(item.company_name))
+        .filter(Boolean)
+    )
+  );
+
+  if (companyNames.length === 0) {
+    return [];
+  }
+
+  const placeholders = companyNames.map(() => '?').join(', ');
+  const [rows] = await connection.query(
+    `
+      SELECT id
+      FROM companies
+      WHERE name IN (${placeholders})
+    `,
+    companyNames
+  );
+
+  return rows.map((item) => Number(item.id)).filter(Boolean);
+}
+
+
+
+async function removeAnnouncementCompanySampling(connection, announcementId) {
   await ensureCompaniesSamplingSchema(connection);
 
   const [rows] = await connection.query(
@@ -200,6 +510,8 @@ async function removeAnnouncementCompanySampling(connection, announcementId) {
 
   await connection.query('DELETE FROM company_sampling_records WHERE announcement_id = ?', [announcementId]);
   await recalculateCompanySampledCount(connection, companyIds);
+
+  return deleteOrphanCompanies(connection, companyIds);
 }
 
 module.exports = {
@@ -207,8 +519,13 @@ module.exports = {
   deriveProvince,
   ensureCompaniesSamplingSchema,
   upsertCompany,
+  deleteOrphanCompanies,
+  cleanupOrphanSupervisionArtifacts,
   syncCompaniesFromAnnouncementDetails,
+
   syncCompaniesFromFlightInspectionDetails,
+  getSupervisionRelatedCompanyIds,
   removeAnnouncementCompanySampling
 };
+
 

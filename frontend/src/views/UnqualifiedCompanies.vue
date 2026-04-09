@@ -69,7 +69,8 @@
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>省份分布</span>
+              <span>不合格企业省份分布</span>
+
             </div>
           </template>
           <div ref="provinceChartRef" style="height: 350px"></div>
@@ -184,7 +185,8 @@ const initCharts = () => {
   // 省份分布图
   if (provinceChartRef.value) {
     provinceChart = echarts.init(provinceChartRef.value)
-    const provinceStats = companyStats.value.province_stats || []
+    const provinceStats = companyStats.value.unqualified_province_stats || []
+
 
     provinceChart.setOption({
       tooltip: {
@@ -196,7 +198,8 @@ const initCharts = () => {
       },
       series: [
         {
-          name: '企业数量',
+          name: '不合格企业数量',
+
           type: 'pie',
           radius: '50%',
           data: provinceStats.map(item => ({

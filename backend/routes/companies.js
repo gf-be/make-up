@@ -15,6 +15,11 @@ function buildUnqualifiedCompanySourceSql() {
     SELECT company_id, product_name, DATE(created_at) AS record_date
     FROM inspection_details
     WHERE inspection_result = 'unqualified' AND company_id IS NOT NULL
+    UNION ALL
+    SELECT csr.company_id, NULL AS product_name, DATE(s.publish_date) AS record_date
+    FROM company_supervision_records csr
+    JOIN supervisions s ON csr.supervision_id = s.id
+    WHERE s.status != 'completed' AND s.defects_and_problems IS NOT NULL AND s.defects_and_problems != ''
   `;
 }
 
@@ -57,13 +62,11 @@ router.get('/', async (req, res) => {
     }
 
     if (has_unqualified === 'true') {
-      const condition = ` AND (
-        COALESCE(c.sampled_count, 0) > 0 OR
-        c.id IN (
-          SELECT DISTINCT company_id
-          FROM inspection_details
-          WHERE inspection_result = 'unqualified' AND company_id IS NOT NULL
-        )
+      const condition = ` AND c.id IN (
+        SELECT DISTINCT source.company_id
+        FROM (
+          ${buildUnqualifiedCompanySourceSql()}
+        ) source
       )`;
       query += condition;
       countQuery += condition;
@@ -103,6 +106,8 @@ router.get('/stats/overview', async (req, res) => {
         SELECT company_id FROM company_sampling_records
         UNION
         SELECT company_id FROM inspection_details WHERE company_id IS NOT NULL
+        UNION
+        SELECT company_id FROM company_supervision_records
       ) sampled_companies
     `);
     const [unqualifiedCompanies] = await pool.query(`
@@ -135,15 +140,31 @@ router.get('/stats/overview', async (req, res) => {
       GROUP BY province
       ORDER BY count DESC
     `);
+    const [unqualifiedProvinceStats] = await pool.query(`
+      SELECT c.province, COUNT(DISTINCT c.id) as count
+      FROM companies c
+      JOIN (
+        SELECT DISTINCT company_id
+        FROM (
+          ${buildUnqualifiedCompanySourceSql()}
+        ) unqualified_source
+      ) unqualified_companies ON unqualified_companies.company_id = c.id
+      WHERE c.province IS NOT NULL AND c.province != ''
+      GROUP BY c.province
+      ORDER BY count DESC
+    `);
 
     res.json({
+
       success: true,
       data: {
         total_companies: Number(totalCompanies[0].count || 0),
         inspected_companies: Number(totalInspections[0].count || 0),
         unqualified_companies: Number(unqualifiedCompanies[0].count || 0),
         top_unqualified: topUnqualified,
-        province_stats: provinceStats
+        province_stats: provinceStats,
+        unqualified_province_stats: unqualifiedProvinceStats
+
       }
     });
   } catch (error) {
@@ -227,6 +248,14 @@ router.get('/:id', async (req, res) => {
       WHERE company_id = ?
     `, [id]);
 
+    const [supervisionStatsRows] = await pool.query(`
+      SELECT
+        COUNT(*) AS supervision_count,
+        COUNT(DISTINCT supervision_id) AS unique_supervision_count
+      FROM company_supervision_records
+      WHERE company_id = ?
+    `, [id]);
+
     const [historyRows] = await pool.query(`
       SELECT *
       FROM (
@@ -262,14 +291,35 @@ router.get('/:id', async (req, res) => {
         FROM inspection_details d
         LEFT JOIN inspections i ON d.inspection_id = i.id
         WHERE d.company_id = ?
+
+        UNION ALL
+
+        SELECT
+          'supervision' AS source_type,
+          s.id AS source_id,
+          s.title,
+          COALESCE(s.publish_date, s.supervision_date) AS inspection_date,
+          s.level,
+          NULL AS product_name,
+          NULL AS brand,
+          CASE WHEN s.status != 'completed' THEN 'unqualified' ELSE 'qualified' END AS inspection_result,
+          s.defects_and_problems AS unqualified_items,
+          s.inspection_basis AS inspection_standard
+        FROM company_supervision_records csr
+
+        LEFT JOIN supervisions s ON csr.supervision_id = s.id
+        LEFT JOIN flight_inspection_detail fid ON csr.supervision_detail_id = fid.id
+        WHERE csr.company_id = ?
       ) history
       ORDER BY inspection_date DESC, source_type DESC, source_id DESC
-    `, [id, id]);
+    `, [id, id, id]);
 
     const stats = statsRows[0] || {};
+    const supervisionStats = supervisionStatsRows[0] || {};
     const recordCount = Number(stats.record_count || 0);
     const qualifiedCount = Number(stats.qualified_count || 0);
     const unqualifiedCount = Number(stats.unqualified_count || 0);
+    const supervisionCount = Number(supervisionStats.unique_supervision_count || 0);
     const sampledCount = Number(companyRows[0].sampled_count || 0);
 
     res.json({
@@ -279,6 +329,7 @@ router.get('/:id', async (req, res) => {
         stats: {
           sampled_count: sampledCount,
           inspection_count: Number(stats.inspection_count || 0),
+          supervision_count: supervisionCount,
           product_count: Number(stats.product_count || 0),
           qualified_count: qualifiedCount,
           unqualified_count: unqualifiedCount,
@@ -342,8 +393,10 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
     await pool.query('DELETE FROM company_sampling_records WHERE company_id = ?', [id]);
+    await pool.query('DELETE FROM company_supervision_records WHERE company_id = ?', [id]);
     await pool.query('UPDATE inspection_details SET company_id = NULL WHERE company_id = ?', [id]);
     await pool.query('DELETE FROM companies WHERE id = ?', [id]);
+
 
     res.json({ success: true, message: '删除成功' });
   } catch (error) {

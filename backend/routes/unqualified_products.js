@@ -1,14 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const {
-  ensureUnqualifiedProductsTable,
-  seedDefaultUnqualifiedProducts
-} = require('../utils/unqualifiedProducts');
+const { ensureUnqualifiedProductsTable } = require('../utils/unqualifiedProducts');
 
 async function ensureUnqualifiedProductsReady() {
   await ensureUnqualifiedProductsTable(pool);
-  await seedDefaultUnqualifiedProducts(pool);
 }
 
 ensureUnqualifiedProductsReady().catch((error) => {
@@ -22,11 +18,16 @@ router.get('/stats/overview', async (req, res) => {
     const [rows] = await pool.query(`
       SELECT
         COUNT(*) AS loaded_count,
-        MAX(total_batches) AS total_batches,
-        COUNT(DISTINCT company_names) AS company_count,
+        COUNT(*) AS total_batches,
+        COUNT(DISTINCT announcement_id) AS announcement_count,
         COUNT(DISTINCT sample_unit_name) AS sample_unit_count,
         COUNT(DISTINCT inspection_institution) AS institution_count
       FROM unqualified_products
+      WHERE announcement_id IS NOT NULL
+    `);
+    const [companyRows] = await pool.query(`
+      SELECT COUNT(DISTINCT company_id) AS company_count
+      FROM company_sampling_records
     `);
 
     res.json({
@@ -34,7 +35,8 @@ router.get('/stats/overview', async (req, res) => {
       data: {
         loaded_count: Number(rows[0]?.loaded_count || 0),
         total_batches: Number(rows[0]?.total_batches || 0),
-        company_count: Number(rows[0]?.company_count || 0),
+        announcement_count: Number(rows[0]?.announcement_count || 0),
+        company_count: Number(companyRows[0]?.company_count || 0),
         sample_unit_count: Number(rows[0]?.sample_unit_count || 0),
         institution_count: Number(rows[0]?.institution_count || 0)
       }
@@ -56,7 +58,7 @@ router.get('/', async (req, res) => {
     const pageSize = Number.parseInt(limit, 10) || 10;
     const offset = (currentPage - 1) * pageSize;
 
-    const conditions = ['1=1'];
+    const conditions = ['announcement_id IS NOT NULL'];
     const params = [];
 
     if (normalizedKeyword) {
@@ -101,13 +103,21 @@ router.get('/', async (req, res) => {
       params
     );
 
-    const [summaryRows] = await pool.query(`
-      SELECT
-        COUNT(*) AS loaded_count,
-        MAX(total_batches) AS total_batches,
-        MAX(batch_title) AS batch_title
-      FROM unqualified_products
-    `);
+    const [summaryRows] = await pool.query(
+      `
+        SELECT
+          COUNT(*) AS loaded_count,
+          COUNT(*) AS total_batches,
+          COUNT(DISTINCT announcement_id) AS announcement_count,
+          CASE
+            WHEN COUNT(DISTINCT announcement_id) = 1 THEN MAX(batch_title)
+            ELSE '全部抽检通告'
+          END AS batch_title
+        FROM unqualified_products
+        WHERE ${whereClause}
+      `,
+      params
+    );
 
     res.json({
       success: true,
@@ -115,7 +125,8 @@ router.get('/', async (req, res) => {
       summary: {
         batch_title: summaryRows[0]?.batch_title || '',
         loaded_count: Number(summaryRows[0]?.loaded_count || 0),
-        total_batches: Number(summaryRows[0]?.total_batches || 0)
+        total_batches: Number(summaryRows[0]?.total_batches || 0),
+        announcement_count: Number(summaryRows[0]?.announcement_count || 0)
       },
       pagination: {
         total: Number(countRows[0]?.total || 0),

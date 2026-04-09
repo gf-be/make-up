@@ -179,10 +179,14 @@ CREATE TABLE IF NOT EXISTS company_sampling_records (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_company_sampling_detail_company (announcement_detail_id, company_id),
     INDEX idx_company_sampling_company (company_id),
-    INDEX idx_company_sampling_announcement (announcement_id)
+    INDEX idx_company_sampling_announcement (announcement_id),
+    CONSTRAINT fk_company_sampling_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+    CONSTRAINT fk_company_sampling_announcement FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE,
+    CONSTRAINT fk_company_sampling_detail FOREIGN KEY (announcement_detail_id) REFERENCES announcement_product_details(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 飞行检查附件表
+
 CREATE TABLE IF NOT EXISTS supervision_attachments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     supervision_id INT NOT NULL,
@@ -224,7 +228,24 @@ CREATE TABLE IF NOT EXISTS flight_inspection_detail (
     INDEX idx_flight_inspection_detail_company_name (company_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 飞行检查企业关联表
+CREATE TABLE IF NOT EXISTS company_supervision_records (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    company_id INT NOT NULL,
+    supervision_id INT NOT NULL,
+    supervision_detail_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_company_supervision_company (supervision_id, company_id),
+    INDEX idx_company_supervision_company (company_id),
+    INDEX idx_company_supervision_supervision (supervision_id),
+    INDEX idx_company_supervision_detail (supervision_detail_id),
+    CONSTRAINT fk_company_supervision_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+    CONSTRAINT fk_company_supervision_supervision FOREIGN KEY (supervision_id) REFERENCES supervisions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_company_supervision_detail FOREIGN KEY (supervision_detail_id) REFERENCES flight_inspection_detail(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 不符合规定化妆品明细表
+
 
 CREATE TABLE IF NOT EXISTS unqualified_products (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -248,13 +269,22 @@ CREATE TABLE IF NOT EXISTS unqualified_products (
     inspection_result LONGTEXT,
     requirement LONGTEXT,
     remarks LONGTEXT,
+    announcement_id INT NULL,
+    announcement_detail_id INT NULL,
+    is_counterfeit TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_unqualified_products_batch_sequence (batch_title, sequence_no),
     INDEX idx_unqualified_products_product_name (product_name),
     INDEX idx_unqualified_products_sample_unit_name (sample_unit_name),
-    INDEX idx_unqualified_products_inspection_institution (inspection_institution)
+    INDEX idx_unqualified_products_inspection_institution (inspection_institution),
+    INDEX idx_unqualified_products_announcement (announcement_id),
+    INDEX idx_unqualified_products_announcement_detail (announcement_detail_id),
+    INDEX idx_unqualified_products_counterfeit (is_counterfeit),
+    CONSTRAINT fk_unqualified_products_announcement FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE,
+    CONSTRAINT fk_unqualified_products_announcement_detail FOREIGN KEY (announcement_detail_id) REFERENCES announcement_product_details(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 INSERT INTO unqualified_products (
     batch_title, total_batches, sequence_no, product_name, company_names, company_addresses,

@@ -47,7 +47,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="view_count" label="浏览量" width="80" />
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="viewDetail(row.id)">
               查看详情
@@ -60,8 +60,17 @@
             >
               下载附件
             </el-button>
+            <el-button
+              link
+              type="danger"
+              :loading="deletingId === row.id"
+              @click="handleDelete(row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
+
       </el-table>
 
       <!-- 分页 -->
@@ -153,13 +162,16 @@
 <script setup>
 import { ref, watch, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAnnouncements, createAnnouncement } from '@/api/index'
-import { ElMessage } from 'element-plus'
+import { getAnnouncements, createAnnouncement, deleteAnnouncement } from '@/api/index'
+import { ElMessage, ElMessageBox } from 'element-plus'
+
 
 const router = useRouter()
 const loading = ref(false)
+const deletingId = ref(null)
 const tableData = ref([])
 const filters = ref({
+
   status: 'published',
   keyword: ''
 })
@@ -253,7 +265,47 @@ const downloadAttachment = (row) => {
   }
 }
 
+const handleDelete = async (row) => {
+  if (!row?.id || deletingId.value) {
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确认删除“${row.title || '该通告'}”吗？删除后将同步清理该通告关联的企业、产品及检查数据。`,
+      '删除确认',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消'
+      }
+    )
+
+    deletingId.value = row.id
+    await deleteAnnouncement(row.id)
+
+    if (tableData.value.length === 1 && pagination.value.page > 1) {
+      pagination.value.page -= 1
+    }
+
+    await loadData()
+    ElMessage.success('通告删除成功')
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+
+    console.error('删除通告失败:', error)
+    ElMessage.error('删除通告失败')
+  } finally {
+    if (deletingId.value === row?.id) {
+      deletingId.value = null
+    }
+  }
+}
+
 const handleUpload = async () => {
+
   if (!formRef.value) return
 
   await formRef.value.validate(async (valid) => {

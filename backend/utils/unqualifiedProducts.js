@@ -99,6 +99,30 @@ async function ensureIndex(connection, indexName, definitionSql) {
   }
 }
 
+async function tableExists(connection, tableName) {
+  const [rows] = await connection.query('SHOW TABLES LIKE ?', [tableName]);
+  return rows.length > 0;
+}
+
+async function ensureForeignKey(connection, tableName, constraintName, definitionSql) {
+  const [rows] = await connection.query(
+    `
+      SELECT CONSTRAINT_NAME
+      FROM information_schema.TABLE_CONSTRAINTS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND CONSTRAINT_NAME = ?
+        AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+      LIMIT 1
+    `,
+    [tableName, constraintName]
+  );
+
+  if (rows.length === 0) {
+    await connection.query(`ALTER TABLE ${tableName} ADD CONSTRAINT ${constraintName} ${definitionSql}`);
+  }
+}
+
 async function ensureUnqualifiedProductsTable(connection) {
   await connection.query(`
     CREATE TABLE IF NOT EXISTS unqualified_products (
@@ -156,8 +180,27 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureIndex(connection, 'idx_unqualified_products_sample_unit_name', 'INDEX idx_unqualified_products_sample_unit_name (sample_unit_name)');
   await ensureIndex(connection, 'idx_unqualified_products_inspection_institution', 'INDEX idx_unqualified_products_inspection_institution (inspection_institution)');
   await ensureIndex(connection, 'idx_unqualified_products_announcement', 'INDEX idx_unqualified_products_announcement (announcement_id)');
+  await ensureIndex(connection, 'idx_unqualified_products_announcement_detail', 'INDEX idx_unqualified_products_announcement_detail (announcement_detail_id)');
   await ensureIndex(connection, 'idx_unqualified_products_counterfeit', 'INDEX idx_unqualified_products_counterfeit (is_counterfeit)');
+
+  if (await tableExists(connection, 'announcements')) {
+    await ensureForeignKey(
+      connection,
+      'unqualified_products',
+      'fk_unqualified_products_announcement',
+      'FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE'
+    );
+  }
+  if (await tableExists(connection, 'announcement_product_details')) {
+    await ensureForeignKey(
+      connection,
+      'unqualified_products',
+      'fk_unqualified_products_announcement_detail',
+      'FOREIGN KEY (announcement_detail_id) REFERENCES announcement_product_details(id) ON DELETE CASCADE'
+    );
+  }
 }
+
 
 async function seedDefaultUnqualifiedProducts(connection) {
   const rows = getDefaultUnqualifiedProducts();

@@ -12,8 +12,11 @@ const {
 } = require('../utils/flightInspectionAttachmentParser');
 const {
   ensureCompaniesSamplingSchema,
-  syncCompaniesFromFlightInspectionDetails
+  syncCompaniesFromFlightInspectionDetails,
+  getSupervisionRelatedCompanyIds,
+  deleteOrphanCompanies
 } = require('../utils/companySamplingSync');
+
 
 
 const EXTRA_COLUMNS = [
@@ -684,9 +687,16 @@ router.put('/:id', uploadAttachments, async (req, res) => {
       detailRows,
       parsedAttachments.attachments[0] || existingAttachment
     );
+    const shouldSyncCompanies = uploadedFiles.length > 0
+      || detailRows.length > 0
+      || Object.prototype.hasOwnProperty.call(req.body, 'company_name')
+      || Object.prototype.hasOwnProperty.call(req.body, 'company_address');
+
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
+
+    const previousCompanyIds = await getSupervisionRelatedCompanyIds(connection, id);
 
     await connection.query(`
       UPDATE supervisions
@@ -696,6 +706,7 @@ router.put('/:id', uploadAttachments, async (req, res) => {
           region = ?, level = ?, supervision_type = ?, content = ?, rectification_deadline = ?, status = ?, source = ?
       WHERE id = ?
     `, [
+
       payload.title,
       payload.company_name,
       payload.production_license_no,
@@ -720,12 +731,15 @@ router.put('/:id', uploadAttachments, async (req, res) => {
 
     if (uploadedFiles.length > 0 || detailRows.length > 0) {
       await replaceFlightInspectionDetails(connection, id, detailRows);
-      const companySyncResult = await syncCompaniesFromFlightInspectionDetails(connection, id);
 
       if (uploadedFiles.length > 0) {
         await replaceSupervisionAttachments(connection, id, parsedAttachments.attachments);
       }
+    }
 
+    if (shouldSyncCompanies) {
+      const companySyncResult = await syncCompaniesFromFlightInspectionDetails(connection, id);
+      await deleteOrphanCompanies(connection, previousCompanyIds);
       await connection.commit();
 
       return res.json({
@@ -740,6 +754,7 @@ router.put('/:id', uploadAttachments, async (req, res) => {
         }
       });
     }
+
 
     await connection.commit();
 
@@ -768,15 +783,51 @@ router.put('/:id', uploadAttachments, async (req, res) => {
 
 // 删除飞行检查通告
 router.delete('/:id', async (req, res) => {
+  let connection;
+
   try {
+    await ensureFlightInspectionColumns();
+
     const { id } = req.params;
-    await pool.query('DELETE FROM supervisions WHERE id = ?', [id]);
-    res.json({ success: true, message: '删除成功' });
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const relatedCompanyIds = await getSupervisionRelatedCompanyIds(connection, id);
+    await connection.query('DELETE FROM company_supervision_records WHERE supervision_id = ?', [id]);
+    await connection.query('DELETE FROM flight_inspection_detail WHERE supervision_id = ?', [id]);
+    await connection.query('DELETE FROM supervision_attachments WHERE supervision_id = ?', [id]);
+    const [result] = await connection.query('DELETE FROM supervisions WHERE id = ?', [id]);
+
+
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '飞行检查通告不存在' });
+    }
+
+    const cleanupResult = await deleteOrphanCompanies(connection, relatedCompanyIds);
+
+
+    await connection.commit();
+    res.json({
+      success: true,
+      message: '删除成功',
+      meta: {
+        deleted_company_count: cleanupResult.deleted_count
+      }
+    });
   } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
     console.error('删除飞行检查通告失败:', error);
     res.status(500).json({ success: false, message: '删除飞行检查通告失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
+
 
 // 获取飞行检查统计数据
 router.get('/stats/overview', async (req, res) => {
