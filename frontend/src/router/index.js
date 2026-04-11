@@ -11,6 +11,12 @@ const routes = [
     component: () => import('../views/Dashboard.vue')
   },
   {
+    path: '/pivot-analysis',
+    name: 'PivotAnalysis',
+    component: () => import('../views/PivotAnalysis.vue')
+  },
+
+  {
     path: '/announcements',
     name: 'Announcements',
     component: () => import('../views/Announcements.vue')

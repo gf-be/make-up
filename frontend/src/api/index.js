@@ -9,6 +9,11 @@ export const getDashboardTrends = () => {
   return request.get('/dashboard/trends')
 }
 
+export const getPivotAnalysis = (params) => {
+  return request.get('/analytics/pivot', { params })
+}
+
+
 // 公告（抽样检查公告）
 export const getAnnouncements = (params) => {
   return request.get('/announcements', { params })

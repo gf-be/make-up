@@ -23,6 +23,8 @@ app.use('/api/companies', require('./routes/companies'));
 app.use('/api/unqualified-products', require('./routes/unqualified_products'));
 app.use('/api/supervisions', require('./routes/supervisions'));
 app.use('/api/dashboard', require('./routes/dashboard_v2'));
+app.use('/api/analytics', require('./routes/analytics'));
+
 
 // 健康检查
 app.get('/health', (req, res) => {
