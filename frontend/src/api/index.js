@@ -13,7 +13,6 @@ export const getPivotAnalysis = (params) => {
   return request.get('/analytics/pivot', { params })
 }
 
-
 // 公告（抽样检查公告）
 export const getAnnouncements = (params) => {
   return request.get('/announcements', { params })
@@ -44,8 +43,6 @@ export const deleteAnnouncementProductDetail = (announcementId, detailId) => {
 }
 
 export const createAnnouncement = (formData) => {
-
-
   return request.post('/announcements', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
@@ -61,11 +58,97 @@ export const updateAnnouncement = (id, formData) => {
   })
 }
 
+export const updateAnnouncementProductType = (id, data = {}) => {
+  return request.patch(`/announcements/${id}/product-type`, data)
+}
+
+export const updateAnnouncementContent = (id, data = {}) => {
+  return request.patch(`/announcements/${id}/content`, data)
+}
+
 export const deleteAnnouncement = (id) => {
+
+
   return request.delete(`/announcements/${id}`)
 }
 
+export const getAnnouncementStagingOverview = () => {
+  return request.get('/announcement-staging/overview')
+}
+
+export const getAnnouncementStagingList = (params) => {
+  return request.get('/announcement-staging', { params })
+}
+
+export const getAnnouncementStagingTree = (params) => {
+  return request.get('/announcement-staging/tree', { params })
+}
+
+export const getAnnouncementStagingDetail = (id) => {
+  return request.get(`/announcement-staging/${id}`)
+}
+
+export const getAnnouncementStagingTracebacks = (params) => {
+  return request.get('/announcement-staging/tracebacks', { params })
+}
+
+export const resolveAnnouncementStagingTraceback = (id) => {
+  return request.post(`/announcement-staging/tracebacks/${id}/resolve`)
+}
+
+export const deleteAnnouncementStagingTraceback = (id) => {
+  return request.delete(`/announcement-staging/tracebacks/${id}`)
+}
+
+export const getAnnouncementStagingWorkspaceCache = (params) => {
+
+  return request.get('/announcement-staging/workspace-cache', { params })
+}
+
+export const saveAnnouncementStagingWorkspaceCache = (data = {}) => {
+  return request.post('/announcement-staging/workspace-cache', data)
+}
+
+export const importAnnouncementStagingJson = (data = {}) => {
+  return request.post('/announcement-staging/import-json', data)
+}
+
+export const confirmAnnouncementStaging = (id) => {
+  return request.post(`/announcement-staging/${id}/confirm`)
+}
+
+export const updateAnnouncementStagingBody = (id, data = {}) => {
+  return request.put(`/announcement-staging/${id}/body`, data)
+}
+
+export const updateAnnouncementStagingProductType = (id, data = {}) => {
+  return request.patch(`/announcement-staging/${id}/product-type`, data)
+}
+
+export const deleteAnnouncementStagingBatch = (id) => {
+
+  return request.delete(`/announcement-staging/${id}`)
+}
+
+export const retreatAnnouncementStagingToTraceback = (id, data = {}) => {
+
+  return request.post(`/announcement-staging/${id}/retreat-to-traceback`, data)
+}
+
+export const deletePublishedAnnouncementStaging = (id) => {
+  return request.delete(`/announcement-staging/${id}/published`)
+}
+
+export const confirmAllAnnouncementStaging = (data = {}) => {
+
+
+  return request.post('/announcement-staging/confirm-all', data)
+}
+
+
+
 // 抽样检查
+
 export const getInspections = (params) => {
   return request.get('/inspections', { params })
 }
@@ -91,17 +174,34 @@ export const getCompanyStats = () => {
   return request.get('/companies/stats/overview')
 }
 
+export const getCompanyFilterOptions = () => {
+  return request.get('/companies/filter-options')
+}
+
 export const getUnqualifiedCompanies = (params) => {
   return request.get('/companies/unqualified/list', { params })
+}
+
+export const getUnqualifiedCompanyFilterOptions = () => {
+  return request.get('/companies/unqualified/filter-options')
 }
 
 export const getUnqualifiedProducts = (params) => {
   return request.get('/unqualified-products', { params })
 }
 
+export const getUnqualifiedProductDetail = (id) => {
+  return request.get(`/unqualified-products/${id}`)
+}
+
 export const getUnqualifiedProductStats = () => {
   return request.get('/unqualified-products/stats/overview')
 }
+
+export const getUnqualifiedProductFilterOptions = () => {
+  return request.get('/unqualified-products/filter-options')
+}
+
 
 export const createCompany = (data) => {
   return request.post('/companies', data)
@@ -122,6 +222,10 @@ export const getSupervisions = (params) => {
 
 export const getSupervisionDetail = (id) => {
   return request.get(`/supervisions/${id}`)
+}
+
+export const updateSupervisionProductType = (id, data = {}) => {
+  return request.patch(`/supervisions/${id}/product-type`, data)
 }
 
 export const createSupervision = (formData) => {
@@ -147,4 +251,3 @@ export const deleteSupervision = (id) => {
 export const getSupervisionStats = () => {
   return request.get('/supervisions/stats/overview')
 }
-

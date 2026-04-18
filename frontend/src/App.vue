@@ -16,11 +16,16 @@
             <el-icon><DataAnalysis /></el-icon>
             <span>数据概览</span>
           </el-menu-item>
-          <!-- <el-menu-item index="/pivot-analysis">
+          <el-menu-item index="/announcement-staging">
             <el-icon><DataAnalysis /></el-icon>
-            <span>数据概览</span> -->
-          <!-- </el-menu-item> -->
+            <span>导入检查</span>
+          </el-menu-item>
+          <el-menu-item index="/announcement-tracebacks">
+            <el-icon><Warning /></el-icon>
+            <span>倒溯处理</span>
+          </el-menu-item>
           <el-menu-item index="/announcements">
+
             <el-icon><Bell /></el-icon>
             <span>抽检通告</span>
           </el-menu-item>
@@ -65,11 +70,15 @@ const route = useRoute()
 
 const activeMenu = computed(() => {
   if (route.path.startsWith('/announcements')) return '/announcements'
+  if (route.path.startsWith('/announcement-staging')) return '/announcement-staging'
+  if (route.path.startsWith('/announcement-tracebacks')) return '/announcement-tracebacks'
   if (route.path.startsWith('/pivot-analysis')) return '/pivot-analysis'
+
   if (route.path.startsWith('/inspections')) return '/inspections'
   if (route.path.startsWith('/companies/unqualified')) return '/companies/unqualified'
 
   if (route.path.startsWith('/unqualified-products')) return '/unqualified-products'
+
   if (route.path.startsWith('/companies')) return '/companies'
   if (route.path.startsWith('/supervisions')) return '/supervisions'
 

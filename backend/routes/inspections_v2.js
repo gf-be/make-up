@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const { ensureInspectionDetailsSchema } = require('../utils/announcementInspectionSync');
+
+ensureInspectionDetailsSchema(pool).catch((error) => {
+  console.error('初始化抽检明细表结构失败:', error);
+});
+
 
 // 获取所有抽样检查列表
 router.get('/', async (req, res) => {
@@ -121,7 +127,10 @@ router.get('/:id', async (req, res) => {
 // 创建抽样检查
 router.post('/', async (req, res) => {
   try {
+    await ensureInspectionDetailsSchema(pool);
+
     const {
+
       announcement_id, title, batch_number, inspection_date, inspection_unit, region,
       level, total_samples, qualified_count, unqualified_count,
       qualified_rate, summary, status, source, details

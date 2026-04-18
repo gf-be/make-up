@@ -92,15 +92,25 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="关键词">
-              <el-input v-model="filters.keyword" clearable placeholder="支持产品名、机构、地区、问题关键词" @keyup.enter="loadData" />
+            <el-form-item label="不符合项目">
+              <el-select v-model="filters.issue_items" multiple filterable collapse-tags collapse-tags-tooltip placeholder="选择具体问题项" style="width: 100%">
+                <el-option v-for="item in options.issue_items" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
+            <el-form-item label="关键词">
+              <el-input v-model="filters.keyword" clearable placeholder="支持产品名、机构、地区、问题关键词" @keyup.enter="handleQuery" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="16">
+          <el-col :span="24">
             <el-form-item label="假冒筛选">
               <div class="action-row">
                 <el-switch v-model="filters.counterfeit_only" active-text="仅看假冒" inactive-text="全部" />
-                <el-button type="primary" @click="loadData">更新分析</el-button>
+                <el-button type="primary" @click="handleQuery">更新分析</el-button>
                 <el-button @click="resetFilters">重置</el-button>
               </div>
             </el-form-item>
@@ -188,7 +198,8 @@
         <el-card shadow="never">
           <template #header>
             <div class="card-header compact">
-              <span>明细样本（{{ detailTotal }} 条，最多展示 200 条）</span>
+              <span>明细样本（{{ detailPagination.total }} 条）</span>
+              <el-tag type="info">分页展示</el-tag>
             </div>
           </template>
           <el-table :data="detailRecords" border stripe max-height="620">
@@ -205,6 +216,18 @@
             <el-table-column prop="sample_unit_name" label="被抽样单位" min-width="180" show-overflow-tooltip />
             <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="220" show-overflow-tooltip />
           </el-table>
+          <el-pagination
+            :page-size="detailPagination.limit"
+            :current-page="detailPagination.page"
+            :total="detailPagination.total"
+            :page-sizes="[20, 50, 100, 200]"
+            layout="total, sizes, prev, pager, next, jumper"
+            class="detail-pagination"
+            @update:page-size="(value) => { detailPagination.limit = value }"
+            @update:current-page="(value) => { detailPagination.page = value }"
+            @size-change="loadData"
+            @current-change="loadData"
+          />
         </el-card>
       </el-col>
     </el-row>
@@ -212,7 +235,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, nextTick, onMounted } from 'vue'
+import { reactive, ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { getPivotAnalysis } from '@/api'
@@ -225,19 +248,25 @@ const options = reactive({
   manufacturer_provinces: [],
   sampled_provinces: [],
   inspection_institutions: [],
-  issue_categories: []
+  issue_categories: [],
+  issue_items: []
 })
 const dimensions = ref({})
 const metrics = ref({})
 const summary = ref({})
 const insights = ref([])
 const detailRecords = ref([])
-const detailTotal = ref(0)
 const pivot = ref({ rows: [], columns: [] })
+const detailPagination = reactive({
+  page: 1,
+  limit: 50,
+  total: 0
+})
 const barChartRef = ref(null)
 const stackChartRef = ref(null)
 let barChart = null
 let stackChart = null
+let resizeHandler = null
 
 const createDefaultFilters = () => ({
   announcement_ids: [],
@@ -247,6 +276,7 @@ const createDefaultFilters = () => ({
   sampled_provinces: [],
   inspection_institutions: [],
   issue_categories: [],
+  issue_items: [],
   keyword: '',
   counterfeit_only: false,
   row_dimension: 'product_category',
@@ -264,11 +294,14 @@ const serializeParams = () => ({
   sampled_provinces: JSON.stringify(filters.sampled_provinces),
   inspection_institutions: JSON.stringify(filters.inspection_institutions),
   issue_categories: JSON.stringify(filters.issue_categories),
+  issue_items: JSON.stringify(filters.issue_items),
   keyword: filters.keyword || undefined,
   counterfeit_only: filters.counterfeit_only ? 'true' : undefined,
   row_dimension: filters.row_dimension,
   col_dimension: filters.col_dimension,
-  metric: filters.metric
+  metric: filters.metric,
+  detail_page: detailPagination.page,
+  detail_limit: detailPagination.limit
 })
 
 const renderCharts = () => {
@@ -331,7 +364,6 @@ const loadData = async () => {
     summary.value = res.data.summary || {}
     insights.value = res.data.insights || []
     detailRecords.value = res.data.detail_records || []
-    detailTotal.value = res.data.detail_total || 0
     pivot.value = res.data.pivot || { rows: [], columns: [] }
     dimensions.value = res.data.dimensions || {}
     metrics.value = res.data.metrics || {}
@@ -343,7 +375,14 @@ const loadData = async () => {
       manufacturer_provinces: res.data.options?.manufacturer_provinces || [],
       sampled_provinces: res.data.options?.sampled_provinces || [],
       inspection_institutions: res.data.options?.inspection_institutions || [],
-      issue_categories: res.data.options?.issue_categories || []
+      issue_categories: res.data.options?.issue_categories || [],
+      issue_items: res.data.options?.issue_items || []
+    })
+
+    Object.assign(detailPagination, {
+      total: res.data.detail_pagination?.total || 0,
+      page: res.data.detail_pagination?.page || detailPagination.page,
+      limit: res.data.detail_pagination?.limit || detailPagination.limit
     })
 
     await nextTick()
@@ -356,17 +395,32 @@ const loadData = async () => {
   }
 }
 
+const handleQuery = async () => {
+  detailPagination.page = 1
+  await loadData()
+}
+
 const resetFilters = async () => {
   Object.assign(filters, createDefaultFilters())
+  Object.assign(detailPagination, { page: 1, limit: 50 })
   await loadData()
 }
 
 onMounted(async () => {
   await loadData()
-  window.addEventListener('resize', () => {
+  resizeHandler = () => {
     barChart?.resize()
     stackChart?.resize()
-  })
+  }
+  window.addEventListener('resize', resizeHandler)
+})
+
+onBeforeUnmount(() => {
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+  }
+  barChart?.dispose()
+  stackChart?.dispose()
 })
 </script>
 
@@ -467,5 +521,11 @@ onMounted(async () => {
 
 .chart-box {
   height: 360px;
+}
+
+.detail-pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

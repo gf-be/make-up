@@ -1,5 +1,6 @@
 {
-  "watch": ["*.js", "routes/", "config/"],
+  "watch": ["*.js", "routes/", "config/", "utils/"],
+
   "ext": "js,json",
   "ignore": ["node_modules/", "*.test.js"],
   "exec": "node server_v2.js",

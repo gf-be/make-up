@@ -99,7 +99,8 @@ CREATE TABLE IF NOT EXISTS inspection_details (
     sample_source VARCHAR(100),
     inspection_result ENUM('qualified', 'unqualified', 'pending') DEFAULT 'pending',
     unqualified_items TEXT,
-    inspection_standard VARCHAR(100),
+    inspection_standard LONGTEXT,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

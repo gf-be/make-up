@@ -17,8 +17,17 @@ const {
 } = require('../utils/companySamplingSync');
 const {
   ensureUnqualifiedProductsTable,
-  replaceUnqualifiedProductsFromAnnouncementDetails
+  replaceUnqualifiedProductsFromAnnouncementDetails,
+  normalizeProductType,
+  normalizeAnnouncementType
 } = require('../utils/unqualifiedProducts');
+const {
+  ensureAnnouncementStagingSchema,
+  updatePublishedAnnouncementStagingBody,
+  updateAnnouncementStagingProductType
+} = require('../utils/announcementStaging');
+
+
 
 
 
@@ -98,7 +107,293 @@ function normalizeNullableText(value) {
   return normalized ? normalized : null;
 }
 
+function normalizeNullableMultilineText(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalized = String(value)
+    .replace(/\u0007/g, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+
+  return normalized || null;
+}
+
+function buildAnnouncementLocationSummarySql() {
+  return `
+    (
+      SELECT GROUP_CONCAT(DISTINCT location_name ORDER BY location_name SEPARATOR '、')
+      FROM (
+        SELECT NULLIF(TRIM(up.sampled_province), '') AS location_name
+        FROM unqualified_products up
+        WHERE up.announcement_id = a.id
+
+        UNION
+
+        SELECT NULLIF(TRIM(up.manufacturer_province), '') AS location_name
+        FROM unqualified_products up
+        WHERE up.announcement_id = a.id
+
+        UNION
+
+        SELECT NULLIF(TRIM(up.product_region), '') AS location_name
+        FROM unqualified_products up
+        WHERE up.announcement_id = a.id
+      ) announcement_locations
+      WHERE location_name IS NOT NULL
+    )
+  `;
+}
+
+function appendAnnouncementListFilters(queryParts, queryParams, filters = {}) {
+  const normalizedStatus = String(filters.status || '').trim();
+  const normalizedProductType = String(filters.productType || filters.product_type || '').trim();
+  const normalizedKeyword = String(filters.keyword || '').trim();
+  const normalizedLocation = String(filters.location || '').trim();
+  const normalizedYear = Number.parseInt(filters.year, 10);
+
+  if (normalizedStatus) {
+    queryParts.push('a.status = ?');
+    queryParams.push(normalizedStatus);
+  }
+
+  if (normalizedProductType) {
+    queryParts.push('a.product_type = ?');
+    queryParams.push(normalizeProductType(normalizedProductType));
+  }
+
+  if (normalizedKeyword) {
+    const keywordPattern = `%${normalizedKeyword}%`;
+    queryParts.push('(a.title LIKE ? OR a.content LIKE ? OR a.announcement_no LIKE ? OR a.inspection_unit LIKE ?)');
+    queryParams.push(keywordPattern, keywordPattern, keywordPattern, keywordPattern);
+  }
+
+  if (Number.isInteger(normalizedYear)) {
+    queryParts.push('YEAR(a.publish_date) = ?');
+    queryParams.push(normalizedYear);
+  }
+
+  if (normalizedLocation) {
+    const locationPattern = `%${normalizedLocation}%`;
+    queryParts.push(`
+      EXISTS (
+        SELECT 1
+        FROM unqualified_products up
+        WHERE up.announcement_id = a.id
+          AND (
+            up.sampled_province LIKE ?
+            OR up.manufacturer_province LIKE ?
+            OR up.product_region LIKE ?
+          )
+      )
+    `);
+    queryParams.push(locationPattern, locationPattern, locationPattern);
+  }
+}
+
+function normalizeComparableText(value) {
+
+  return String(normalizeNullableMultilineText(value) || '')
+    .replace(/\s+/g, '')
+    .trim();
+}
+
+function parseJsonSafely(value, fallbackValue = null) {
+  if (value === undefined || value === null || value === '') {
+    return fallbackValue;
+  }
+
+  if (typeof value === 'object') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    return fallbackValue;
+  }
+}
+
+function isMeaningfulAnnouncementContent(content, title = '') {
+  const normalizedContent = normalizeNullableMultilineText(content);
+  if (!normalizedContent) {
+    return false;
+  }
+
+  const comparableContent = normalizeComparableText(normalizedContent);
+  const comparableTitle = normalizeComparableText(title);
+  if (!comparableContent) {
+    return false;
+  }
+  if (comparableTitle && comparableContent === comparableTitle) {
+    return false;
+  }
+
+  return normalizedContent.length >= 20 || /[。；：，]/.test(normalizedContent);
+}
+
+function pickAnnouncementDisplayContent(candidates = [], title = '') {
+  for (const candidate of candidates) {
+    const normalizedCandidate = normalizeNullableMultilineText(candidate);
+    if (isMeaningfulAnnouncementContent(normalizedCandidate, title)) {
+      return normalizedCandidate;
+    }
+  }
+  return null;
+}
+
+function loadAnnouncementSourcePayload(sourceJsonFile) {
+  const normalizedPath = normalizeNullableText(sourceJsonFile);
+  if (!normalizedPath) {
+    return null;
+  }
+
+  const inlinePayload = parseJsonSafely(normalizedPath, null);
+  if (inlinePayload) {
+    return inlinePayload;
+  }
+
+  const candidatePaths = path.isAbsolute(normalizedPath)
+    ? [normalizedPath]
+    : [
+        path.resolve(process.cwd(), normalizedPath),
+        path.resolve(__dirname, '..', normalizedPath),
+        path.resolve(__dirname, '..', '..', normalizedPath)
+      ];
+
+  for (const filePath of candidatePaths) {
+    try {
+      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        continue;
+      }
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      const payload = parseJsonSafely(fileContent, null);
+      if (payload) {
+        return payload;
+      }
+    } catch (error) {
+      console.warn('读取公告源 JSON 失败:', filePath, error.message);
+    }
+  }
+
+  return null;
+}
+
+async function findAnnouncementStagingBatchId(connection, announcementId) {
+  const [batchRows] = await connection.query(
+    `
+      SELECT id
+      FROM announcement_staging_batches
+      WHERE published_announcement_id = ?
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    [announcementId]
+  );
+
+  if (batchRows[0]?.id) {
+    return Number(batchRows[0].id);
+  }
+
+  const [backupRows] = await connection.query(
+    `
+      SELECT staging_batch_id
+      FROM announcement_publish_backups
+      WHERE announcement_id = ?
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    [announcementId]
+  );
+
+  return backupRows[0]?.staging_batch_id ? Number(backupRows[0].staging_batch_id) : null;
+}
+
+async function resolveAnnouncementDisplayContent(connection, announcement) {
+  if (!announcement) {
+    return null;
+  }
+
+  const title = normalizeNullableText(announcement.title) || '';
+  const existingContent = normalizeNullableMultilineText(announcement.content);
+  if (isMeaningfulAnnouncementContent(existingContent, title)) {
+    return existingContent;
+  }
+
+  const stagingBatchId = announcement.id ? await findAnnouncementStagingBatchId(connection, announcement.id) : null;
+  if (stagingBatchId) {
+    const [stagingRows] = await connection.query(
+      'SELECT content, raw_payload FROM announcement_staging_batches WHERE id = ? LIMIT 1',
+      [stagingBatchId]
+    );
+    const stagingBatch = stagingRows[0] || null;
+    const stagingPayload = parseJsonSafely(stagingBatch?.raw_payload, {});
+    const stagingContent = pickAnnouncementDisplayContent([
+      stagingBatch?.content,
+      stagingPayload?.content_text,
+      stagingPayload?.content,
+      stagingPayload?.content_preview,
+      stagingPayload?.page_text
+    ], title);
+    if (stagingContent) {
+      return stagingContent;
+    }
+  }
+
+  if (announcement.id) {
+    const [backupRows] = await connection.query(
+      `
+        SELECT payload_json
+        FROM announcement_publish_backups
+        WHERE announcement_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+      [announcement.id]
+    );
+    const backupPayload = parseJsonSafely(backupRows[0]?.payload_json, {});
+    const backupStagingPayload = typeof backupPayload?.staging_batch?.raw_payload === 'string'
+      ? parseJsonSafely(backupPayload.staging_batch.raw_payload, {})
+      : (backupPayload?.staging_batch?.raw_payload || {});
+    const backupContent = pickAnnouncementDisplayContent([
+      backupPayload?.published_announcement?.content,
+      backupPayload?.staging_batch?.content,
+      backupStagingPayload?.content_text,
+      backupStagingPayload?.content,
+      backupStagingPayload?.content_preview,
+      backupStagingPayload?.page_text
+    ], title);
+    if (backupContent) {
+      return backupContent;
+    }
+  }
+
+  const sourcePayload = loadAnnouncementSourcePayload(announcement.source_json_file);
+  const sourceContent = pickAnnouncementDisplayContent([
+    sourcePayload?.content_text,
+    sourcePayload?.content,
+    sourcePayload?.content_preview,
+    sourcePayload?.page_text
+  ], title);
+  if (sourceContent) {
+    return sourceContent;
+  }
+
+  if (existingContent && normalizeComparableText(existingContent) !== normalizeComparableText(title)) {
+    return existingContent;
+  }
+
+  return null;
+}
+
 function deriveCounterfeitFlag(remarks, explicitValue) {
+
   if (explicitValue === '0' || explicitValue === 0 || explicitValue === false) {
     return 0;
   }
@@ -200,65 +495,92 @@ async function parseAttachmentSafely(file) {
   }
 }
 
-ensureAnnouncementProductDetailsTable(pool)
-  .then(() => ensureCompaniesSamplingSchema(pool))
-  .then(() => ensureUnqualifiedProductsTable(pool))
-  .catch((error) => {
-    console.error('初始化公告相关数据表失败:', error);
-  });
+async function ensureAnnouncementRouteSchema() {
+  await ensureAnnouncementProductDetailsTable(pool);
+  await ensureCompaniesSamplingSchema(pool);
+  await ensureUnqualifiedProductsTable(pool);
+  await ensureAnnouncementStagingSchema(pool);
+}
+
+ensureAnnouncementRouteSchema().catch((error) => {
+  console.error('初始化公告相关数据表失败:', error);
+});
+
 
 
 
 // 获取所有公告列表
 router.get('/', async (req, res) => {
   try {
-    const { status, page = 1, limit = 10, keyword } = req.query;
-    const offset = (page - 1) * limit;
+    await ensureAnnouncementRouteSchema();
 
-    let query = `
-      SELECT a.*, u.username as author_name
-      FROM announcements a
-      LEFT JOIN users u ON a.author_id = u.id
-      WHERE 1=1
-    `;
-    const params = [];
+    const {
+      status,
+      page = 1,
+      limit = 10,
+      keyword = '',
+      product_type = '',
+      year = '',
+      location = ''
+    } = req.query;
+    const currentPage = Math.max(Number.parseInt(page, 10) || 1, 1);
+    const pageSize = Math.max(Number.parseInt(limit, 10) || 10, 1);
+    const offset = (currentPage - 1) * pageSize;
+    const normalizedProductType = String(product_type || '').trim();
+    const normalizedKeyword = String(keyword || '').trim();
+    const normalizedLocation = String(location || '').trim();
+    const normalizedYear = Number.parseInt(year, 10);
+    const locationSummarySql = buildAnnouncementLocationSummarySql();
 
-    if (status) {
-      query += ' AND a.status = ?';
-      params.push(status);
-    }
-    if (keyword) {
-      query += ' AND (a.title LIKE ? OR a.content LIKE ?)';
-      params.push(`%${keyword}%`, `%${keyword}%`);
-    }
+    const queryParts = ['1=1'];
+    const queryParams = [];
+    appendAnnouncementListFilters(queryParts, queryParams, {
+      status,
+      productType: normalizedProductType,
+      keyword: normalizedKeyword,
+      location: normalizedLocation,
+      year: Number.isInteger(normalizedYear) ? normalizedYear : null
+    });
 
-    query += ' ORDER BY a.publish_date DESC, a.created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), offset);
+    const [rows] = await pool.query(
+      `
+        SELECT a.*, u.username AS author_name, ${locationSummarySql} AS location_summary
+        FROM announcements a
+        LEFT JOIN users u ON a.author_id = u.id
+        WHERE ${queryParts.join(' AND ')}
+        ORDER BY a.publish_date DESC, a.created_at DESC
+        LIMIT ? OFFSET ?
+      `,
+      [...queryParams, pageSize, offset]
+    );
 
-    const [rows] = await pool.query(query, params);
-
-    // 获取总数
-    let countQuery = 'SELECT COUNT(*) as total FROM announcements a WHERE 1=1';
+    const countParts = ['1=1'];
     const countParams = [];
-    if (status) {
-      countQuery += ' AND a.status = ?';
-      countParams.push(status);
-    }
-    if (keyword) {
-      countQuery += ' AND (a.title LIKE ? OR a.content LIKE ?)';
-      countParams.push(`%${keyword}%`, `%${keyword}%`);
-    }
+    appendAnnouncementListFilters(countParts, countParams, {
+      status,
+      productType: normalizedProductType,
+      keyword: normalizedKeyword,
+      location: normalizedLocation,
+      year: Number.isInteger(normalizedYear) ? normalizedYear : null
+    });
 
-    const [countResult] = await pool.query(countQuery, countParams);
+    const [countResult] = await pool.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM announcements a
+        WHERE ${countParts.join(' AND ')}
+      `,
+      countParams
+    );
 
     res.json({
       success: true,
       data: rows,
       pagination: {
-        total: countResult[0].total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(countResult[0].total / limit)
+        total: Number(countResult[0].total || 0),
+        page: currentPage,
+        limit: pageSize,
+        pages: Math.ceil(Number(countResult[0].total || 0) / pageSize)
       }
     });
   } catch (error) {
@@ -267,10 +589,15 @@ router.get('/', async (req, res) => {
   }
 });
 
+
+
 // 获取公告详情
 router.get('/:id', async (req, res) => {
   try {
+    await ensureAnnouncementRouteSchema();
+
     const { id } = req.params;
+
 
     const [rows] = await pool.query(`
       SELECT
@@ -299,7 +626,12 @@ router.get('/:id', async (req, res) => {
     // 更新浏览次数
     await pool.query('UPDATE announcements SET view_count = view_count + 1 WHERE id = ?', [id]);
 
-    res.json({ success: true, data: rows[0] });
+    const announcement = {
+      ...rows[0],
+      content: await resolveAnnouncementDisplayContent(pool, rows[0])
+    };
+
+    res.json({ success: true, data: announcement });
   } catch (error) {
     console.error('获取公告详情失败:', error);
     res.status(500).json({ success: false, message: '获取公告详情失败' });
@@ -309,7 +641,10 @@ router.get('/:id', async (req, res) => {
 // 获取公告关联的批次不符合规定化妆品明细
 router.get('/:announcementId/product-details', async (req, res) => {
   try {
+    await ensureAnnouncementRouteSchema();
+
     const { announcementId } = req.params;
+
     const {
       unqualified_item = '',
       company_keyword = '',
@@ -563,9 +898,28 @@ router.post('/', upload.single('attachment'), async (req, res) => {
   let connection;
 
   try {
-    const { title, content, announcement_no, publish_date, status, author_id, inspection_unit, inspection_count } = req.body;
+    await ensureAnnouncementRouteSchema();
 
+    const {
+      title,
+      content,
+      announcement_no,
+      publish_date,
+      status,
+      author_id,
+      inspection_unit,
+      inspection_count,
+      product_type,
+      announcement_type,
+      source_detail_url,
+      source_page,
+      source_json_file
+    } = req.body;
+
+    const normalizedProductType = normalizeProductType(product_type);
+    const normalizedAnnouncementType = normalizeAnnouncementType(announcement_type || 'sampling');
     const extractedInfo = extractAnnouncementInfo(content);
+
     const parsedAttachment = await parseAttachmentSafely(req.file);
     const parsedInspectionCount = parsedAttachment.parsedCount > 0 ? parsedAttachment.parsedCount : 0;
 
@@ -581,8 +935,9 @@ router.post('/', upload.single('attachment'), async (req, res) => {
       INSERT INTO announcements (
         title, content, announcement_no, publish_date,
         inspection_unit, inspection_count, attachment_path, attachment_name,
+        product_type, announcement_type, source_detail_url, source_page, source_json_file,
         status, author_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       title,
       content,
@@ -592,9 +947,15 @@ router.post('/', upload.single('attachment'), async (req, res) => {
       finalInspectionCount,
       attachmentPath,
       attachmentName,
+      normalizedProductType,
+      normalizedAnnouncementType,
+      normalizeNullableText(source_detail_url),
+      normalizeNullableText(source_page),
+      normalizeNullableText(source_json_file),
       status || 'published',
       author_id
     ]);
+
 
     if (parsedAttachment.rows.length > 0) {
       await replaceAnnouncementProductDetails(connection, result.insertId, parsedAttachment.rows);
@@ -635,16 +996,166 @@ router.post('/', upload.single('attachment'), async (req, res) => {
   }
 });
 
+router.patch('/:id/content', async (req, res) => {
+  let connection;
+
+  try {
+    await ensureAnnouncementRouteSchema();
+
+    const { id } = req.params;
+    const normalizedContent = normalizeNullableMultilineText(req.body?.content);
+    if (!normalizedContent) {
+      return res.status(400).json({ success: false, message: '通告正文不能为空' });
+    }
+
+    const extractedInfo = extractAnnouncementInfo(normalizedContent);
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query('SELECT * FROM announcements WHERE id = ? LIMIT 1', [id]);
+    const existingAnnouncement = rows[0] || null;
+    if (!existingAnnouncement) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '公告不存在' });
+    }
+
+    const stagingBatchId = await findAnnouncementStagingBatchId(connection, id);
+    if (stagingBatchId) {
+      await updatePublishedAnnouncementStagingBody(connection, stagingBatchId, normalizedContent);
+    } else {
+      await connection.query('UPDATE announcements SET content = ? WHERE id = ?', [normalizedContent, id]);
+    }
+
+    const nextInspectionUnit = normalizeNullableText(extractedInfo.inspection_unit) || existingAnnouncement.inspection_unit || null;
+    await connection.query('UPDATE announcements SET inspection_unit = ? WHERE id = ?', [nextInspectionUnit, id]);
+    const inspectionCount = await refreshAnnouncementInspectionCount(connection, id, extractedInfo.inspection_count);
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: '通告正文更新成功',
+      data: {
+        id: Number(id),
+        updated_content: normalizedContent,
+        inspection_unit: nextInspectionUnit,
+        inspection_count: inspectionCount,
+        updated_staging_batch_id: stagingBatchId
+      }
+    });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('更新公告正文失败:', error);
+    res.status(500).json({ success: false, message: '更新公告正文失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+router.patch('/:id/product-type', async (req, res) => {
+
+  let connection;
+
+  try {
+    await ensureAnnouncementRouteSchema();
+
+    const { id } = req.params;
+    const productType = normalizeNullableText(req.body?.product_type);
+    if (!productType) {
+      return res.status(400).json({ success: false, message: '产品类型不能为空' });
+    }
+
+    const normalizedProductType = normalizeProductType(productType);
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query('SELECT id FROM announcements WHERE id = ? LIMIT 1', [id]);
+    if (!rows[0]) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '公告不存在' });
+    }
+
+    const stagingBatchId = await findAnnouncementStagingBatchId(connection, id);
+    let resultPayload;
+
+    if (stagingBatchId) {
+      resultPayload = await updateAnnouncementStagingProductType(connection, stagingBatchId, normalizedProductType);
+    } else {
+      await connection.query('UPDATE announcements SET product_type = ? WHERE id = ?', [normalizedProductType, id]);
+      const syncResult = await syncAnnouncementDerivedData(connection, id);
+      resultPayload = {
+        product_type: normalizedProductType,
+        announcement_type: 'sampling',
+        synced_company_count: syncResult.companySyncResult.company_count,
+        synced_unqualified_count: syncResult.unqualifiedSyncResult.synced_count,
+        inspection_count: syncResult.inspectionCount,
+        updated_staging_batch_id: null
+      };
+    }
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: '产品类型更新成功',
+      data: {
+        id: Number(id),
+        product_type: resultPayload.product_type || normalizedProductType,
+        announcement_type: resultPayload.announcement_type || 'sampling',
+        synced_company_count: Number(resultPayload.synced_company_count || 0),
+        synced_unqualified_count: Number(resultPayload.synced_unqualified_count || 0),
+        inspection_count: resultPayload.inspection_count === null || resultPayload.inspection_count === undefined
+          ? null
+          : Number(resultPayload.inspection_count),
+        updated_staging_batch_id: resultPayload.updated_staging_id || resultPayload.staging_batch_id || resultPayload.updated_staging_batch_id || stagingBatchId || null
+      }
+    });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('更新公告产品类型失败:', error);
+    res.status(500).json({ success: false, message: '更新公告产品类型失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
 // 更新公告
 router.put('/:id', upload.single('attachment'), async (req, res) => {
   let connection;
 
   try {
+    await ensureAnnouncementRouteSchema();
+
     const { id } = req.params;
-    const { title, content, announcement_no, publish_date, status, inspection_unit, inspection_count } = req.body;
+    const {
+      title,
+      content,
+      announcement_no,
+      publish_date,
+      status,
+      inspection_unit,
+      inspection_count,
+      product_type,
+      announcement_type,
+      source_detail_url,
+      source_page,
+      source_json_file
+    } = req.body;
+    const normalizedProductType = normalizeProductType(product_type);
+    const normalizedAnnouncementType = normalizeAnnouncementType(announcement_type || 'sampling');
 
     const extractedInfo = extractAnnouncementInfo(content);
+
     const parsedAttachment = await parseAttachmentSafely(req.file);
+
     const parsedInspectionCount = parsedAttachment.parsedCount > 0 ? parsedAttachment.parsedCount : 0;
     const finalInspectionUnit = inspection_unit || extractedInfo.inspection_unit;
     const finalInspectionCount = parsedInspectionCount || normalizeInspectionCount(inspection_count, extractedInfo.inspection_count);
@@ -659,7 +1170,10 @@ router.put('/:id', upload.single('attachment'), async (req, res) => {
         UPDATE announcements
         SET title = ?, content = ?, announcement_no = ?, publish_date = ?,
             inspection_unit = ?, inspection_count = ?,
-            attachment_path = ?, attachment_name = ?, status = ?
+            attachment_path = ?, attachment_name = ?,
+            product_type = ?, announcement_type = ?,
+            source_detail_url = ?, source_page = ?, source_json_file = ?,
+            status = ?
         WHERE id = ?
       `, [
         title,
@@ -670,16 +1184,25 @@ router.put('/:id', upload.single('attachment'), async (req, res) => {
         finalInspectionCount,
         attachmentPath,
         attachmentName,
+        normalizedProductType,
+        normalizedAnnouncementType,
+        normalizeNullableText(source_detail_url),
+        normalizeNullableText(source_page),
+        normalizeNullableText(source_json_file),
         status,
         id
       ]);
+
 
       await replaceAnnouncementProductDetails(connection, id, parsedAttachment.rows);
     } else {
       await connection.query(`
         UPDATE announcements
         SET title = ?, content = ?, announcement_no = ?, publish_date = ?,
-            inspection_unit = ?, inspection_count = ?, status = ?
+            inspection_unit = ?, inspection_count = ?,
+            product_type = ?, announcement_type = ?,
+            source_detail_url = ?, source_page = ?, source_json_file = ?,
+            status = ?
         WHERE id = ?
       `, [
         title,
@@ -688,9 +1211,15 @@ router.put('/:id', upload.single('attachment'), async (req, res) => {
         publish_date,
         finalInspectionUnit,
         finalInspectionCount,
+        normalizedProductType,
+        normalizedAnnouncementType,
+        normalizeNullableText(source_detail_url),
+        normalizeNullableText(source_page),
+        normalizeNullableText(source_json_file),
         status,
         id
       ]);
+
     }
 
     const syncResult = await syncAnnouncementDerivedData(connection, id, finalInspectionCount);
@@ -731,7 +1260,10 @@ router.delete('/:id', async (req, res) => {
   let connection;
 
   try {
+    await ensureAnnouncementRouteSchema();
+
     const { id } = req.params;
+
     connection = await pool.getConnection();
     await connection.beginTransaction();
 

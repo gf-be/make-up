@@ -13,9 +13,9 @@
         <el-descriptions-item label="企业名称">
           {{ detail.company.name }}
         </el-descriptions-item>
-        <el-descriptions-item label="品牌">
+        <!-- <el-descriptions-item label="品牌">
           {{ detail.company.brand || '-' }}
-        </el-descriptions-item>
+        </el-descriptions-item> -->
         <el-descriptions-item label="类型">
           <el-tag :type="getTypeType(detail.company.type)">
             {{ getTypeText(detail.company.type) }}
@@ -24,9 +24,9 @@
         <el-descriptions-item label="省份">
           {{ detail.company.province || '-' }}
         </el-descriptions-item>
-        <el-descriptions-item label="城市">
+        <!-- <el-descriptions-item label="城市">
           {{ detail.company.city || '-' }}
-        </el-descriptions-item>
+        </el-descriptions-item> -->
         <el-descriptions-item label="地址">
           {{ detail.company.address || '-' }}
         </el-descriptions-item>
@@ -113,7 +113,7 @@
           </el-table-column>
 
           <el-table-column prop="product_name" label="产品名称" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="brand" label="品牌" width="120" />
+          <!-- <el-table-column prop="brand" label="品牌" width="120" /> -->
 
           <el-table-column prop="inspection_date" label="检查日期" width="110" />
           <el-table-column prop="level" label="级别" width="80">
@@ -200,6 +200,7 @@ const getLevelType = (level) => {
 }
 
 const getLevelText = (level) => {
+console.log(level);
   const map = { national: '国家级', provincial: '省级', municipal: '市级' }
   return map[level] || level
 }

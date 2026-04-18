@@ -22,10 +22,22 @@ const routes = [
     component: () => import('../views/Announcements.vue')
   },
   {
+    path: '/announcement-staging',
+    name: 'AnnouncementStaging',
+    component: () => import('../views/AnnouncementStaging.vue')
+  },
+  {
+    path: '/announcement-tracebacks',
+    name: 'AnnouncementTracebacks',
+    component: () => import('../views/AnnouncementTracebacks.vue')
+  },
+  {
     path: '/announcements/:id',
+
     name: 'AnnouncementDetail',
     component: () => import('../views/AnnouncementDetail.vue')
   },
+
   {
     path: '/inspections',
     name: 'Inspections',
@@ -46,6 +58,12 @@ const routes = [
     name: 'UnqualifiedProducts',
     component: () => import('../views/UnqualifiedProducts.vue')
   },
+  {
+    path: '/unqualified-products/:id',
+    name: 'UnqualifiedProductDetail',
+    component: () => import('../views/UnqualifiedProductDetail.vue')
+  },
+
   {
     path: '/companies/stats',
     redirect: '/companies/unqualified'

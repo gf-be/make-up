@@ -9,22 +9,32 @@
             <h1 class="detail-title">{{ detail.title || '飞行检查详情' }}</h1>
             <div class="detail-meta">
               <el-tag :type="getLevelType(detail.level)">{{ getLevelText(detail.level) }}</el-tag>
+              <el-tag effect="plain">{{ productTypeLabel }}</el-tag>
               <span>发布日期：{{ formatDate(detail.publish_date || detail.supervision_date) }}</span>
               <span>来源：{{ detail.source || '-' }}</span>
             </div>
           </div>
+
           <div class="detail-header__actions">
             <el-button @click="goBack">返回列表</el-button>
           </div>
         </div>
 
         <el-descriptions :column="2" border class="overview-descriptions">
+          <el-descriptions-item label="产品类型">
+            <el-space wrap>
+              <span>{{ productTypeLabel }}</span>
+              <el-button link type="primary" size="small" :loading="savingProductType" @click="openProductTypeDialog">修改产品类型</el-button>
+            </el-space>
+          </el-descriptions-item>
+
           <el-descriptions-item label="企业汇总">
             {{ overviewCompanyName }}
           </el-descriptions-item>
           <el-descriptions-item label="涉及企业数">
             {{ totalCompanyCount }}
           </el-descriptions-item>
+
           <el-descriptions-item label="检查单位">
             {{ detail.inspection_unit || detail.detail_record?.inspection_unit || '-' }}
           </el-descriptions-item>
@@ -169,18 +179,50 @@
         </div>
       </template>
     </el-card>
+
+    <el-dialog
+      v-model="productTypeDialogVisible"
+      title="修改产品类型"
+      width="420px"
+      :close-on-click-modal="false"
+    >
+      <div style="margin-bottom: 16px; color: #606266; line-height: 1.7;">
+        保存后会同步更新当前飞行检查通告、企业关联记录和问题项数据。
+      </div>
+      <el-select v-model="productTypeForm.product_type" placeholder="请选择产品类型" style="width: 100%">
+        <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+      </el-select>
+      <template #footer>
+        <el-button @click="productTypeDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingProductType" @click="handleSaveProductType">保存产品类型</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
+
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getSupervisionDetail } from '@/api/index'
+import { getSupervisionDetail, updateSupervisionProductType } from '@/api/index'
+
+const PRODUCT_TYPE_LABELS = {
+  cosmetics: '化妆品',
+  food: '食品',
+  medical_device: '医疗器械'
+}
 
 const route = useRoute()
+
 const router = useRouter()
 const loading = ref(false)
+const savingProductType = ref(false)
 const detail = ref(null)
+const productTypeDialogVisible = ref(false)
+const productTypeForm = reactive({
+  product_type: 'unknown'
+})
+
 
 const buildFallbackAttachmentGroups = (record) => {
   if (!record) {
@@ -258,7 +300,13 @@ const overviewCompanyName = computed(() => {
   return detail.value?.company_name || detail.value?.detail_record?.company_name || (totalCompanyCount.value ? `共 ${totalCompanyCount.value} 家企业` : '-')
 })
 
+const productTypeLabel = computed(() => {
+  const value = detail.value?.product_type
+  return PRODUCT_TYPE_LABELS[value] || value || '未分类'
+})
+
 const loadData = async () => {
+
   loading.value = true
   try {
     const res = await getSupervisionDetail(route.params.id)
@@ -270,7 +318,34 @@ const loadData = async () => {
   }
 }
 
+const openProductTypeDialog = () => {
+  productTypeForm.product_type = detail.value?.product_type || 'unknown'
+  productTypeDialogVisible.value = true
+}
+
+const handleSaveProductType = async () => {
+  if (!route.params.id || savingProductType.value) {
+    return
+  }
+
+  savingProductType.value = true
+  try {
+    await updateSupervisionProductType(route.params.id, {
+      product_type: productTypeForm.product_type
+    })
+    productTypeDialogVisible.value = false
+    ElMessage.success('产品类型更新成功')
+    await loadData()
+  } catch (error) {
+    console.error('更新飞行检查产品类型失败:', error)
+    ElMessage.error('更新飞行检查产品类型失败')
+  } finally {
+    savingProductType.value = false
+  }
+}
+
 const goBack = () => {
+
   router.push('/supervisions')
 }
 

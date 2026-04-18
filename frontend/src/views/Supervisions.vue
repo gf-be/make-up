@@ -3,13 +3,14 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>化妆品飞行检查通告</span>
+          <span>飞行检查通告</span>
           <el-button type="primary" @click="showUploadDialog = true">
             <el-icon><Upload /></el-icon>
             上传通告
           </el-button>
         </div>
       </template>
+
 
       <el-row :gutter="20" class="stats-row">
         <el-col :span="6">
@@ -40,15 +41,21 @@
 
       <el-form :model="filters" inline class="filter-form">
         <el-form-item label="级别">
-          <el-select v-model="filters.level" style="width: 240px" placeholder="选择级别" clearable @change="handleSearch">
+          <el-select v-model="filters.level" style="width: 180px" placeholder="选择级别" clearable @change="handleSearch">
             <el-option label="国家级" value="national" />
             <el-option label="省级" value="provincial" />
             <el-option label="市级" value="municipal" />
           </el-select>
         </el-form-item>
+        <el-form-item label="产品类型">
+          <el-select v-model="filters.product_type" style="width: 180px" placeholder="全部产品类型" clearable @change="handleSearch">
+            <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="企业名称">
           <el-input v-model="filters.company_name" placeholder="输入企业名称" clearable @keyup.enter="handleSearch" />
         </el-form-item>
+
         <el-form-item label="检查单位">
           <el-input v-model="filters.inspection_unit" placeholder="输入检查单位" clearable @keyup.enter="handleSearch" />
         </el-form-item>
@@ -66,7 +73,13 @@
 
       <el-table :data="tableData" stripe v-loading="loading">
         <el-table-column prop="company_name" label="企业名称" min-width="220" show-overflow-tooltip />
+        <el-table-column label="产品类型" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag size="small">{{ getProductTypeLabel(row.product_type) }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="company_count" label="涉及企业数" width="100" align="center" />
+
         <el-table-column prop="attachment_count" label="附件数" width="90" align="center" />
         <el-table-column prop="production_license_no" label="生产许可证编号" min-width="180" show-overflow-tooltip />
         <el-table-column prop="company_address" label="企业地址" min-width="220" show-overflow-tooltip />
@@ -126,7 +139,13 @@
         <el-form-item label="通告标题" prop="title">
           <el-input v-model="form.title" placeholder="请输入通告标题" />
         </el-form-item>
+        <el-form-item label="产品类型" prop="product_type">
+          <el-select v-model="form.product_type" placeholder="请选择产品类型" style="width: 100%">
+            <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="发布日期" prop="publish_date">
+
           <el-date-picker
             v-model="form.publish_date"
             type="date"
@@ -164,7 +183,8 @@
             <el-button type="primary">选择文件</el-button>
             <template #tip>
               <div class="el-upload__tip">
-                支持一次上传多个 PDF、Word、Excel 附件；系统会逐个提取企业信息并写入 `companies` 表
+                支持一次上传多个 PDF、Word、Excel 附件；系统会逐个提取企业信息，并同步写入企业表与问题产品聚合表
+
               </div>
             </template>
           </el-upload>
@@ -200,6 +220,15 @@ import { useRouter } from 'vue-router'
 import { createSupervision, getSupervisions, getSupervisionStats, deleteSupervision } from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
+const PRODUCT_TYPE_LABELS = {
+  cosmetics: '化妆品',
+  food: '食品',
+  medical_device: '医疗器械',
+  unknown: '未知'
+}
+
+
+const productTypeOptions = Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => ({ value, label }))
 
 const router = useRouter()
 const formRef = ref(null)
@@ -212,10 +241,12 @@ const tableData = ref([])
 const stats = ref({})
 const filters = ref({
   level: '',
+  product_type: '',
   company_name: '',
   inspection_unit: '',
   keyword: ''
 })
+
 const pagination = ref({
   page: 1,
   limit: 10,
@@ -224,12 +255,14 @@ const pagination = ref({
 const uploadFileList = ref([])
 const form = reactive({
   title: '',
+  product_type: 'cosmetics',
   publish_date: '',
   level: 'national',
   content: '',
   files: []
 })
 const extractedInfo = reactive({
+
   company_name: '',
   inspection_unit: '',
   publish_date: '',
@@ -239,8 +272,10 @@ const extractedInfo = reactive({
 
 
 const rules = {
+  product_type: [{ required: true, message: '请选择产品类型', trigger: 'change' }],
   level: [{ required: true, message: '请选择级别', trigger: 'change' }]
 }
+
 
 
 watch(() => form.content, (value) => {
@@ -291,6 +326,7 @@ const handleSearch = () => {
 const resetFilters = () => {
   filters.value = {
     level: '',
+    product_type: '',
     company_name: '',
     inspection_unit: '',
     keyword: ''
@@ -298,6 +334,7 @@ const resetFilters = () => {
   pagination.value.page = 1
   loadData()
 }
+
 
 const handleFileChange = (_file, fileList) => {
   uploadFileList.value = fileList
@@ -315,10 +352,12 @@ const handleFileExceed = () => {
 
 const resetForm = () => {
   form.title = ''
+  form.product_type = 'cosmetics'
   form.publish_date = ''
   form.level = 'national'
   form.content = ''
   form.files = []
+
   uploadFileList.value = []
   extractedInfo.company_name = ''
   extractedInfo.inspection_unit = ''
@@ -343,10 +382,13 @@ const handleUpload = async () => {
     try {
       const formData = new FormData()
       formData.append('title', form.title)
+      formData.append('product_type', form.product_type)
+      formData.append('announcement_type', 'flight_inspection')
       formData.append('publish_date', form.publish_date)
       formData.append('level', form.level)
       formData.append('content', form.content)
       formData.append('status', 'ongoing')
+
       form.files.forEach(file => {
         formData.append('attachments', file)
       })
@@ -355,6 +397,7 @@ const handleUpload = async () => {
       const parsedCount = res?.data?.parsed_detail_count || 0
       const attachmentCount = res?.data?.attachment_count || form.files.length || 0
       const syncedCompanyCount = res?.data?.synced_company_count || 0
+      const syncedUnqualifiedCount = res?.data?.synced_unqualified_count || 0
 
       extractedInfo.company_name = res?.data?.extracted_info?.company_name || extractedInfo.company_name
       extractedInfo.inspection_unit = res?.data?.extracted_info?.inspection_unit || extractedInfo.inspection_unit
@@ -362,8 +405,9 @@ const handleUpload = async () => {
       extractedInfo.company_count = syncedCompanyCount || extractedInfo.company_count
 
       ElMessage.success(
-        `飞行检查通告上传成功，已上传 ${attachmentCount} 个附件，解析 ${parsedCount} 条明细，同步 ${syncedCompanyCount} 家企业`
+        `${getProductTypeLabel(form.product_type)}飞行检查上传成功，已上传 ${attachmentCount} 个附件，解析 ${parsedCount} 条明细，同步 ${syncedCompanyCount} 家企业，写入 ${syncedUnqualifiedCount} 条问题项`
       )
+
 
       showUploadDialog.value = false
       resetForm()
@@ -435,11 +479,16 @@ const handleDelete = async (row) => {
   }
 }
 
+const getProductTypeLabel = (value) => {
+  return PRODUCT_TYPE_LABELS[value] || value || '未分类'
+}
+
 const getLevelType = (level) => {
 
   const map = { national: 'danger', provincial: 'warning', municipal: 'info' }
   return map[level] || 'info'
 }
+
 
 const getLevelText = (level) => {
   const map = { national: '国家级', provincial: '省级', municipal: '市级' }

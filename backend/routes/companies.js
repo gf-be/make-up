@@ -2,33 +2,117 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { ensureCompaniesSamplingSchema } = require('../utils/companySamplingSync');
+const { getProductTypeOptions, normalizeProductType } = require('../utils/unqualifiedProducts');
 
 ensureCompaniesSamplingSchema(pool).catch((error) => {
   console.error('初始化企业抽查统计失败:', error);
 });
 
+function normalizeOptionalText(value) {
+  const normalized = String(value || '').trim();
+  return normalized || '';
+}
+
 function buildUnqualifiedCompanySourceSql() {
   return `
-    SELECT company_id, product_name, sampled_at AS record_date
-    FROM company_sampling_records
+    SELECT
+      csr.company_id,
+      csr.product_name,
+      csr.sampled_at AS record_date,
+      csr.product_type,
+      csr.announcement_type,
+      'announcement' AS source_type,
+      csr.announcement_id AS source_id,
+      a.title AS source_title
+    FROM company_sampling_records csr
+    LEFT JOIN announcements a ON csr.announcement_id = a.id
+
     UNION ALL
-    SELECT company_id, product_name, DATE(created_at) AS record_date
-    FROM inspection_details
-    WHERE inspection_result = 'unqualified' AND company_id IS NOT NULL
+
+    SELECT
+      d.company_id,
+      d.product_name,
+      COALESCE(i.inspection_date, DATE(d.created_at), DATE(i.created_at)) AS record_date,
+      a.product_type AS product_type,
+      COALESCE(a.announcement_type, 'sampling') AS announcement_type,
+      'inspection' AS source_type,
+      i.id AS source_id,
+      i.title AS source_title
+    FROM inspection_details d
+    LEFT JOIN inspections i ON d.inspection_id = i.id
+    LEFT JOIN announcements a ON i.announcement_id = a.id
+    WHERE d.inspection_result = 'unqualified' AND d.company_id IS NOT NULL
+
     UNION ALL
-    SELECT csr.company_id, NULL AS product_name, DATE(s.publish_date) AS record_date
+
+    SELECT
+      csr.company_id,
+      NULL AS product_name,
+      COALESCE(s.publish_date, s.supervision_date) AS record_date,
+      csr.product_type,
+      csr.announcement_type,
+      'supervision' AS source_type,
+      csr.supervision_id AS source_id,
+      s.title AS source_title
     FROM company_supervision_records csr
     JOIN supervisions s ON csr.supervision_id = s.id
     WHERE s.status != 'completed' AND s.defects_and_problems IS NOT NULL AND s.defects_and_problems != ''
   `;
 }
 
+function applyUnqualifiedCompanyFilters(queryParts, params, filters = {}) {
+  const keyword = normalizeOptionalText(filters.keyword);
+  const province = normalizeOptionalText(filters.province);
+  const productType = normalizeOptionalText(filters.product_type);
+  const sourceType = normalizeOptionalText(filters.source_type);
+  const year = Number.parseInt(filters.year, 10);
+  const productKeyword = normalizeOptionalText(filters.product_keyword);
+  const sourceKeyword = normalizeOptionalText(filters.source_keyword);
+
+  if (keyword) {
+    queryParts.push('(c.name LIKE ? OR c.brand LIKE ?)');
+    params.push(`%${keyword}%`, `%${keyword}%`);
+  }
+
+  if (province) {
+    queryParts.push('c.province = ?');
+    params.push(province);
+  }
+
+  if (productType) {
+    queryParts.push('source.product_type = ?');
+    params.push(normalizeProductType(productType));
+  }
+
+  if (sourceType) {
+    queryParts.push('source.source_type = ?');
+    params.push(sourceType);
+  }
+
+  if (Number.isInteger(year)) {
+    queryParts.push('YEAR(source.record_date) = ?');
+    params.push(year);
+  }
+
+  if (productKeyword) {
+    queryParts.push('source.product_name LIKE ?');
+    params.push(`%${productKeyword}%`);
+  }
+
+  if (sourceKeyword) {
+    queryParts.push('source.source_title LIKE ?');
+    params.push(`%${sourceKeyword}%`);
+  }
+}
+
+
 // 获取企业列表（支持筛选和搜索）
 router.get('/', async (req, res) => {
   try {
     await ensureCompaniesSamplingSchema(pool);
 
-    const { name, brand, province, has_unqualified, page = 1, limit = 10 } = req.query;
+    const { name, brand, province, product_category, has_unqualified, page = 1, limit = 10 } = req.query;
+
     const currentPage = parseInt(page, 10) || 1;
     const pageSize = parseInt(limit, 10) || 10;
     const offset = (currentPage - 1) * pageSize;
@@ -60,8 +144,15 @@ router.get('/', async (req, res) => {
       params.push(province);
       countParams.push(province);
     }
+    if (product_category) {
+      query += ' AND c.product_category = ?';
+      countQuery += ' AND c.product_category = ?';
+      params.push(product_category);
+      countParams.push(product_category);
+    }
 
     if (has_unqualified === 'true') {
+
       const condition = ` AND c.id IN (
         SELECT DISTINCT source.company_id
         FROM (
@@ -173,38 +264,120 @@ router.get('/stats/overview', async (req, res) => {
   }
 });
 
+router.get('/unqualified/filter-options', async (req, res) => {
+  try {
+    await ensureCompaniesSamplingSchema(pool);
+
+    const sourceSql = buildUnqualifiedCompanySourceSql();
+    const [[provinceRows], [productTypeRows], [yearRows]] = await Promise.all([
+      pool.query(`
+        SELECT DISTINCT c.province
+        FROM companies c
+        JOIN (${sourceSql}) source ON c.id = source.company_id
+        WHERE c.province IS NOT NULL AND TRIM(c.province) != ''
+        ORDER BY c.province ASC
+      `),
+      pool.query(`
+        SELECT DISTINCT source.product_type
+        FROM (${sourceSql}) source
+        WHERE source.product_type IS NOT NULL AND TRIM(source.product_type) != ''
+        ORDER BY source.product_type ASC
+      `),
+      pool.query(`
+        SELECT DISTINCT YEAR(source.record_date) AS year
+        FROM (${sourceSql}) source
+        WHERE source.record_date IS NOT NULL
+        ORDER BY year DESC
+      `)
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        provinces: provinceRows.map((row) => ({ value: row.province, label: row.province })),
+        product_types: getProductTypeOptions((productTypeRows || []).map((row) => row.product_type)),
+        source_types: [
+          { value: 'announcement', label: '抽检通告' },
+          { value: 'inspection', label: '抽样检查' },
+          { value: 'supervision', label: '飞行检查' }
+        ],
+        years: (yearRows || [])
+          .map((row) => Number(row.year))
+          .filter((value) => Number.isInteger(value) && value > 0)
+          .map((value) => ({ value: String(value), label: `${value}年` }))
+      }
+    });
+  } catch (error) {
+    console.error('获取不合格企业筛选项失败:', error);
+    res.status(500).json({ success: false, message: '获取不合格企业筛选项失败' });
+  }
+});
+
 // 获取不合格企业列表（必须在 /:id 之前定义）
 router.get('/unqualified/list', async (req, res) => {
   try {
     await ensureCompaniesSamplingSchema(pool);
 
-    const { page = 1, limit = 10 } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      keyword = '',
+      province = '',
+      product_type = '',
+      source_type = '',
+      year = '',
+      product_keyword = '',
+      source_keyword = ''
+    } = req.query;
     const currentPage = parseInt(page, 10) || 1;
     const pageSize = parseInt(limit, 10) || 10;
     const offset = (currentPage - 1) * pageSize;
+    const sourceSql = buildUnqualifiedCompanySourceSql();
 
-    const [rows] = await pool.query(`
-      SELECT
-        c.id, c.name, c.brand, c.province,
-        COUNT(*) as unqualified_count,
-        GROUP_CONCAT(DISTINCT source.product_name ORDER BY source.product_name SEPARATOR '、') as unqualified_products,
-        MAX(source.record_date) as last_unqualified_date,
-        COALESCE(c.sampled_count, 0) as sampled_count
-      FROM companies c
-      JOIN (
-        ${buildUnqualifiedCompanySourceSql()}
-      ) source ON c.id = source.company_id
-      GROUP BY c.id, c.name, c.brand, c.province, c.sampled_count
-      ORDER BY unqualified_count DESC, last_unqualified_date DESC
-      LIMIT ? OFFSET ?
-    `, [pageSize, offset]);
+    const queryParts = ['1=1'];
+    const queryParams = [];
+    applyUnqualifiedCompanyFilters(queryParts, queryParams, {
+      keyword,
+      province,
+      product_type,
+      source_type,
+      year,
+      product_keyword,
+      source_keyword
+    });
 
-    const [countResult] = await pool.query(`
-      SELECT COUNT(DISTINCT company_id) as total
-      FROM (
-        ${buildUnqualifiedCompanySourceSql()}
-      ) source
-    `);
+    const [rows] = await pool.query(
+      `
+        SELECT
+          c.id,
+          c.name,
+          c.brand,
+          c.province,
+          COUNT(*) AS unqualified_count,
+          GROUP_CONCAT(DISTINCT source.product_name ORDER BY source.product_name SEPARATOR '、') AS unqualified_products,
+          GROUP_CONCAT(DISTINCT source.source_title ORDER BY source.record_date DESC SEPARATOR '；') AS source_titles,
+          GROUP_CONCAT(DISTINCT source.source_type ORDER BY source.source_type SEPARATOR '、') AS source_types,
+          MAX(source.record_date) AS last_unqualified_date,
+          COALESCE(c.sampled_count, 0) AS sampled_count
+        FROM companies c
+        JOIN (${sourceSql}) source ON c.id = source.company_id
+        WHERE ${queryParts.join(' AND ')}
+        GROUP BY c.id, c.name, c.brand, c.province, c.sampled_count
+        ORDER BY unqualified_count DESC, last_unqualified_date DESC, c.updated_at DESC
+        LIMIT ? OFFSET ?
+      `,
+      [...queryParams, pageSize, offset]
+    );
+
+    const [countResult] = await pool.query(
+      `
+        SELECT COUNT(DISTINCT c.id) AS total
+        FROM companies c
+        JOIN (${sourceSql}) source ON c.id = source.company_id
+        WHERE ${queryParts.join(' AND ')}
+      `,
+      queryParams
+    );
 
     res.json({
       success: true,
@@ -222,8 +395,42 @@ router.get('/unqualified/list', async (req, res) => {
   }
 });
 
+
+router.get('/filter-options', async (req, res) => {
+  try {
+    await ensureCompaniesSamplingSchema(pool);
+
+    const [[provinceRows], [productCategoryRows]] = await Promise.all([
+      pool.query(`
+        SELECT DISTINCT province
+        FROM companies
+        WHERE province IS NOT NULL AND TRIM(province) != ''
+        ORDER BY province ASC
+      `),
+      pool.query(`
+        SELECT DISTINCT product_category
+        FROM companies
+        WHERE product_category IS NOT NULL AND TRIM(product_category) != ''
+        ORDER BY product_category ASC
+      `)
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        provinces: provinceRows.map((row) => ({ value: row.province, label: row.province })),
+        product_categories: productCategoryRows.map((row) => ({ value: row.product_category, label: row.product_category }))
+      }
+    });
+  } catch (error) {
+    console.error('获取企业筛选项失败:', error);
+    res.status(500).json({ success: false, message: '获取企业筛选项失败' });
+  }
+});
+
 // 获取企业详情
 router.get('/:id', async (req, res) => {
+
   try {
     await ensureCompaniesSamplingSchema(pool);
 

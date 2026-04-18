@@ -26,13 +26,23 @@ CREATE TABLE IF NOT EXISTS announcements (
     inspection_count INT DEFAULT 0,  -- 抽检批次总数（自动提取）
     attachment_path VARCHAR(500),  -- 附件路径
     attachment_name VARCHAR(200),  -- 附件原名
+    product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',  -- 产品类型
+    announcement_type VARCHAR(50) NOT NULL DEFAULT 'sampling',  -- 通告类型
+    source_detail_url VARCHAR(500),  -- 来源详情页
+    source_page VARCHAR(500),  -- 来源分页或栏目
+    source_json_file VARCHAR(500),  -- 来源 JSON 文件
     status ENUM('draft', 'published', 'archived') DEFAULT 'draft',
+
     author_id INT,
     view_count INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_announcements_product_type (product_type),
+    INDEX idx_announcements_announcement_type (announcement_type),
+    INDEX idx_announcements_source_detail_url (source_detail_url(191))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 -- 公告批次不符合规定化妆品明细表
 CREATE TABLE IF NOT EXISTS announcement_product_details (
@@ -117,7 +127,8 @@ CREATE TABLE IF NOT EXISTS inspection_details (
     sample_source VARCHAR(100),
     inspection_result ENUM('qualified', 'unqualified', 'pending') DEFAULT 'pending',
     unqualified_items TEXT,
-    inspection_standard VARCHAR(100),
+    inspection_standard LONGTEXT,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE,
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
@@ -157,7 +168,13 @@ CREATE TABLE IF NOT EXISTS supervisions (
     region VARCHAR(100),
     level ENUM('national', 'provincial', 'municipal') NOT NULL,
     supervision_type VARCHAR(50),
+    product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+    announcement_type VARCHAR(50) NOT NULL DEFAULT 'flight_inspection',
+    source_detail_url VARCHAR(500),
+    source_page VARCHAR(500),
+    source_json_file VARCHAR(500),
     content LONGTEXT,
+
     rectification_deadline DATE,
     status ENUM('ongoing', 'completed', 'pending_rectification') DEFAULT 'ongoing',
     source VARCHAR(100),
@@ -165,8 +182,12 @@ CREATE TABLE IF NOT EXISTS supervisions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_supervisions_company_name (company_name),
-    INDEX idx_supervisions_publish_date (publish_date)
+    INDEX idx_supervisions_publish_date (publish_date),
+    INDEX idx_supervisions_product_type (product_type),
+    INDEX idx_supervisions_announcement_type (announcement_type),
+    INDEX idx_supervisions_source_detail_url (source_detail_url(191))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 -- 企业抽查记录表
 CREATE TABLE IF NOT EXISTS company_sampling_records (
@@ -175,11 +196,17 @@ CREATE TABLE IF NOT EXISTS company_sampling_records (
     announcement_id INT NOT NULL,
     announcement_detail_id INT NOT NULL,
     product_name VARCHAR(255),
+    product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+    announcement_type VARCHAR(50) NOT NULL DEFAULT 'sampling',
     sampled_at DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     UNIQUE KEY uk_company_sampling_detail_company (announcement_detail_id, company_id),
     INDEX idx_company_sampling_company (company_id),
     INDEX idx_company_sampling_announcement (announcement_id),
+    INDEX idx_company_sampling_product_type (product_type),
+    INDEX idx_company_sampling_announcement_type (announcement_type),
+
     CONSTRAINT fk_company_sampling_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
     CONSTRAINT fk_company_sampling_announcement FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE,
     CONSTRAINT fk_company_sampling_detail FOREIGN KEY (announcement_detail_id) REFERENCES announcement_product_details(id) ON DELETE CASCADE
@@ -234,11 +261,17 @@ CREATE TABLE IF NOT EXISTS company_supervision_records (
     company_id INT NOT NULL,
     supervision_id INT NOT NULL,
     supervision_detail_id INT NULL,
+    product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+    announcement_type VARCHAR(50) NOT NULL DEFAULT 'flight_inspection',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     UNIQUE KEY uk_company_supervision_company (supervision_id, company_id),
     INDEX idx_company_supervision_company (company_id),
     INDEX idx_company_supervision_supervision (supervision_id),
     INDEX idx_company_supervision_detail (supervision_detail_id),
+    INDEX idx_company_supervision_product_type (product_type),
+    INDEX idx_company_supervision_announcement_type (announcement_type),
+
     CONSTRAINT fk_company_supervision_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
     CONSTRAINT fk_company_supervision_supervision FOREIGN KEY (supervision_id) REFERENCES supervisions(id) ON DELETE CASCADE,
     CONSTRAINT fk_company_supervision_detail FOREIGN KEY (supervision_detail_id) REFERENCES flight_inspection_detail(id) ON DELETE SET NULL
@@ -269,24 +302,75 @@ CREATE TABLE IF NOT EXISTS unqualified_products (
     inspection_result LONGTEXT,
     requirement LONGTEXT,
     remarks LONGTEXT,
+    product_category VARCHAR(100) NULL,
+    manufacturer_province VARCHAR(100) NULL,
+    sampled_province VARCHAR(100) NULL,
+    issue_category VARCHAR(100) NULL,
+    product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+    announcement_type VARCHAR(50) NOT NULL DEFAULT 'sampling',
     announcement_id INT NULL,
     announcement_detail_id INT NULL,
+    supervision_id INT NULL,
+    supervision_detail_id INT NULL,
     is_counterfeit TINYINT(1) DEFAULT 0,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_unqualified_products_batch_sequence (batch_title, sequence_no),
     INDEX idx_unqualified_products_product_name (product_name),
     INDEX idx_unqualified_products_sample_unit_name (sample_unit_name),
     INDEX idx_unqualified_products_inspection_institution (inspection_institution),
+    INDEX idx_unqualified_products_product_region (product_region),
+    INDEX idx_unqualified_products_product_category (product_category),
+    INDEX idx_unqualified_products_manufacturer_province (manufacturer_province),
+    INDEX idx_unqualified_products_sampled_province (sampled_province),
+    INDEX idx_unqualified_products_issue_category (issue_category),
     INDEX idx_unqualified_products_announcement (announcement_id),
     INDEX idx_unqualified_products_announcement_detail (announcement_detail_id),
+    INDEX idx_unqualified_products_supervision (supervision_id),
+    INDEX idx_unqualified_products_supervision_detail (supervision_detail_id),
     INDEX idx_unqualified_products_counterfeit (is_counterfeit),
     CONSTRAINT fk_unqualified_products_announcement FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE,
-    CONSTRAINT fk_unqualified_products_announcement_detail FOREIGN KEY (announcement_detail_id) REFERENCES announcement_product_details(id) ON DELETE CASCADE
+    CONSTRAINT fk_unqualified_products_announcement_detail FOREIGN KEY (announcement_detail_id) REFERENCES announcement_product_details(id) ON DELETE CASCADE,
+    CONSTRAINT fk_unqualified_products_supervision FOREIGN KEY (supervision_id) REFERENCES supervisions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_unqualified_products_supervision_detail FOREIGN KEY (supervision_detail_id) REFERENCES flight_inspection_detail(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+
+
+CREATE TABLE IF NOT EXISTS unqualified_product_category_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    unqualified_product_id INT NOT NULL,
+    announcement_id INT NULL,
+    announcement_detail_id INT NULL,
+    product_category VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_unqualified_product_category_item (unqualified_product_id, product_category),
+    INDEX idx_upci_product_category (product_category),
+    INDEX idx_upci_product (unqualified_product_id),
+    INDEX idx_upci_announcement (announcement_id),
+    INDEX idx_upci_announcement_detail (announcement_detail_id),
+    CONSTRAINT fk_upci_unqualified_product FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS unqualified_product_issue_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    unqualified_product_id INT NOT NULL,
+    announcement_id INT NULL,
+    announcement_detail_id INT NULL,
+    issue_item VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_unqualified_product_issue_item (unqualified_product_id, issue_item),
+    INDEX idx_upii_issue_item (issue_item),
+    INDEX idx_upii_product (unqualified_product_id),
+    INDEX idx_upii_announcement (announcement_id),
+    INDEX idx_upii_announcement_detail (announcement_detail_id),
+    CONSTRAINT fk_upii_unqualified_product FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT INTO unqualified_products (
+
     batch_title, total_batches, sequence_no, product_name, company_names, company_addresses,
     sample_unit_name, sample_unit_address, package_spec, batch_no, production_date, expiry_date,
     product_region, registration_no, production_license_no, inspection_institution,
@@ -324,8 +408,105 @@ ON DUPLICATE KEY UPDATE
     requirement = VALUES(requirement),
     remarks = VALUES(remarks);
 
+-- 公告临时导入批次表（爬虫 JSON 待确认区）
+CREATE TABLE IF NOT EXISTS announcement_staging_batches (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    source_sequence INT NULL,
+    source_json_file VARCHAR(500) NOT NULL,
+    source_detail_url VARCHAR(500) NULL,
+    source_page VARCHAR(500) NULL,
+    title VARCHAR(255) NOT NULL,
+    announcement_no VARCHAR(100) NULL,
+    publish_date DATE NULL,
+    content LONGTEXT,
+    inspection_unit VARCHAR(500),
+    inspection_count INT DEFAULT 0,
+    attachment_count INT DEFAULT 0,
+    parsed_detail_count INT DEFAULT 0,
+    counterfeit_count INT DEFAULT 0,
+    primary_attachment_name VARCHAR(255),
+    primary_attachment_path VARCHAR(1000),
+    product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+    announcement_type VARCHAR(50) NOT NULL DEFAULT 'sampling',
+    raw_payload LONGTEXT,
+    status ENUM('pending', 'confirmed') DEFAULT 'pending',
+    published_announcement_id INT NULL,
+    published_supervision_id INT NULL,
+    confirmed_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_staging_source_json_file (source_json_file),
+    INDEX idx_staging_status_publish_date (status, publish_date),
+    INDEX idx_staging_announcement_no (announcement_no),
+    INDEX idx_staging_product_type (product_type),
+    INDEX idx_staging_announcement_type (announcement_type),
+    INDEX idx_staging_published_announcement (published_announcement_id),
+    INDEX idx_staging_published_supervision (published_supervision_id),
+    CONSTRAINT fk_staging_published_announcement FOREIGN KEY (published_announcement_id) REFERENCES announcements(id) ON DELETE SET NULL,
+    CONSTRAINT fk_staging_published_supervision FOREIGN KEY (published_supervision_id) REFERENCES supervisions(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 公告临时导入产品明细表
+CREATE TABLE IF NOT EXISTS announcement_staging_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    staging_batch_id INT NOT NULL,
+    sequence_no INT NOT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    company_names TEXT,
+    company_addresses TEXT,
+    sample_unit_name VARCHAR(500),
+    sample_unit_address TEXT,
+    package_spec VARCHAR(255),
+    batch_no VARCHAR(255),
+    production_date VARCHAR(100),
+    expiry_date VARCHAR(255),
+    product_region VARCHAR(255),
+    registration_no VARCHAR(255),
+    production_license_no VARCHAR(255),
+    inspection_institution VARCHAR(255),
+    unqualified_items LONGTEXT,
+    inspection_result LONGTEXT,
+    requirement LONGTEXT,
+    remarks LONGTEXT,
+    is_counterfeit TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_staging_item_batch_sequence (staging_batch_id, sequence_no),
+    INDEX idx_staging_item_product (product_name),
+    INDEX idx_staging_item_counterfeit (is_counterfeit),
+    CONSTRAINT fk_staging_item_batch FOREIGN KEY (staging_batch_id) REFERENCES announcement_staging_batches(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 公告正式发布备用快照表
+CREATE TABLE IF NOT EXISTS announcement_publish_backups (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    staging_batch_id INT NOT NULL,
+    announcement_id INT NULL,
+    supervision_id INT NULL,
+    title VARCHAR(255) NOT NULL,
+    announcement_no VARCHAR(100),
+    publish_date DATE NULL,
+    inspection_unit VARCHAR(500),
+    inspection_count INT DEFAULT 0,
+    detail_count INT DEFAULT 0,
+    primary_attachment_name VARCHAR(255),
+    primary_attachment_path VARCHAR(1000),
+    product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+    announcement_type VARCHAR(50) NOT NULL DEFAULT 'sampling',
+    payload_json LONGTEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_publish_backup_stage (staging_batch_id),
+    INDEX idx_publish_backup_announcement (announcement_id),
+    INDEX idx_publish_backup_supervision (supervision_id),
+    CONSTRAINT fk_publish_backup_stage FOREIGN KEY (staging_batch_id) REFERENCES announcement_staging_batches(id) ON DELETE CASCADE,
+    CONSTRAINT fk_publish_backup_announcement FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE,
+    CONSTRAINT fk_publish_backup_supervision FOREIGN KEY (supervision_id) REFERENCES supervisions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- 操作日志表
 CREATE TABLE IF NOT EXISTS operation_logs (
+
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     action VARCHAR(50) NOT NULL,

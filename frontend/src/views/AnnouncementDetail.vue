@@ -8,6 +8,7 @@
           <h1 class="title">{{ announcement.title }}</h1>
           <div class="meta">
             <el-tag :type="statusType">{{ statusText }}</el-tag>
+            <el-tag effect="plain">{{ announcementProductTypeLabel }}</el-tag>
             <span class="date">{{ formatDate(announcement.publish_date) }}</span>
             <span v-if="announcement.announcement_no" class="announcement-no">
               {{ announcement.announcement_no }}
@@ -15,11 +16,19 @@
           </div>
         </div>
 
+
         <el-divider />
 
         <div class="content">
           <h3>关键信息</h3>
           <el-descriptions :column="2" border>
+            <el-descriptions-item label="产品类型">
+              <el-space wrap>
+                <span>{{ announcementProductTypeLabel }}</span>
+                <el-button link type="primary" size="small" :loading="savingProductType" @click="openProductTypeDialog">修改产品类型</el-button>
+              </el-space>
+            </el-descriptions-item>
+
             <el-descriptions-item label="检验单位">
               {{ announcement.inspection_unit || '暂无' }}
             </el-descriptions-item>
@@ -36,8 +45,11 @@
             </el-descriptions-item>
           </el-descriptions>
 
-          <h3>公告内容</h3>
-          <div class="announcement-content" v-html="formatContent(announcement.content)"></div>
+          <div class="section-header">
+            <h3>公告内容</h3>
+            <!-- <el-button type="primary" plain size="small" :loading="savingContent" @click="openContentDialog">编辑正文</el-button> -->
+          </div>
+          <div class="announcement-content">{{ announcement.content || '暂无内容' }}</div>
 
           <div v-if="announcement.attachment_path" class="attachment">
             <h3>附件下载</h3>
@@ -48,7 +60,8 @@
 
           <div class="product-details">
             <div class="section-header">
-              <h3>批次不符合规定化妆品详细信息</h3>
+              <h3>{{ announcementProductTypeLabel }}问题产品详细信息</h3>
+
               <div class="section-tags">
                 <el-tag type="info">总计 {{ productDetailsSummary.total || 0 }} 批次</el-tag>
                 <el-tag v-if="productDetailsSummary.has_filters" type="success">
@@ -63,7 +76,7 @@
             <el-form :model="productDetailFilters" inline class="detail-filter-form">
               <el-form-item label="不符合规定项目">
                 <el-input
-                  v-model="productDetailFilters.unqualified_item"
+                  v-model="productDetailFilters. unqualified_item"
                   placeholder="输入项目关键字"
                   clearable
                   @keyup.enter="handleProductDetailSearch"
@@ -121,16 +134,16 @@
               <el-table-column prop="product_name" label="产品名称" min-width="220" show-overflow-tooltip />
               <el-table-column prop="company_names" label="注册人/备案人等名称" min-width="240" show-overflow-tooltip />
               <el-table-column prop="sample_unit_name" label="被抽样单位" min-width="220" show-overflow-tooltip />
-              <el-table-column prop="package_spec" label="包装规格" width="120" show-overflow-tooltip />
-              <el-table-column prop="batch_no" label="标示批号" width="140" show-overflow-tooltip />
-              <el-table-column prop="inspection_institution" label="检验机构" min-width="180" show-overflow-tooltip />
+              <!-- <el-table-column prop="package_spec" label="包装规格" width="120" show-overflow-tooltip /> -->
+              <!-- <el-table-column prop="batch_no" label="标示批号" width="140" show-overflow-tooltip /> -->
+              <!-- <el-table-column prop="inspection_institution" label="检验机构" min-width="180" show-overflow-tooltip /> -->
               <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="220" show-overflow-tooltip />
-              <el-table-column label="备注" width="120" align="center">
+              <!-- <el-table-column label="备注" width="120" align="center">
                 <template #default="{ row }">
                   <el-tag v-if="row.is_counterfeit" type="danger" size="small">涉嫌假冒</el-tag>
                   <span v-else class="remark-text">{{ row.remarks && row.remarks !== '/' ? '有备注' : '无' }}</span>
                 </template>
-              </el-table-column>
+              </el-table-column> -->
               <el-table-column label="操作" width="140" fixed="right" align="center">
                 <template #default="{ row }">
                   <el-button link type="primary" @click="openEditProductDetail(row)">编辑</el-button>
@@ -148,7 +161,7 @@
           <h3>相关检查记录</h3>
           <el-table :data="relatedInspections" stripe>
             <el-table-column prop="product_name" label="产品名称" min-width="200" />
-            <el-table-column prop="brand" label="品牌" width="120" />
+            <!-- <el-table-column prop="brand" label="品牌" width="120" /> -->
             <el-table-column prop="manufacturer" label="生产企业" min-width="200" />
             <el-table-column prop="inspection_result" label="检查结果" width="100">
               <template #default="{ row }">
@@ -170,6 +183,47 @@
       </template>
     </el-card>
 
+    <!-- <el-dialog
+      v-model="contentDialogVisible"
+      :title="announcement ? `编辑正文：${announcement.title || '当前通告'}` : '编辑通告正文'"
+      width="820px"
+      :close-on-click-modal="false"
+    >
+      <div style="margin-bottom: 16px; color: #606266; line-height: 1.7;">
+        保存后会同步更新当前抽检通告正文；若该通告来自导入核验工作台，也会同步回写对应临时批次正文。
+      </div>
+      <el-input
+        v-model="contentForm.content"
+        type="textarea"
+        :rows="18"
+        resize="vertical"
+        placeholder="请输入修订后的通告正文"
+      />
+      <template #footer>
+        <el-button @click="contentDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingContent" @click="handleSaveContent">保存正文</el-button>
+      </template>
+    </el-dialog> -->
+
+    <!-- <el-dialog
+      v-model="productTypeDialogVisible"
+      title="修改产品类型"
+      width="420px"
+      :close-on-click-modal="false"
+    >
+
+      <div style="margin-bottom: 16px; color: #606266; line-height: 1.7;">
+        保存后会同步更新当前抽检通告、企业关联记录和问题产品数据。
+      </div>
+      <el-select v-model="productTypeForm.product_type" placeholder="请选择产品类型" style="width: 100%">
+        <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+      </el-select>
+      <template #footer>
+        <el-button @click="productTypeDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingProductType" @click="handleSaveProductType">保存产品类型</el-button>
+      </template>
+    </el-dialog> -->
+
     <el-dialog
       v-model="editDialogVisible"
       title="编辑不符合规定化妆品明细"
@@ -177,6 +231,7 @@
       :close-on-click-modal="false"
     >
       <el-form ref="productDetailFormRef" :model="productDetailForm" :rules="productDetailRules" label-width="120px">
+
         <el-row :gutter="16">
           <el-col :span="8">
             <el-form-item label="序号" prop="sequence_no">
@@ -217,7 +272,7 @@
         </el-row>
 
         <el-row :gutter="16">
-          <el-col :span="8">
+          <!-- <el-col :span="8">
             <el-form-item label="包装规格">
               <el-input v-model="productDetailForm.package_spec" />
             </el-form-item>
@@ -226,7 +281,7 @@
             <el-form-item label="标示批号">
               <el-input v-model="productDetailForm.batch_no" />
             </el-form-item>
-          </el-col>
+          </el-col> -->
           <el-col :span="8">
             <el-form-item label="生产日期">
               <el-input v-model="productDetailForm.production_date" />
@@ -302,20 +357,42 @@ import {
   getAnnouncementById,
   getAnnouncementProductDetails,
   getRelatedInspections,
-  updateAnnouncementProductDetail
+  updateAnnouncementContent,
+  updateAnnouncementProductDetail,
+  updateAnnouncementProductType
 } from '@/api/index'
+
+
 import dayjs from 'dayjs'
 
+const PRODUCT_TYPE_LABELS = {
+  cosmetics: '化妆品',
+  food: '食品',
+  medical_device: '医疗器械',
+  unknown: '未分类'
+}
+
+const productTypeOptions = Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => ({
+  value,
+  label
+}))
+
 const route = useRoute()
+
 const router = useRouter()
 const loading = ref(false)
 const productDetailsLoading = ref(false)
 const savingProductDetail = ref(false)
+const savingProductType = ref(false)
+// const savingContent = ref(false)
 const announcement = ref(null)
 const relatedInspections = ref([])
 const productDetails = ref([])
 const editDialogVisible = ref(false)
+// const contentDialogVisible = ref(false)
+const productTypeDialogVisible = ref(false)
 const productDetailFormRef = ref(null)
+
 const productDetailFilters = ref({
   unqualified_item: '',
   company_keyword: '',
@@ -323,6 +400,12 @@ const productDetailFilters = ref({
   is_counterfeit: ''
 })
 const productDetailsSummary = ref(createEmptySummary())
+const productTypeForm = reactive({
+  product_type: 'unknown'
+})
+const contentForm = reactive({
+  content: ''
+})
 const productDetailForm = reactive(createEmptyProductDetailForm())
 const productDetailRules = {
   sequence_no: [{ required: true, message: '请输入序号', trigger: 'change' }],
@@ -372,8 +455,13 @@ function createEmptyProductDetailForm () {
 }
 
 const currentAnnouncementId = computed(() => announcement.value?.id || route.params.id)
+const announcementProductTypeLabel = computed(() => {
+  const value = announcement.value?.product_type
+  return PRODUCT_TYPE_LABELS[value] || value || '未分类'
+})
 
 const activeCounterfeitCount = computed(() => {
+
   return productDetailsSummary.value.has_filters
     ? Number(productDetailsSummary.value.filtered_counterfeit_count || 0)
     : Number(productDetailsSummary.value.counterfeit_count || 0)
@@ -406,13 +494,47 @@ const formatDate = (date) => {
   const value = dayjs(date)
   return value.isValid() ? value.format('YYYY年MM月DD日') : date
 }
+// 编辑正文
+// const openContentDialog = () => {
+//   contentForm.content = announcement.value?.content || ''
+//   contentDialogVisible.value = true
+// }
 
-const formatContent = (content) => {
-  if (!content) return '暂无内容'
-  return content.replace(/\n/g, '<br>')
-}
+// const handleSaveContent = async () => {
+//   if (!currentAnnouncementId.value || savingContent.value) {
+//     return
+//   }
+
+//   const nextContent = String(contentForm.content || '').trim()
+//   if (!nextContent) {
+//     ElMessage.warning('通告正文不能为空')
+//     return
+//   }
+
+//   savingContent.value = true
+//   try {
+//     const res = await updateAnnouncementContent(currentAnnouncementId.value, {
+//       content: nextContent
+//     })
+//     // contentDialogVisible.value = false
+//     announcement.value = {
+//       ...(announcement.value || {}),
+//       content: res.data?.updated_content || nextContent,
+//       inspection_unit: res.data?.inspection_unit ?? announcement.value?.inspection_unit, 
+//       inspection_count: res.data?.inspection_count ?? announcement.value?.inspection_count
+//     }
+//     ElMessage.success('通告正文更新成功')
+//     await fetchAnnouncementOnly(currentAnnouncementId.value)
+//   } catch (error) {
+//     console.error('更新公告正文失败:', error)
+//     ElMessage.error('更新公告正文失败')
+//   } finally {
+//     savingContent.value = false
+//   }
+// }
 
 const downloadAttachment = () => {
+
   if (announcement.value?.attachment_path) {
     window.open(`http://localhost:3000${announcement.value.attachment_path}`, '_blank')
   }
@@ -502,7 +624,34 @@ const refreshAnnouncementData = async () => {
   ])
 }
 
+const openProductTypeDialog = () => {
+  productTypeForm.product_type = announcement.value?.product_type || 'unknown'
+  productTypeDialogVisible.value = true
+}
+
+const handleSaveProductType = async () => {
+  if (!currentAnnouncementId.value || savingProductType.value) {
+    return
+  }
+
+  savingProductType.value = true
+  try {
+    await updateAnnouncementProductType(currentAnnouncementId.value, {
+      product_type: productTypeForm.product_type
+    })
+    productTypeDialogVisible.value = false
+    ElMessage.success('产品类型更新成功')
+    await refreshAnnouncementData()
+  } catch (error) {
+    console.error('更新公告产品类型失败:', error)
+    ElMessage.error('更新公告产品类型失败')
+  } finally {
+    savingProductType.value = false
+  }
+}
+
 const handleProductDetailSearch = () => {
+
   if (currentAnnouncementId.value) {
     fetchProductDetails(currentAnnouncementId.value)
   }

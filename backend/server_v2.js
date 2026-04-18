@@ -18,12 +18,14 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 路由
 app.use('/api/announcements', require('./routes/announcements_v2'));
+app.use('/api/announcement-staging', require('./routes/announcement_staging'));
 app.use('/api/inspections', require('./routes/inspections_v2'));
 app.use('/api/companies', require('./routes/companies'));
 app.use('/api/unqualified-products', require('./routes/unqualified_products'));
 app.use('/api/supervisions', require('./routes/supervisions'));
 app.use('/api/dashboard', require('./routes/dashboard_v2'));
 app.use('/api/analytics', require('./routes/analytics'));
+
 
 
 // 健康检查
@@ -39,12 +41,14 @@ app.get('/', (req, res) => {
     description: '专注于抽样检查和企业管理的化妆品资讯系统',
     endpoints: {
       announcements: '/api/announcements',
+      announcementStaging: '/api/announcement-staging',
       inspections: '/api/inspections',
       companies: '/api/companies',
       unqualifiedProducts: '/api/unqualified-products',
       supervisions: '/api/supervisions',
       dashboard: '/api/dashboard'
     }
+
   });
 });
 

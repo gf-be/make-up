@@ -16,6 +16,12 @@ const {
   getSupervisionRelatedCompanyIds,
   deleteOrphanCompanies
 } = require('../utils/companySamplingSync');
+const {
+  replaceUnqualifiedProductsFromFlightInspectionDetails,
+  normalizeProductType,
+  normalizeAnnouncementType
+} = require('../utils/unqualifiedProducts');
+
 
 
 
@@ -28,8 +34,22 @@ const EXTRA_COLUMNS = [
   { name: 'handling_measures', definition: 'LONGTEXT NULL' },
   { name: 'publish_date', definition: 'DATE NULL' },
   { name: 'attachment_path', definition: 'VARCHAR(500) NULL' },
-  { name: 'attachment_name', definition: 'VARCHAR(200) NULL' }
+  { name: 'attachment_name', definition: 'VARCHAR(200) NULL' },
+  { name: 'product_type', definition: "VARCHAR(50) NOT NULL DEFAULT 'cosmetics'" },
+  { name: 'announcement_type', definition: "VARCHAR(50) NOT NULL DEFAULT 'flight_inspection'" },
+  { name: 'source_detail_url', definition: 'VARCHAR(500) NULL' },
+  { name: 'source_page', definition: 'VARCHAR(500) NULL' },
+  { name: 'source_json_file', definition: 'VARCHAR(500) NULL' }
 ];
+
+async function ensureIndexExists(tableName, indexName, definitionSql) {
+  const [rows] = await pool.query(`SHOW INDEX FROM ${tableName} WHERE Key_name = ?`, [indexName]);
+  if (rows.length === 0) {
+    await pool.query(`ALTER TABLE ${tableName} ADD ${definitionSql}`);
+  }
+}
+
+
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -124,7 +144,12 @@ async function ensureFlightInspectionColumns() {
     }
   }
 
+  await ensureIndexExists('supervisions', 'idx_supervisions_product_type', 'INDEX idx_supervisions_product_type (product_type)');
+  await ensureIndexExists('supervisions', 'idx_supervisions_announcement_type', 'INDEX idx_supervisions_announcement_type (announcement_type)');
+  await ensureIndexExists('supervisions', 'idx_supervisions_source_detail_url', 'INDEX idx_supervisions_source_detail_url (source_detail_url(191))');
+
   await ensureFlightInspectionDetailTable(pool);
+
   await ensureSupervisionAttachmentsTable();
   await ensureCompaniesSamplingSchema(pool);
 }
@@ -147,6 +172,11 @@ function buildFlightInspectionSelect() {
       s.region,
       s.level,
       s.supervision_type,
+      s.product_type,
+      s.announcement_type,
+      s.source_detail_url,
+      s.source_page,
+      s.source_json_file,
       s.content,
       s.rectification_deadline,
       s.status,
@@ -154,6 +184,7 @@ function buildFlightInspectionSelect() {
       s.view_count,
       s.attachment_path,
       s.attachment_name,
+
       (
         SELECT COUNT(*)
         FROM supervision_attachments sa
@@ -320,7 +351,17 @@ function buildFlightInspectionSummary(detailRows = []) {
   };
 }
 
+function normalizeFlightInspectionDetailRows(rows = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => String(row?.company_name || '').trim())
+    .map((row, index) => ({
+      ...row,
+      sequence_no: index + 1
+    }));
+}
+
 async function parseAttachmentSafely(file) {
+
 
   if (!file) {
     return {
@@ -409,7 +450,7 @@ function normalizeFlightInspectionPayload(body = {}, detailRows = [], attachment
   const title = body.title || detail.title || (
     summary.companyCount > 1
       ? `${summary.companyCount}家企业飞行检查通告`
-      : (companyName ? `${companyName}飞行检查结果` : '化妆品飞行检查通告')
+      : (companyName ? `${companyName}飞行检查结果` : '飞行检查通告')
   );
 
   return {
@@ -426,6 +467,11 @@ function normalizeFlightInspectionPayload(body = {}, detailRows = [], attachment
     region: body.region || null,
     level: body.level || 'national',
     supervision_type: body.supervision_type || '飞行检查',
+    product_type: normalizeProductType(body.product_type),
+    announcement_type: normalizeAnnouncementType(body.announcement_type || 'flight_inspection'),
+    source_detail_url: body.source_detail_url ? String(body.source_detail_url).trim() : null,
+    source_page: body.source_page ? String(body.source_page).trim() : null,
+    source_json_file: body.source_json_file ? String(body.source_json_file).trim() : null,
     content: body.content || summary.combinedRawText || detail.raw_text || null,
     rectification_deadline: body.rectification_deadline || null,
     status: body.status || 'ongoing',
@@ -434,6 +480,7 @@ function normalizeFlightInspectionPayload(body = {}, detailRows = [], attachment
     attachment_name: attachmentInfo.attachment_name || null
   };
 }
+
 
 async function getExistingAttachmentInfo(id) {
   const [rows] = await pool.query('SELECT attachment_path, attachment_name FROM supervisions WHERE id = ?', [id]);
@@ -454,10 +501,12 @@ router.get('/', async (req, res) => {
       level,
       company_name,
       inspection_unit,
+      product_type,
       page = 1,
       limit = 10,
       keyword
     } = req.query;
+
     const currentPage = parseInt(page, 10) || 1;
     const pageSize = parseInt(limit, 10) || 10;
     const offset = (currentPage - 1) * pageSize;
@@ -474,7 +523,16 @@ router.get('/', async (req, res) => {
       countParams.push(level);
     }
 
+    if (product_type) {
+      const normalizedProductType = normalizeProductType(product_type);
+      query += ' AND s.product_type = ?';
+      countQuery += ' AND product_type = ?';
+      params.push(normalizedProductType);
+      countParams.push(normalizedProductType);
+    }
+
     if (company_name) {
+
       query += ` AND (
         s.company_name LIKE ?
         OR EXISTS (
@@ -594,11 +652,13 @@ router.post('/', uploadAttachments, async (req, res) => {
     const uploadedFiles = collectUploadedFiles(req);
     const parsedAttachments = await parseUploadedAttachments(uploadedFiles);
     const fallbackDetail = uploadedFiles.length === 0 && req.body.content ? parseFlightInspectionText(req.body.content) : null;
-    const detailRows = parsedAttachments.rows.length > 0
+    const rawDetailRows = parsedAttachments.rows.length > 0
       ? parsedAttachments.rows
       : (fallbackDetail ? [{ ...fallbackDetail, sequence_no: 1 }] : []);
+    const detailRows = normalizeFlightInspectionDetailRows(rawDetailRows);
     const primaryAttachment = parsedAttachments.attachments[0] || {};
     const payload = normalizeFlightInspectionPayload(req.body, detailRows, primaryAttachment);
+
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -608,9 +668,12 @@ router.post('/', uploadAttachments, async (req, res) => {
         title, company_name, production_license_no, company_address,
         supervision_date, publish_date, supervision_unit, inspection_basis,
         defects_and_problems, handling_measures, attachment_path, attachment_name,
-        region, level, supervision_type, content, rectification_deadline, status, source
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        region, level, supervision_type, product_type, announcement_type,
+        source_detail_url, source_page, source_json_file,
+        content, rectification_deadline, status, source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
+
       payload.title,
       payload.company_name,
       payload.production_license_no,
@@ -626,6 +689,11 @@ router.post('/', uploadAttachments, async (req, res) => {
       payload.region,
       payload.level,
       payload.supervision_type,
+      payload.product_type,
+      payload.announcement_type,
+      payload.source_detail_url,
+      payload.source_page,
+      payload.source_json_file,
       payload.content,
       payload.rectification_deadline,
       payload.status,
@@ -635,7 +703,9 @@ router.post('/', uploadAttachments, async (req, res) => {
     await replaceFlightInspectionDetails(connection, result.insertId, detailRows);
     await replaceSupervisionAttachments(connection, result.insertId, parsedAttachments.attachments);
     const companySyncResult = await syncCompaniesFromFlightInspectionDetails(connection, result.insertId);
+    const unqualifiedSyncResult = await replaceUnqualifiedProductsFromFlightInspectionDetails(connection, result.insertId);
     await connection.commit();
+
 
     res.json({
       success: true,
@@ -649,10 +719,12 @@ router.post('/', uploadAttachments, async (req, res) => {
         parsed_detail_count: detailRows.length,
         attachment_count: parsedAttachments.attachments.length,
         synced_company_count: companySyncResult.company_count,
+        synced_unqualified_count: unqualifiedSyncResult.synced_count,
         parse_message: parsedAttachments.message,
         parse_supported: uploadedFiles.length > 0 ? parsedAttachments.supportedCount > 0 : Boolean(fallbackDetail)
       }
     });
+
   } catch (error) {
     if (connection) {
       await connection.rollback();
@@ -667,6 +739,58 @@ router.post('/', uploadAttachments, async (req, res) => {
 });
 
 
+router.patch('/:id/product-type', async (req, res) => {
+  let connection;
+
+  try {
+    await ensureFlightInspectionColumns();
+
+    const { id } = req.params;
+    const productType = String(req.body?.product_type || '').trim();
+    if (!productType) {
+      return res.status(400).json({ success: false, message: '产品类型不能为空' });
+    }
+
+    const normalizedProductType = normalizeProductType(productType);
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query('SELECT id FROM supervisions WHERE id = ? LIMIT 1', [id]);
+    if (!rows[0]) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '飞行检查通告不存在' });
+    }
+
+    const previousCompanyIds = await getSupervisionRelatedCompanyIds(connection, id);
+    await connection.query('UPDATE supervisions SET product_type = ? WHERE id = ?', [normalizedProductType, id]);
+    const unqualifiedSyncResult = await replaceUnqualifiedProductsFromFlightInspectionDetails(connection, id);
+    const companySyncResult = await syncCompaniesFromFlightInspectionDetails(connection, id);
+    await deleteOrphanCompanies(connection, previousCompanyIds);
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: '产品类型更新成功',
+      data: {
+        id: Number(id),
+        product_type: normalizedProductType,
+        synced_company_count: companySyncResult.company_count,
+        synced_unqualified_count: unqualifiedSyncResult.synced_count
+      }
+    });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('更新飞行检查产品类型失败:', error);
+    res.status(500).json({ success: false, message: '更新飞行检查产品类型失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
 // 更新飞行检查通告
 router.put('/:id', uploadAttachments, async (req, res) => {
   let connection;
@@ -678,10 +802,13 @@ router.put('/:id', uploadAttachments, async (req, res) => {
     const uploadedFiles = collectUploadedFiles(req);
     const parsedAttachments = await parseUploadedAttachments(uploadedFiles);
     const fallbackDetail = uploadedFiles.length === 0 && req.body.content ? parseFlightInspectionText(req.body.content) : null;
-    const detailRows = parsedAttachments.rows.length > 0
+
+    const rawDetailRows = parsedAttachments.rows.length > 0
       ? parsedAttachments.rows
       : (fallbackDetail ? [{ ...fallbackDetail, sequence_no: 1 }] : []);
+    const detailRows = normalizeFlightInspectionDetailRows(rawDetailRows);
     const existingAttachment = uploadedFiles.length > 0 ? {} : await getExistingAttachmentInfo(id);
+
     const payload = normalizeFlightInspectionPayload(
       req.body,
       detailRows,
@@ -690,7 +817,10 @@ router.put('/:id', uploadAttachments, async (req, res) => {
     const shouldSyncCompanies = uploadedFiles.length > 0
       || detailRows.length > 0
       || Object.prototype.hasOwnProperty.call(req.body, 'company_name')
-      || Object.prototype.hasOwnProperty.call(req.body, 'company_address');
+      || Object.prototype.hasOwnProperty.call(req.body, 'company_address')
+      || Object.prototype.hasOwnProperty.call(req.body, 'product_type')
+      || Object.prototype.hasOwnProperty.call(req.body, 'announcement_type');
+
 
 
     connection = await pool.getConnection();
@@ -703,7 +833,9 @@ router.put('/:id', uploadAttachments, async (req, res) => {
       SET title = ?, company_name = ?, production_license_no = ?, company_address = ?,
           supervision_date = ?, publish_date = ?, supervision_unit = ?, inspection_basis = ?,
           defects_and_problems = ?, handling_measures = ?, attachment_path = ?, attachment_name = ?,
-          region = ?, level = ?, supervision_type = ?, content = ?, rectification_deadline = ?, status = ?, source = ?
+          region = ?, level = ?, supervision_type = ?, product_type = ?, announcement_type = ?,
+          source_detail_url = ?, source_page = ?, source_json_file = ?,
+          content = ?, rectification_deadline = ?, status = ?, source = ?
       WHERE id = ?
     `, [
 
@@ -722,12 +854,18 @@ router.put('/:id', uploadAttachments, async (req, res) => {
       payload.region,
       payload.level,
       payload.supervision_type,
+      payload.product_type,
+      payload.announcement_type,
+      payload.source_detail_url,
+      payload.source_page,
+      payload.source_json_file,
       payload.content,
       payload.rectification_deadline,
       payload.status,
       payload.source,
       id
     ]);
+
 
     if (uploadedFiles.length > 0 || detailRows.length > 0) {
       await replaceFlightInspectionDetails(connection, id, detailRows);
@@ -736,6 +874,8 @@ router.put('/:id', uploadAttachments, async (req, res) => {
         await replaceSupervisionAttachments(connection, id, parsedAttachments.attachments);
       }
     }
+
+    const unqualifiedSyncResult = await replaceUnqualifiedProductsFromFlightInspectionDetails(connection, id);
 
     if (shouldSyncCompanies) {
       const companySyncResult = await syncCompaniesFromFlightInspectionDetails(connection, id);
@@ -749,6 +889,7 @@ router.put('/:id', uploadAttachments, async (req, res) => {
           parsed_detail_count: detailRows.length,
           attachment_count: uploadedFiles.length > 0 ? parsedAttachments.attachments.length : undefined,
           synced_company_count: companySyncResult.company_count,
+          synced_unqualified_count: unqualifiedSyncResult.synced_count,
           parse_message: parsedAttachments.message,
           parse_supported: uploadedFiles.length > 0 ? parsedAttachments.supportedCount > 0 : Boolean(fallbackDetail)
         }
@@ -763,10 +904,12 @@ router.put('/:id', uploadAttachments, async (req, res) => {
       message: '更新成功',
       data: {
         parsed_detail_count: 0,
+        synced_unqualified_count: unqualifiedSyncResult.synced_count,
         parse_message: '',
         parse_supported: false
       }
     });
+
   } catch (error) {
     if (connection) {
       await connection.rollback();
@@ -794,9 +937,11 @@ router.delete('/:id', async (req, res) => {
 
     const relatedCompanyIds = await getSupervisionRelatedCompanyIds(connection, id);
     await connection.query('DELETE FROM company_supervision_records WHERE supervision_id = ?', [id]);
+    await connection.query('DELETE FROM unqualified_products WHERE supervision_id = ?', [id]);
     await connection.query('DELETE FROM flight_inspection_detail WHERE supervision_id = ?', [id]);
     await connection.query('DELETE FROM supervision_attachments WHERE supervision_id = ?', [id]);
     const [result] = await connection.query('DELETE FROM supervisions WHERE id = ?', [id]);
+
 
 
     if (result.affectedRows === 0) {

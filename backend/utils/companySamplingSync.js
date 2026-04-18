@@ -1,3 +1,10 @@
+const {
+  normalizeProductType,
+  normalizeAnnouncementType
+} = require('./unqualifiedProducts');
+const { deriveProductCategory } = require('./dataAnalysisHelpers');
+
+
 function normalizeText(value) {
   return String(value || '')
     .replace(/\u0007/g, ' ')
@@ -5,6 +12,7 @@ function normalizeText(value) {
     .replace(/[ \t]+/g, ' ')
     .trim();
 }
+
 
 function splitCompanyValues(value) {
   const normalized = String(value || '')
@@ -26,7 +34,35 @@ function deriveProvince(region, address) {
   return match ? match[1] : null;
 }
 
+async function ensureColumnExists(connection, tableName, columnName, definition) {
+  const [rows] = await connection.query(`SHOW COLUMNS FROM ${tableName} LIKE ?`, [columnName]);
+  if (rows.length === 0) {
+    try {
+      await connection.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+    } catch (error) {
+      if (error?.code !== 'ER_DUP_FIELDNAME') {
+        throw error;
+      }
+    }
+  }
+}
+
+async function ensureIndexExists(connection, tableName, indexName, definitionSql) {
+  const [rows] = await connection.query(`SHOW INDEX FROM ${tableName} WHERE Key_name = ?`, [indexName]);
+  if (rows.length === 0) {
+    try {
+      await connection.query(`ALTER TABLE ${tableName} ADD ${definitionSql}`);
+    } catch (error) {
+      if (error?.code !== 'ER_DUP_KEYNAME') {
+        throw error;
+      }
+    }
+  }
+}
+
+
 async function ensureCompaniesSamplingSchema(connection) {
+
   const [sampledCountColumn] = await connection.query('SHOW COLUMNS FROM companies LIKE ?', ['sampled_count']);
   if (sampledCountColumn.length === 0) {
     await connection.query('ALTER TABLE companies ADD COLUMN sampled_count INT DEFAULT 0 AFTER city');
@@ -37,6 +73,13 @@ async function ensureCompaniesSamplingSchema(connection) {
     await connection.query('ALTER TABLE companies ADD COLUMN last_sampled_at DATE NULL AFTER sampled_count');
   }
 
+  const [productCategoryColumn] = await connection.query('SHOW COLUMNS FROM companies LIKE ?', ['product_category']);
+  if (productCategoryColumn.length === 0) {
+    await connection.query("ALTER TABLE companies ADD COLUMN product_category VARCHAR(100) NULL AFTER city");
+  }
+  await ensureIndexExists(connection, 'companies', 'idx_companies_product_category', 'INDEX idx_companies_product_category (product_category)');
+
+
   await connection.query(`
     CREATE TABLE IF NOT EXISTS company_sampling_records (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -44,11 +87,15 @@ async function ensureCompaniesSamplingSchema(connection) {
       announcement_id INT NOT NULL,
       announcement_detail_id INT NOT NULL,
       product_name VARCHAR(255),
+      product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+      announcement_type VARCHAR(50) NOT NULL DEFAULT 'sampling',
       sampled_at DATE NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE KEY uk_company_sampling_detail_company (announcement_detail_id, company_id),
       INDEX idx_company_sampling_company (company_id),
-      INDEX idx_company_sampling_announcement (announcement_id)
+      INDEX idx_company_sampling_announcement (announcement_id),
+      INDEX idx_company_sampling_product_type (product_type),
+      INDEX idx_company_sampling_announcement_type (announcement_type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
@@ -58,13 +105,27 @@ async function ensureCompaniesSamplingSchema(connection) {
       company_id INT NOT NULL,
       supervision_id INT NOT NULL,
       supervision_detail_id INT NULL,
+      product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+      announcement_type VARCHAR(50) NOT NULL DEFAULT 'flight_inspection',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE KEY uk_company_supervision_company (supervision_id, company_id),
       INDEX idx_company_supervision_company (company_id),
       INDEX idx_company_supervision_supervision (supervision_id),
-      INDEX idx_company_supervision_detail (supervision_detail_id)
+      INDEX idx_company_supervision_detail (supervision_detail_id),
+      INDEX idx_company_supervision_product_type (product_type),
+      INDEX idx_company_supervision_announcement_type (announcement_type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  await ensureColumnExists(connection, 'company_sampling_records', 'product_type', "VARCHAR(50) NOT NULL DEFAULT 'cosmetics' AFTER product_name");
+  await ensureColumnExists(connection, 'company_sampling_records', 'announcement_type', "VARCHAR(50) NOT NULL DEFAULT 'sampling' AFTER product_type");
+  await ensureColumnExists(connection, 'company_supervision_records', 'product_type', "VARCHAR(50) NOT NULL DEFAULT 'cosmetics' AFTER supervision_detail_id");
+  await ensureColumnExists(connection, 'company_supervision_records', 'announcement_type', "VARCHAR(50) NOT NULL DEFAULT 'flight_inspection' AFTER product_type");
+  await ensureIndexExists(connection, 'company_sampling_records', 'idx_company_sampling_product_type', 'INDEX idx_company_sampling_product_type (product_type)');
+  await ensureIndexExists(connection, 'company_sampling_records', 'idx_company_sampling_announcement_type', 'INDEX idx_company_sampling_announcement_type (announcement_type)');
+  await ensureIndexExists(connection, 'company_supervision_records', 'idx_company_supervision_product_type', 'INDEX idx_company_supervision_product_type (product_type)');
+  await ensureIndexExists(connection, 'company_supervision_records', 'idx_company_supervision_announcement_type', 'INDEX idx_company_supervision_announcement_type (announcement_type)');
+
 
   await ensureForeignKey(
     connection,
@@ -156,9 +217,16 @@ async function ensureForeignKey(connection, tableName, constraintName, definitio
   );
 
   if (rows.length === 0) {
-    await connection.query(`ALTER TABLE ${tableName} ADD CONSTRAINT ${constraintName} ${definitionSql}`);
+    try {
+      await connection.query(`ALTER TABLE ${tableName} ADD CONSTRAINT ${constraintName} ${definitionSql}`);
+    } catch (error) {
+      if (error?.code !== 'ER_FK_DUP_NAME') {
+        throw error;
+      }
+    }
   }
 }
+
 
 async function cleanupOrphanSupervisionArtifacts(connection) {
   const result = {
@@ -279,19 +347,22 @@ async function deleteOrphanCompanies(connection, companyIds = []) {
   };
 }
 
-async function upsertCompany(connection, companyName, companyAddress, province) {
+async function upsertCompany(connection, companyName, companyAddress, province, productCategory = null) {
 
   const [existingRows] = await connection.query(
-    'SELECT id, address, province FROM companies WHERE name = ? LIMIT 1',
+    'SELECT id, address, province, product_category FROM companies WHERE name = ? LIMIT 1',
     [companyName]
   );
 
   if (existingRows.length > 0) {
     const existing = existingRows[0];
-    if ((!existing.address && companyAddress) || (!existing.province && province)) {
+    const shouldUpdateAddress = (!existing.address && companyAddress);
+    const shouldUpdateProvince = (!existing.province && province);
+    const shouldUpdateCategory = (!existing.product_category && productCategory);
+    if (shouldUpdateAddress || shouldUpdateProvince || shouldUpdateCategory) {
       await connection.query(
-        'UPDATE companies SET address = COALESCE(address, ?), province = COALESCE(province, ?) WHERE id = ?',
-        [companyAddress || null, province || null, existing.id]
+        'UPDATE companies SET address = COALESCE(address, ?), province = COALESCE(province, ?), product_category = COALESCE(product_category, ?) WHERE id = ?',
+        [companyAddress || null, province || null, productCategory || null, existing.id]
       );
     }
     return existing.id;
@@ -299,17 +370,32 @@ async function upsertCompany(connection, companyName, companyAddress, province) 
 
   const [result] = await connection.query(
     `
-      INSERT INTO companies (name, type, address, province, sampled_count, last_sampled_at)
-      VALUES (?, 'manufacturer', ?, ?, 0, NULL)
+      INSERT INTO companies (name, type, address, province, product_category, sampled_count, last_sampled_at)
+      VALUES (?, 'manufacturer', ?, ?, ?, 0, NULL)
     `,
-    [companyName, companyAddress || null, province || null]
+    [companyName, companyAddress || null, province || null, productCategory || null]
   );
 
   return result.insertId;
 }
 
+
 async function syncCompaniesFromAnnouncementDetails(connection, announcementId, publishDate = null) {
   await ensureCompaniesSamplingSchema(connection);
+
+  const [announcementRows] = await connection.query(
+    `
+      SELECT publish_date, product_type, announcement_type
+      FROM announcements
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [announcementId]
+  );
+  const announcement = announcementRows[0] || {};
+  const sampledAt = publishDate || announcement.publish_date || null;
+  const productType = normalizeProductType(announcement.product_type);
+  const announcementType = normalizeAnnouncementType(announcement.announcement_type || 'sampling');
 
   const [oldCompanyRows] = await connection.query(
     'SELECT DISTINCT company_id FROM company_sampling_records WHERE announcement_id = ?',
@@ -330,6 +416,7 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
     [announcementId]
   );
 
+
   for (const detail of detailRows) {
     const companyNames = splitCompanyValues(detail.company_names);
     const companyAddresses = splitCompanyValues(detail.company_addresses);
@@ -338,7 +425,9 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
     for (const [index, companyName] of companyNames.entries()) {
       const companyAddress = companyAddresses[index] || defaultAddress;
       const province = deriveProvince(detail.product_region, companyAddress);
-      const companyId = await upsertCompany(connection, companyName, companyAddress, province);
+      const productCategory = deriveProductCategory(detail.product_name);
+      const companyId = await upsertCompany(connection, companyName, companyAddress, province, productCategory);
+
       const normalizedCompanyId = Number(companyId);
       affectedCompanyIds.add(normalizedCompanyId);
       currentCompanyIds.add(normalizedCompanyId);
@@ -346,11 +435,21 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
       await connection.query(
         `
           INSERT INTO company_sampling_records (
-            company_id, announcement_id, announcement_detail_id, product_name, sampled_at
-          ) VALUES (?, ?, ?, ?, ?)
+            company_id, announcement_id, announcement_detail_id, product_name,
+            product_type, announcement_type, sampled_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
         `,
-        [companyId, announcementId, detail.id, detail.product_name || null, publishDate || null]
+        [
+          companyId,
+          announcementId,
+          detail.id,
+          detail.product_name || null,
+          productType,
+          announcementType,
+          sampledAt
+        ]
       );
+
     }
   }
 
@@ -388,22 +487,27 @@ async function syncCompaniesFromFlightInspectionDetails(connection, supervisionI
   );
   const [supervisionRows] = await connection.query(
     `
-      SELECT company_name, company_address
+      SELECT company_name, company_address, product_type, announcement_type
       FROM supervisions
       WHERE id = ?
       LIMIT 1
     `,
     [supervisionId]
   );
+  const supervision = supervisionRows[0] || {};
+  const productType = normalizeProductType(supervision.product_type);
+  const announcementType = normalizeAnnouncementType(supervision.announcement_type || 'flight_inspection');
+
 
   const sourceRows = [...detailRows];
-  if (supervisionRows[0]?.company_name) {
+  if (supervision.company_name) {
     sourceRows.push({
       id: null,
-      company_name: supervisionRows[0].company_name,
-      company_address: supervisionRows[0].company_address
+      company_name: supervision.company_name,
+      company_address: supervision.company_address
     });
   }
+
 
   for (const detail of sourceRows) {
     const companyName = normalizeText(detail.company_name);
@@ -413,7 +517,9 @@ async function syncCompaniesFromFlightInspectionDetails(connection, supervisionI
 
     const companyAddress = normalizeText(detail.company_address) || null;
     const province = deriveProvince(null, companyAddress);
-    const companyId = await upsertCompany(connection, companyName, companyAddress, province);
+    const productCategory = deriveProductCategory(detail.product_name);
+    const companyId = await upsertCompany(connection, companyName, companyAddress, province, productCategory);
+
     const normalizedCompanyId = Number(companyId);
     affectedCompanyIds.add(normalizedCompanyId);
     currentCompanyIds.add(normalizedCompanyId);
@@ -424,11 +530,14 @@ async function syncCompaniesFromFlightInspectionDetails(connection, supervisionI
 
     await connection.query(
       `
-        INSERT INTO company_supervision_records (company_id, supervision_id, supervision_detail_id)
-        VALUES (?, ?, ?)
+        INSERT INTO company_supervision_records (
+          company_id, supervision_id, supervision_detail_id, product_type, announcement_type
+        )
+        VALUES (?, ?, ?, ?, ?)
       `,
-      [companyId, supervisionId, detail.id || null]
+      [companyId, supervisionId, detail.id || null, productType, announcementType]
     );
+
     linkedCompanyIds.add(normalizedCompanyId);
   }
 

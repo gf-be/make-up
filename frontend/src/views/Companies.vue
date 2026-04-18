@@ -8,20 +8,25 @@
             <el-icon><DataAnalysis /></el-icon>
             不合格企业
           </el-button>
-
         </div>
       </template>
 
-      <!-- 筛选栏 -->
       <el-form :model="filters" inline class="filter-form">
         <el-form-item label="企业名称">
           <el-input v-model="filters.name" placeholder="输入企业名称" clearable @keyup.enter="loadData" />
         </el-form-item>
-        <el-form-item label="品牌">
+        <!-- <el-form-item label="品牌">
           <el-input v-model="filters.brand" placeholder="输入品牌" clearable @keyup.enter="loadData" />
-        </el-form-item>
+        </el-form-item> -->
         <el-form-item label="省份">
-          <el-input v-model="filters.province" placeholder="输入省份" clearable @keyup.enter="loadData" />
+          <el-select v-model="filters.province" placeholder="全部省份" clearable filterable style="width: 180px" @change="loadData">
+            <el-option v-for="item in filterOptions.provinces" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="产品分类">
+          <el-select v-model="filters.product_category" placeholder="全部产品分类" clearable filterable style="width: 220px" @change="loadData">
+            <el-option v-for="item in filterOptions.product_categories" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
         </el-form-item>
         <el-form-item label="只看不合格">
           <el-switch v-model="filters.has_unqualified" active-text="是" inactive-text="否" @change="loadData" />
@@ -35,7 +40,6 @@
         </el-form-item>
       </el-form>
 
-      <!-- 统计卡片 -->
       <el-row :gutter="20" class="stats-row">
         <el-col :span="6">
           <div class="stat-item">
@@ -59,21 +63,19 @@
           <div class="stat-item rate">
             <div class="stat-value">
               {{ companyStats.inspected_companies
-                  ? ((companyStats.inspected_companies - companyStats.unqualified_companies) / companyStats.inspected_companies * 100).toFixed(1)
-                  : 0 }}%
+                ? ((companyStats.inspected_companies - companyStats.unqualified_companies) / companyStats.inspected_companies * 100).toFixed(1)
+                : 0 }}%
             </div>
             <div class="stat-label">合格率</div>
           </div>
         </el-col>
       </el-row>
 
-      <!-- 数据表格 -->
       <el-table :data="tableData" stripe v-loading="loading">
         <el-table-column prop="name" label="企业名称" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="brand" label="品牌" width="120" />
+        <!-- <el-table-column prop="brand" label="品牌" width="120" /> -->
         <el-table-column prop="sampled_count" label="抽查次数" width="100" align="center" />
         <el-table-column prop="type" label="类型" width="100">
-
           <template #default="{ row }">
             <el-tag :type="getTypeType(row.type)" size="small">
               {{ getTypeText(row.type) }}
@@ -81,7 +83,8 @@
           </template>
         </el-table-column>
         <el-table-column prop="province" label="省份" width="100" />
-        <el-table-column prop="city" label="城市" width="100" />
+        <el-table-column prop="product_category" label="产品分类" width="140" show-overflow-tooltip />
+        <!-- <el-table-column prop="city" label="城市" width="100" /> -->
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="viewDetail(row.id)">
@@ -91,7 +94,6 @@
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
       <el-pagination
         :page-size="pagination.limit"
         :current-page="pagination.page"
@@ -104,24 +106,28 @@
         @size-change="loadData"
         @current-change="loadData"
       />
-
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getCompanies, getCompanyStats } from '@/api/index'
+import { getCompanies, getCompanyFilterOptions, getCompanyStats } from '@/api/index'
 
 const router = useRouter()
 const loading = ref(false)
 const tableData = ref([])
 const companyStats = ref({})
+const filterOptions = ref({
+  provinces: [],
+  product_categories: []
+})
 const filters = ref({
   name: '',
   brand: '',
   province: '',
+  product_category: '',
   has_unqualified: false
 })
 const pagination = ref({
@@ -157,11 +163,24 @@ const loadStats = async () => {
   }
 }
 
+const loadFilterOptions = async () => {
+  try {
+    const res = await getCompanyFilterOptions()
+    filterOptions.value = res.data || {
+      provinces: [],
+      product_categories: []
+    }
+  } catch (error) {
+    console.error('加载企业筛选项失败:', error)
+  }
+}
+
 const resetFilters = () => {
   filters.value = {
     name: '',
     brand: '',
     province: '',
+    product_category: '',
     has_unqualified: false
   }
   pagination.value.page = 1
@@ -184,6 +203,7 @@ const getTypeText = (type) => {
 
 onMounted(() => {
   loadStats()
+  loadFilterOptions()
   loadData()
 })
 </script>
