@@ -17,6 +17,7 @@ const {
   removeAnnouncementCompanySampling
 } = require('./companySamplingSync');
 const { syncInspectionsFromAnnouncementDetails } = require('./announcementInspectionSync');
+const { linkFoodInspectionToPublishedAnnouncement } = require('./foodInspectionStore');
 
 const {
 
@@ -2113,6 +2114,9 @@ async function publishSamplingStagingBatch(connection, detail) {
 
   await replaceAnnouncementProductDetails(connection, announcementId, items);
   const syncResult = await syncPublishedAnnouncementDerivedData(connection, announcementId, finalInspectionCount);
+  if (typeInfo.product_type === 'food' && batch.source_detail_url) {
+    await linkFoodInspectionToPublishedAnnouncement(connection, batch.source_detail_url, announcementId, batch.id);
+  }
 
   const [publishedRows] = await connection.query(
     'SELECT * FROM announcements WHERE id = ? LIMIT 1',

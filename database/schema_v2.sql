@@ -76,6 +76,83 @@ CREATE TABLE IF NOT EXISTS announcement_product_details (
     INDEX idx_apd_is_counterfeit (is_counterfeit)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 食品抽检通报原始拆解表（爬虫 JSON 入库，正式发布后关联 announcements）
+CREATE TABLE IF NOT EXISTS food_inspection (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(500) NOT NULL,
+    announcement_no VARCHAR(100),
+    publish_date DATE,
+    source_detail_url VARCHAR(500),
+    source_page VARCHAR(500),
+    notice_category VARCHAR(100),
+    notice_category_label VARCHAR(100),
+    classification_status VARCHAR(50),
+    content_text LONGTEXT,
+    content_preview LONGTEXT,
+    attachment_count INT DEFAULT 0,
+    parsed_detail_count INT DEFAULT 0,
+    staging_batch_id INT,
+    published_announcement_id INT,
+    raw_payload LONGTEXT,
+    source_json_file VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_food_inspection_source_url (source_detail_url(191)),
+    INDEX idx_food_inspection_publish_date (publish_date),
+    INDEX idx_food_inspection_category (notice_category),
+    INDEX idx_food_inspection_staging (staging_batch_id),
+    INDEX idx_food_inspection_published (published_announcement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS food_inspection_attachments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    food_inspection_id INT NOT NULL,
+    attachment_name VARCHAR(500) NOT NULL,
+    attachment_url VARCHAR(800),
+    local_path VARCHAR(800),
+    file_ext VARCHAR(50),
+    attachment_type VARCHAR(80),
+    supported TINYINT(1) DEFAULT 0,
+    parsed_count INT DEFAULT 0,
+    parse_message VARCHAR(1000),
+    raw_payload LONGTEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (food_inspection_id) REFERENCES food_inspection(id) ON DELETE CASCADE,
+    INDEX idx_food_attachment_notice (food_inspection_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS food_inspection_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    food_inspection_id INT NOT NULL,
+    attachment_id INT,
+    sequence_no INT NOT NULL DEFAULT 1,
+    product_name VARCHAR(500) NOT NULL,
+    company_names TEXT,
+    company_addresses TEXT,
+    sample_unit_name VARCHAR(500),
+    sample_unit_address TEXT,
+    package_spec VARCHAR(255),
+    batch_no VARCHAR(255),
+    production_date VARCHAR(100),
+    expiry_date VARCHAR(255),
+    product_region VARCHAR(255),
+    inspection_institution VARCHAR(255),
+    unqualified_items LONGTEXT,
+    inspection_result LONGTEXT,
+    requirement LONGTEXT,
+    remarks LONGTEXT,
+    raw_payload LONGTEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (food_inspection_id) REFERENCES food_inspection(id) ON DELETE CASCADE,
+    FOREIGN KEY (attachment_id) REFERENCES food_inspection_attachments(id) ON DELETE SET NULL,
+    INDEX idx_food_product_notice (food_inspection_id),
+    INDEX idx_food_product_name (product_name),
+    INDEX idx_food_product_company (company_names(191)),
+    INDEX idx_food_product_issue (unqualified_items(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 抽样检查表
 CREATE TABLE IF NOT EXISTS inspections (
 

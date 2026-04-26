@@ -25,6 +25,8 @@ app.use('/api/unqualified-products', require('./routes/unqualified_products'));
 app.use('/api/supervisions', require('./routes/supervisions'));
 app.use('/api/dashboard', require('./routes/dashboard_v2'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/sampling-search', require('./routes/sampling_search'));
+app.use('/api/food-inspections', require('./routes/food_inspections'));
 
 
 
@@ -46,7 +48,9 @@ app.get('/', (req, res) => {
       companies: '/api/companies',
       unqualifiedProducts: '/api/unqualified-products',
       supervisions: '/api/supervisions',
-      dashboard: '/api/dashboard'
+      dashboard: '/api/dashboard',
+      samplingSearch: '/api/sampling-search',
+      foodInspections: '/api/food-inspections'
     }
 
   });

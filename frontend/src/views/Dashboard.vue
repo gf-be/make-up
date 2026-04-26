@@ -51,7 +51,7 @@
       </el-col>
     </el-row>
 
-    <el-row :gutter="20" class="mt-20">
+    <!-- <el-row :gutter="20" class="mt-20">
       <el-col :span="12">
         <el-card class="chart-card">
           <template #header>
@@ -72,9 +72,9 @@
           <div ref="supervisionChartRef" style="height: 300px"></div>
         </el-card>
       </el-col>
-    </el-row>
+    </el-row> -->
 
-    <el-row :gutter="20" class="mt-20">
+    <!-- <el-row :gutter="20" class="mt-20">
       <el-col :span="24">
         <el-card class="chart-card">
           <template #header>
@@ -85,7 +85,7 @@
           <div ref="trendChartRef" style="height: 300px"></div>
         </el-card>
       </el-col>
-    </el-row>
+    </el-row> -->
 
     <el-row :gutter="20" class="mt-20">
       <el-col :span="8">

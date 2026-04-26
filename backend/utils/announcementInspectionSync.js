@@ -46,13 +46,46 @@ function deriveInspectionLevel(announcement = {}, region = '') {
   return 'national';
 }
 
+function isValidSqlDateParts(year, month, day) {
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  if (!Number.isInteger(y) || y < 1900 || y > 2100) {
+    return false;
+  }
+  if (!Number.isInteger(m) || m < 1 || m > 12) {
+    return false;
+  }
+  if (!Number.isInteger(d) || d < 1 || d > 31) {
+    return false;
+  }
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+function toSqlDateOrNull(yearStr, monthStr, dayStr) {
+  const y = String(yearStr).trim();
+  const mo = String(monthStr).trim().padStart(2, '0');
+  const da = String(dayStr).trim().padStart(2, '0');
+  if (!isValidSqlDateParts(y, mo, da)) {
+    return null;
+  }
+  return `${y}-${mo}-${da}`;
+}
+
 function normalizeDateForSql(value) {
   if (!value) {
     return null;
   }
 
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
+    const y = value.getFullYear();
+    const m = value.getMonth() + 1;
+    const d = value.getDate();
+    if (!isValidSqlDateParts(y, m, d)) {
+      return null;
+    }
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   }
 
   const normalized = String(value).trim();
@@ -61,19 +94,20 @@ function normalizeDateForSql(value) {
   }
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-    return normalized;
+    const [y, m, d] = normalized.split('-');
+    return toSqlDateOrNull(y, m, d);
   }
 
-  const slashMatch = normalized.match(/^(\d{4})[/.](\d{1,2})[/.](\d{1,2})$/);
+  const slashMatch = normalized.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
   if (slashMatch) {
     const [, year, month, day] = slashMatch;
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    return toSqlDateOrNull(year, month, day);
   }
 
   const compactMatch = normalized.match(/^(\d{4})(\d{2})(\d{2})$/);
   if (compactMatch) {
     const [, year, month, day] = compactMatch;
-    return `${year}-${month}-${day}`;
+    return toSqlDateOrNull(year, month, day);
   }
 
   return null;

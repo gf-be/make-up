@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
-    redirect: '/dashboard'
+    redirect: '/unqualified-products'
   },
   {
     path: '/dashboard',
@@ -14,6 +14,11 @@ const routes = [
     path: '/pivot-analysis',
     name: 'PivotAnalysis',
     component: () => import('../views/PivotAnalysis.vue')
+  },
+  {
+    path: '/sampling-search',
+    name: 'SamplingDataSearch',
+    component: () => import('../views/SamplingDataSearch.vue')
   },
 
   {

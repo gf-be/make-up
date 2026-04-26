@@ -3,51 +3,71 @@
     <el-header class="header">
       <div class="header-content">
         <div class="logo">
-          <el-icon :size="28"><Document /></el-icon>
+          <el-icon :size="28">
+            <Document />
+          </el-icon>
           <span>化妆品资讯系统</span>
         </div>
-        <el-menu
-          :default-active="activeMenu"
-          mode="horizontal"
-          router
-          class="nav-menu"
-        >
-          <el-menu-item index="/pivot-analysis">
-            <el-icon><DataAnalysis /></el-icon>
-            <span>数据概览</span>
+        <el-menu :default-active="activeMenu" mode="horizontal" router class="nav-menu">
+          <el-menu-item index="/unqualified-products">
+            <el-icon>
+              <Document />
+            </el-icon>
+            <span>不合格产品</span>
           </el-menu-item>
+          <el-menu-item index="/pivot-analysis">
+            <el-icon>
+              <DataAnalysis />
+            </el-icon>
+            <span>数据矩阵</span>
+          </el-menu-item>
+          <!-- <el-menu-item index="/sampling-search">
+            <el-icon><Search /></el-icon>
+            <span>数据检索</span>
+          </el-menu-item> -->
           <el-menu-item index="/announcement-staging">
-            <el-icon><DataAnalysis /></el-icon>
+            <el-icon>
+              <DataAnalysis />
+            </el-icon>
             <span>导入检查</span>
           </el-menu-item>
           <el-menu-item index="/announcement-tracebacks">
-            <el-icon><Warning /></el-icon>
+            <el-icon>
+              <Warning />
+            </el-icon>
             <span>倒溯处理</span>
           </el-menu-item>
           <el-menu-item index="/announcements">
 
-            <el-icon><Bell /></el-icon>
+            <el-icon>
+              <Bell />
+            </el-icon>
             <span>抽检通告</span>
           </el-menu-item>
 
           <el-menu-item index="/inspections">
-            <el-icon><Checked /></el-icon>
+            <el-icon>
+              <Checked />
+            </el-icon>
             <span>抽样检查</span>
           </el-menu-item>
           <el-menu-item index="/companies">
-            <el-icon><OfficeBuilding /></el-icon>
+            <el-icon>
+              <OfficeBuilding />
+            </el-icon>
             <span>企业管理</span>
           </el-menu-item>
           <el-menu-item index="/companies/unqualified">
-            <el-icon><TrendCharts /></el-icon>
+            <el-icon>
+              <TrendCharts />
+            </el-icon>
             <span>不合格企业</span>
           </el-menu-item>
-          <el-menu-item index="/unqualified-products">
-            <el-icon><Document /></el-icon>
-            <span>不合格产品</span>
-          </el-menu-item>
+
           <el-menu-item index="/supervisions">
-            <el-icon><Warning /></el-icon>
+            <el-icon>
+              <Warning />
+            </el-icon>
             <span>飞行检查</span>
           </el-menu-item>
 
@@ -55,7 +75,7 @@
         </el-menu>
       </div>
     </el-header>
-    
+
     <el-main class="main-content">
       <router-view />
     </el-main>
@@ -73,6 +93,7 @@ const activeMenu = computed(() => {
   if (route.path.startsWith('/announcement-staging')) return '/announcement-staging'
   if (route.path.startsWith('/announcement-tracebacks')) return '/announcement-tracebacks'
   if (route.path.startsWith('/pivot-analysis')) return '/pivot-analysis'
+  // if (route.path.startsWith('/sampling-search')) return '/sampling-search'
 
   if (route.path.startsWith('/inspections')) return '/inspections'
   if (route.path.startsWith('/companies/unqualified')) return '/companies/unqualified'

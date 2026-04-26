@@ -58,7 +58,7 @@
         <el-table :data="detail.details" stripe border>
           <el-table-column type="index" label="序号" width="60" />
           <el-table-column prop="product_name" label="产品名称" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="brand" label="品牌" width="120" />
+          <!-- <el-table-column prop="brand" label="品牌" width="120" /> -->
           <el-table-column prop="manufacturer" label="生产企业" min-width="200" show-overflow-tooltip />
           <el-table-column prop="sample_source" label="抽样地点" width="120" />
           <el-table-column prop="production_date" label="生产日期" width="110" />

@@ -34,26 +34,26 @@
 
       <!-- 统计信息 -->
       <el-row :gutter="20" class="stats-row">
-        <el-col :span="6">
+        <el-col :span="8">
           <div class="stat-item">
             <div class="stat-value">{{ detail.stats.sampled_count || 0 }}</div>
             <div class="stat-label">被抽查次数</div>
           </div>
         </el-col>
 
-        <el-col :span="6">
+        <el-col :span="8">
           <div class="stat-item product">
             <div class="stat-value">{{ detail.stats.product_count || 0 }}</div>
             <div class="stat-label">抽检产品数</div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <!-- <el-col :span="6">
           <div class="stat-item qualified">
             <div class="stat-value">{{ detail.stats.qualified_count || 0 }}</div>
             <div class="stat-label">合格数</div>
           </div>
-        </el-col>
-        <el-col :span="6">
+        </el-col> -->
+        <el-col :span="8">
           <div class="stat-item unqualified">
             <div class="stat-value">{{ detail.stats.unqualified_count || 0 }}</div>
             <div class="stat-label">不合格数</div>
@@ -62,7 +62,7 @@
       </el-row>
 
       <!-- 合格率展示 -->
-      <el-row :gutter="20" class="mt-20">
+      <!-- <el-row :gutter="20" class="mt-20">
         <el-col :span="12">
           <el-card>
             <template #header>
@@ -98,7 +98,7 @@
             </div>
           </el-card>
         </el-col>
-      </el-row>
+      </el-row> -->
 
       <!-- 检查历史 -->
       <div class="history-section">

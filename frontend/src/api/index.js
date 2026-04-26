@@ -13,6 +13,23 @@ export const getPivotAnalysis = (params) => {
   return request.get('/analytics/pivot', { params })
 }
 
+// 组合式数据检索（抽检多维检索 / 导出）
+export const getSamplingSearchFieldSchema = () => {
+  return request.get('/sampling-search/field-schema')
+}
+
+export const getSamplingSearchOptions = (params) => {
+  return request.get('/sampling-search/options', { params })
+}
+
+export const postSamplingSearchQuery = (data) => {
+  return request.post('/sampling-search/query', data)
+}
+
+export const postSamplingSearchExport = (data) => {
+  return request.post('/sampling-search/export', data, { responseType: 'blob' })
+}
+
 // 公告（抽样检查公告）
 export const getAnnouncements = (params) => {
   return request.get('/announcements', { params })
@@ -190,6 +207,22 @@ export const getUnqualifiedProducts = (params) => {
   return request.get('/unqualified-products', { params })
 }
 
+export const getUnqualifiedProductTree = (params, config = {}) => {
+  return request.get('/unqualified-products/tree', { params, ...config })
+}
+
+export const getUnqualifiedProductTreeChildren = (params, config = {}) => {
+  return request.get('/unqualified-products/tree-children', { params, ...config })
+}
+
+export const getUnqualifiedProductNodeDetails = (data, config = {}) => {
+  return request.post('/unqualified-products/node-details', data, config)
+}
+
+export const getUnqualifiedProductCheckedTreeNodes = (data, config = {}) => {
+  return request.post('/unqualified-products/checked-tree-nodes', data, config)
+}
+
 export const getUnqualifiedProductDetail = (id) => {
   return request.get(`/unqualified-products/${id}`)
 }
@@ -200,6 +233,24 @@ export const getUnqualifiedProductStats = () => {
 
 export const getUnqualifiedProductFilterOptions = () => {
   return request.get('/unqualified-products/filter-options')
+}
+
+export const getUnqualifiedProductSourcesInRange = (params) => {
+  return request.get('/unqualified-products', {
+    params: { ...params, list_sources: '1' }
+  })
+}
+
+export const postFoodInspectionImportJson = (data = {}) => {
+  return request.post('/food-inspections/import-json', data)
+}
+
+export const getFoodInspections = (params) => {
+  return request.get('/food-inspections', { params })
+}
+
+export const getFoodInspectionDetail = (id) => {
+  return request.get(`/food-inspections/${id}`)
 }
 
 

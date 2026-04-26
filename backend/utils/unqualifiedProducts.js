@@ -6,6 +6,11 @@ const {
   extractIssueItems,
   buildDerivedAnalyticsFields
 } = require('./dataAnalysisHelpers');
+const {
+  ensureUnqualifiedProductTreeRollupTable,
+  rebuildUnqualifiedProductTreeRollupsForSource,
+  backfillUnqualifiedProductTreeRollupsIfNeeded
+} = require('./unqualifiedProductTreeRollup');
 
 const PRODUCT_TYPE_LABELS = {
   cosmetics: '化妆品',
@@ -75,7 +80,14 @@ const UNQUALIFIED_PRODUCT_FIELDS = [
   'sampled_province',
   'issue_category',
   'product_type',
-  'announcement_type'
+  'announcement_type',
+  'source_key',
+  'source_no',
+  'source_title',
+  'source_publish_date',
+  'source_year',
+  'province_display',
+  'company_id'
 ];
 
 const SOURCE_LINK_FIELDS = [
@@ -213,6 +225,7 @@ function normalizeRequiredTextField(value) {
 function enrichPayload(payload = {}) {
   const productType = normalizeProductType(payload.product_type);
   const announcementType = normalizeAnnouncementType(payload.announcement_type);
+  const derivedAnalyticsFields = buildDerivedAnalyticsFields(payload);
   const normalizedPayload = {
     ...payload,
     company_names: normalizeRequiredTextField(payload.company_names),
@@ -228,7 +241,70 @@ function enrichPayload(payload = {}) {
     ...normalizedPayload,
     product_type: productType,
     announcement_type: announcementType,
-    ...buildDerivedAnalyticsFields(normalizedPayload)
+    ...derivedAnalyticsFields,
+    ...buildSearchHotFields({
+      ...normalizedPayload,
+      product_type: productType,
+      announcement_type: announcementType,
+      ...derivedAnalyticsFields
+    })
+  };
+}
+
+function normalizeDateValue(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  const text = String(value).trim();
+  return text || null;
+}
+
+function resolveSourceYear(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value.getFullYear();
+  }
+
+  const matched = String(value).match(/\b(20\d{2})\b/);
+  return matched ? Number(matched[1]) : null;
+}
+
+function buildProvinceDisplayValue(payload = {}) {
+  return String(
+    payload.manufacturer_province
+    || payload.sampled_province
+    || payload.product_region
+    || ''
+  ).trim() || null;
+}
+
+function buildSearchHotFields(payload = {}) {
+  const sourceType = payload.announcement_id ? 'announcement' : (payload.supervision_id ? 'supervision' : '');
+  const sourceId = payload.announcement_id || payload.supervision_id || null;
+  const sourceKey = sourceType && sourceId ? `${sourceType}:${sourceId}` : null;
+  const sourceNo = String(payload.source_no || '').trim()
+    || (payload.announcement_id ? `公告#${payload.announcement_id}` : '')
+    || (payload.supervision_id ? `飞检通告#${payload.supervision_id}` : '')
+    || null;
+  const sourceTitle = String(payload.source_title || payload.batch_title || '').trim() || null;
+  const sourcePublishDate = normalizeDateValue(payload.source_publish_date);
+
+  return {
+    source_key: sourceKey,
+    source_no: sourceNo,
+    source_title: sourceTitle,
+    source_publish_date: sourcePublishDate,
+    source_year: resolveSourceYear(sourcePublishDate),
+    province_display: buildProvinceDisplayValue(payload),
+    company_id: payload.company_id ? Number(payload.company_id) : null
   };
 }
 
@@ -424,6 +500,92 @@ async function backfillDerivedFields(connection) {
   }
 }
 
+async function backfillSearchHotFields(connection) {
+  const hasSamplingRecords = await tableExists(connection, 'company_sampling_records');
+  const hasSupervisionRecords = await tableExists(connection, 'company_supervision_records');
+  const joinSql = [
+    'LEFT JOIN announcements a ON up.announcement_id = a.id',
+    'LEFT JOIN supervisions s ON up.supervision_id = s.id'
+  ];
+  const companyParts = ['up.company_id'];
+
+  if (hasSamplingRecords) {
+    joinSql.push(`
+      LEFT JOIN (
+        SELECT
+          announcement_id,
+          announcement_detail_id,
+          MIN(company_id) AS company_id
+        FROM company_sampling_records
+        GROUP BY announcement_id, announcement_detail_id
+      ) csr ON csr.announcement_id = up.announcement_id
+        AND csr.announcement_detail_id = up.announcement_detail_id
+    `);
+    companyParts.unshift('csr.company_id');
+  }
+
+  if (hasSupervisionRecords) {
+    joinSql.push(`
+      LEFT JOIN (
+        SELECT
+          supervision_id,
+          COALESCE(supervision_detail_id, 0) AS supervision_detail_key,
+          MIN(company_id) AS company_id
+        FROM company_supervision_records
+        GROUP BY supervision_id, COALESCE(supervision_detail_id, 0)
+      ) csr2 ON csr2.supervision_id = up.supervision_id
+        AND csr2.supervision_detail_key = COALESCE(up.supervision_detail_id, 0)
+    `);
+    companyParts.unshift('csr2.company_id');
+  }
+
+  await connection.query(`
+    UPDATE unqualified_products up
+    ${joinSql.join('\n')}
+    SET
+      up.source_key = CASE
+        WHEN up.announcement_id IS NOT NULL THEN CONCAT('announcement:', up.announcement_id)
+        WHEN up.supervision_id IS NOT NULL THEN CONCAT('supervision:', up.supervision_id)
+        ELSE NULL
+      END,
+      up.source_no = COALESCE(
+        NULLIF(TRIM(a.announcement_no), ''),
+        CASE
+          WHEN up.supervision_id IS NOT NULL THEN CONCAT('飞检通告#', up.supervision_id)
+          WHEN up.announcement_id IS NOT NULL THEN CONCAT('公告#', up.announcement_id)
+          ELSE NULL
+        END
+      ),
+      up.source_title = COALESCE(
+        NULLIF(TRIM(a.title), ''),
+        NULLIF(TRIM(s.title), ''),
+        NULLIF(TRIM(up.batch_title), '')
+      ),
+      up.source_publish_date = COALESCE(a.publish_date, s.publish_date, s.supervision_date),
+      up.source_year = CASE
+        WHEN COALESCE(a.publish_date, s.publish_date, s.supervision_date) IS NOT NULL
+          THEN YEAR(COALESCE(a.publish_date, s.publish_date, s.supervision_date))
+        ELSE NULL
+      END,
+      up.province_display = COALESCE(
+        NULLIF(TRIM(up.manufacturer_province), ''),
+        NULLIF(TRIM(up.sampled_province), ''),
+        NULLIF(TRIM(up.product_region), '')
+      ),
+      up.company_id = COALESCE(${companyParts.join(', ')})
+    WHERE (
+      up.source_key IS NULL
+      OR up.source_no IS NULL
+      OR up.source_title IS NULL
+      OR up.source_publish_date IS NULL
+      OR up.source_year IS NULL
+      OR up.province_display IS NULL
+      OR up.company_id IS NULL
+    )
+      AND (up.announcement_id IS NOT NULL OR up.supervision_id IS NOT NULL)
+  `);
+}
+
 async function syncIssueItemsForSource(connection, filter = {}) {
   await ensureUnqualifiedProductIssueItemsTable(connection);
 
@@ -617,6 +779,13 @@ async function ensureUnqualifiedProductsTable(connection) {
       issue_category VARCHAR(100) NULL,
       product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
       announcement_type VARCHAR(50) NOT NULL DEFAULT 'sampling',
+      source_key VARCHAR(80) NULL,
+      source_no VARCHAR(255) NULL,
+      source_title VARCHAR(500) NULL,
+      source_publish_date DATETIME NULL,
+      source_year INT NULL,
+      province_display VARCHAR(100) NULL,
+      company_id INT NULL,
       announcement_id INT NULL,
       announcement_detail_id INT NULL,
       supervision_id INT NULL,
@@ -654,7 +823,14 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'issue_category', 'VARCHAR(100) NULL AFTER sampled_province');
   await ensureColumn(connection, 'product_type', "VARCHAR(50) NOT NULL DEFAULT 'cosmetics' AFTER issue_category");
   await ensureColumn(connection, 'announcement_type', "VARCHAR(50) NOT NULL DEFAULT 'sampling' AFTER product_type");
-  await ensureColumn(connection, 'announcement_id', 'INT NULL AFTER announcement_type');
+  await ensureColumn(connection, 'source_key', 'VARCHAR(80) NULL AFTER announcement_type');
+  await ensureColumn(connection, 'source_no', 'VARCHAR(255) NULL AFTER source_key');
+  await ensureColumn(connection, 'source_title', 'VARCHAR(500) NULL AFTER source_no');
+  await ensureColumn(connection, 'source_publish_date', 'DATETIME NULL AFTER source_title');
+  await ensureColumn(connection, 'source_year', 'INT NULL AFTER source_publish_date');
+  await ensureColumn(connection, 'province_display', 'VARCHAR(100) NULL AFTER source_year');
+  await ensureColumn(connection, 'company_id', 'INT NULL AFTER province_display');
+  await ensureColumn(connection, 'announcement_id', 'INT NULL AFTER company_id');
   await ensureColumn(connection, 'announcement_detail_id', 'INT NULL AFTER announcement_id');
   await ensureColumn(connection, 'supervision_id', 'INT NULL AFTER announcement_detail_id');
   await ensureColumn(connection, 'supervision_detail_id', 'INT NULL AFTER supervision_id');
@@ -677,6 +853,14 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_issue_category', 'INDEX idx_unqualified_products_issue_category (issue_category)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_product_type', 'INDEX idx_unqualified_products_product_type (product_type)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_announcement_type', 'INDEX idx_unqualified_products_announcement_type (announcement_type)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_source_key', 'INDEX idx_unqualified_products_source_key (source_key)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_source_year', 'INDEX idx_unqualified_products_source_year (source_year)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_source_publish_date', 'INDEX idx_unqualified_products_source_publish_date (source_publish_date)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_province_display', 'INDEX idx_unqualified_products_province_display (province_display)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_company_id', 'INDEX idx_unqualified_products_company_id (company_id)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_tree_filters', 'INDEX idx_unqualified_products_tree_filters (source_year, announcement_type, product_type)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_province_year', 'INDEX idx_unqualified_products_province_year (province_display, source_year)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_source_order', 'INDEX idx_unqualified_products_source_order (source_publish_date, id)');
 
   if (await tableExists(connection, 'announcements')) {
     await ensureForeignKey(
@@ -710,13 +894,24 @@ async function ensureUnqualifiedProductsTable(connection) {
       'FOREIGN KEY (supervision_detail_id) REFERENCES flight_inspection_detail(id) ON DELETE CASCADE'
     );
   }
+  if (await tableExists(connection, 'companies')) {
+    await ensureForeignKey(
+      connection,
+      'unqualified_products',
+      'fk_unqualified_products_company',
+      'FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL'
+    );
+  }
 
   await ensureUnqualifiedProductCategoryItemsTable(connection);
 
   await ensureUnqualifiedProductIssueItemsTable(connection);
+  await ensureUnqualifiedProductTreeRollupTable(connection);
   await backfillDerivedFields(connection);
+  await backfillSearchHotFields(connection);
   await backfillProductCategoryItemsIfNeeded(connection);
   await backfillIssueItemsIfNeeded(connection);
+  await backfillUnqualifiedProductTreeRollupsIfNeeded(connection);
 }
 
 async function seedDefaultUnqualifiedProducts(connection) {
@@ -739,6 +934,10 @@ async function seedDefaultUnqualifiedProducts(connection) {
       announcement_detail_id: null,
       supervision_id: null,
       supervision_detail_id: null,
+      source_no: null,
+      source_title: row.batch_title,
+      source_publish_date: null,
+      company_id: null,
       is_counterfeit: 0
     });
 
@@ -805,7 +1004,12 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
   await ensureUnqualifiedProductsTable(connection);
 
   const [announcementRows] = await connection.query(
-    'SELECT id, title, announcement_no, product_type, announcement_type FROM announcements WHERE id = ? LIMIT 1',
+    `
+      SELECT id, title, announcement_no, publish_date, product_type, announcement_type
+      FROM announcements
+      WHERE id = ?
+      LIMIT 1
+    `,
     [announcementId]
   );
   const announcement = announcementRows[0];
@@ -883,6 +1087,10 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
     announcement_detail_id: row.id,
     supervision_id: null,
     supervision_detail_id: null,
+    source_no: announcement.announcement_no,
+    source_title: announcement.title,
+    source_publish_date: announcement.publish_date || null,
+    company_id: null,
     is_counterfeit: row.is_counterfeit ? 1 : 0
   }));
 
@@ -899,13 +1107,16 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
 
   const productCategorySyncResult = await syncProductCategoryItemsForSource(connection, { announcementId });
   const issueSyncResult = await syncIssueItemsForSource(connection, { announcementId });
+  await backfillSearchHotFields(connection);
+  const rollupSyncResult = await rebuildUnqualifiedProductTreeRollupsForSource(connection, { announcementId });
 
   return {
     synced_count: detailRows.length,
     batch_title: batchTitle,
     total_batches: totalBatches,
     synced_product_category_count: productCategorySyncResult.synced_product_category_count,
-    synced_issue_item_count: issueSyncResult.synced_issue_item_count
+    synced_issue_item_count: issueSyncResult.synced_issue_item_count,
+    synced_rollup_count: rollupSyncResult.synced_rollup_count
   };
 }
 
@@ -999,6 +1210,10 @@ async function replaceUnqualifiedProductsFromFlightInspectionDetails(connection,
     announcement_detail_id: null,
     supervision_id: Number(supervisionId),
     supervision_detail_id: row.id || null,
+    source_no: `飞检通告#${supervisionId}`,
+    source_title: supervision.title,
+    source_publish_date: supervision.publish_date || supervision.supervision_date || row.publish_date || null,
+    company_id: null,
     is_counterfeit: 0
   }));
 
@@ -1015,13 +1230,16 @@ async function replaceUnqualifiedProductsFromFlightInspectionDetails(connection,
 
   const productCategorySyncResult = await syncProductCategoryItemsForSource(connection, { supervisionId });
   const issueSyncResult = await syncIssueItemsForSource(connection, { supervisionId });
+  await backfillSearchHotFields(connection);
+  const rollupSyncResult = await rebuildUnqualifiedProductTreeRollupsForSource(connection, { supervisionId });
 
   return {
     synced_count: payloadRows.length,
     batch_title: batchTitle,
     total_batches: totalBatches,
     synced_product_category_count: productCategorySyncResult.synced_product_category_count,
-    synced_issue_item_count: issueSyncResult.synced_issue_item_count
+    synced_issue_item_count: issueSyncResult.synced_issue_item_count,
+    synced_rollup_count: rollupSyncResult.synced_rollup_count
   };
 }
 

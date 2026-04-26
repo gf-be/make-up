@@ -19,6 +19,9 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
   response => {
+    if (response.config.responseType === 'blob') {
+      return response.data
+    }
     const res = response.data
     if (res.success === false) {
       ElMessage.error(res.message || '请求失败')
@@ -27,6 +30,9 @@ request.interceptors.response.use(
     return res
   },
   error => {
+    if (axios.isCancel(error) || error?.code === 'ERR_CANCELED') {
+      return Promise.reject(error)
+    }
     ElMessage.error(error.message || '网络错误')
     return Promise.reject(error)
   }

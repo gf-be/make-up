@@ -14,23 +14,49 @@
         <el-row :gutter="16">
           <el-col :span="8">
             <el-form-item label="通告批次">
-              <el-select v-model="filters.announcement_ids" multiple filterable collapse-tags collapse-tags-tooltip placeholder="选择一个或多个批次" style="width: 100%">
-                <el-option v-for="item in options.announcements" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ pickLen(filters.announcement_ids) ? `已选 ${pickLen(filters.announcement_ids)} 项` : '未选择' }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-checkbox-wrap">
+                  <el-checkbox-group v-model="filters.announcement_ids" class="filter-checkbox-group">
+                    <el-checkbox v-for="item in options.announcements" :key="item.value" :label="item.value">
+                      {{ item.label }}
+                    </el-checkbox>
+                  </el-checkbox-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="行维度">
-              <el-select v-model="filters.row_dimension" style="width: 100%">
-                <el-option v-for="(label, key) in dimensions" :key="key" :label="label" :value="key" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ labelForDimension(filters.row_dimension) }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-radio-wrap">
+                  <el-radio-group v-model="filters.row_dimension" class="filter-radio-group">
+                    <el-radio v-for="(label, key) in dimensions" :key="key" :label="key">{{ label }}</el-radio>
+                  </el-radio-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="列维度">
-              <el-select v-model="filters.col_dimension" style="width: 100%">
-                <el-option v-for="(label, key) in dimensions" :key="key" :label="label" :value="key" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ labelForDimension(filters.col_dimension) }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-radio-wrap">
+                  <el-radio-group v-model="filters.col_dimension" class="filter-radio-group">
+                    <el-radio v-for="(label, key) in dimensions" :key="key" :label="key">{{ label }}</el-radio>
+                  </el-radio-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -38,23 +64,51 @@
         <el-row :gutter="16">
           <el-col :span="8">
             <el-form-item label="统计指标">
-              <el-select v-model="filters.metric" style="width: 100%">
-                <el-option v-for="(label, key) in metrics" :key="key" :label="label" :value="key" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ labelForMetric(filters.metric) }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-radio-wrap">
+                  <el-radio-group v-model="filters.metric" class="filter-radio-group">
+                    <el-radio v-for="(label, key) in metrics" :key="key" :label="key">{{ label }}</el-radio>
+                  </el-radio-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="产品类别">
-              <el-select v-model="filters.product_categories" multiple filterable collapse-tags collapse-tags-tooltip placeholder="选择产品类别" style="width: 100%">
-                <el-option v-for="item in options.product_categories" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ pickLen(filters.product_categories) ? `已选 ${pickLen(filters.product_categories)} 项` : '未选择' }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-checkbox-wrap">
+                  <el-checkbox-group v-model="filters.product_categories" class="filter-checkbox-group">
+                    <el-checkbox v-for="item in options.product_categories" :key="item.value" :label="item.value">
+                      {{ item.label }}
+                    </el-checkbox>
+                  </el-checkbox-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="产品标示地区">
-              <el-select v-model="filters.product_regions" multiple filterable collapse-tags collapse-tags-tooltip placeholder="选择产品标示地区" style="width: 100%">
-                <el-option v-for="item in options.product_regions" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ pickLen(filters.product_regions) ? `已选 ${pickLen(filters.product_regions)} 项` : '未选择' }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-checkbox-wrap">
+                  <el-checkbox-group v-model="filters.product_regions" class="filter-checkbox-group">
+                    <el-checkbox v-for="item in options.product_regions" :key="item.value" :label="item.value">
+                      {{ item.label }}
+                    </el-checkbox>
+                  </el-checkbox-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -62,23 +116,53 @@
         <el-row :gutter="16">
           <el-col :span="8">
             <el-form-item label="生产/备案地区">
-              <el-select v-model="filters.manufacturer_provinces" multiple filterable collapse-tags collapse-tags-tooltip placeholder="选择生产/备案地区" style="width: 100%">
-                <el-option v-for="item in options.manufacturer_provinces" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ pickLen(filters.manufacturer_provinces) ? `已选 ${pickLen(filters.manufacturer_provinces)} 项` : '未选择' }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-checkbox-wrap">
+                  <el-checkbox-group v-model="filters.manufacturer_provinces" class="filter-checkbox-group">
+                    <el-checkbox v-for="item in options.manufacturer_provinces" :key="item.value" :label="item.value">
+                      {{ item.label }}
+                    </el-checkbox>
+                  </el-checkbox-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="抽样地区">
-              <el-select v-model="filters.sampled_provinces" multiple filterable collapse-tags collapse-tags-tooltip placeholder="选择抽样地区" style="width: 100%">
-                <el-option v-for="item in options.sampled_provinces" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ pickLen(filters.sampled_provinces) ? `已选 ${pickLen(filters.sampled_provinces)} 项` : '未选择' }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-checkbox-wrap">
+                  <el-checkbox-group v-model="filters.sampled_provinces" class="filter-checkbox-group">
+                    <el-checkbox v-for="item in options.sampled_provinces" :key="item.value" :label="item.value">
+                      {{ item.label }}
+                    </el-checkbox>
+                  </el-checkbox-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="检验机构">
-              <el-select v-model="filters.inspection_institutions" multiple filterable collapse-tags collapse-tags-tooltip placeholder="选择检验机构" style="width: 100%">
-                <el-option v-for="item in options.inspection_institutions" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ pickLen(filters.inspection_institutions) ? `已选 ${pickLen(filters.inspection_institutions)} 项` : '未选择' }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-checkbox-wrap">
+                  <el-checkbox-group v-model="filters.inspection_institutions" class="filter-checkbox-group">
+                    <el-checkbox v-for="item in options.inspection_institutions" :key="item.value" :label="item.value">
+                      {{ item.label }}
+                    </el-checkbox>
+                  </el-checkbox-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -86,16 +170,36 @@
         <el-row :gutter="16">
           <el-col :span="8">
             <el-form-item label="问题类型">
-              <el-select v-model="filters.issue_categories" multiple filterable collapse-tags collapse-tags-tooltip placeholder="选择问题类型" style="width: 100%">
-                <el-option v-for="item in options.issue_categories" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ pickLen(filters.issue_categories) ? `已选 ${pickLen(filters.issue_categories)} 项` : '未选择' }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-checkbox-wrap">
+                  <el-checkbox-group v-model="filters.issue_categories" class="filter-checkbox-group">
+                    <el-checkbox v-for="item in options.issue_categories" :key="item.value" :label="item.value">
+                      {{ item.label }}
+                    </el-checkbox>
+                  </el-checkbox-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="不符合项目">
-              <el-select v-model="filters.issue_items" multiple filterable collapse-tags collapse-tags-tooltip placeholder="选择具体问题项" style="width: 100%">
-                <el-option v-for="item in options.issue_items" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
+              <div class="filter-hover-field">
+                <div class="filter-hover-strip">
+                  <span class="filter-hover-summary">{{ pickLen(filters.issue_items) ? `已选 ${pickLen(filters.issue_items)} 项` : '未选择' }}</span>
+                  <span class="filter-hover-tip">悬停展开</span>
+                </div>
+                <div class="filter-checkbox-wrap">
+                  <el-checkbox-group v-model="filters.issue_items" class="filter-checkbox-group">
+                    <el-checkbox v-for="item in options.issue_items" :key="item.value" :label="item.value">
+                      {{ item.label }}
+                    </el-checkbox>
+                  </el-checkbox-group>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -128,7 +232,7 @@
       <el-col :span="4"><div class="stat-card danger"><div class="stat-value">{{ summary.counterfeit_count || 0 }}</div><div class="stat-label">假冒记录</div></div></el-col>
     </el-row>
 
-    <el-row :gutter="16" class="mt-16">
+    <!-- <el-row :gutter="16" class="mt-16">
       <el-col :span="24">
         <el-card shadow="never">
           <template #header>
@@ -146,9 +250,9 @@
           <el-empty v-else description="当前筛选结果暂无可提炼素材" />
         </el-card>
       </el-col>
-    </el-row>
+    </el-row> -->
 
-    <el-row :gutter="16" class="mt-16">
+    <!-- <el-row :gutter="16" class="mt-16">
       <el-col :span="12">
         <el-card shadow="never">
           <template #header>
@@ -169,7 +273,7 @@
           <div ref="stackChartRef" class="chart-box"></div>
         </el-card>
       </el-col>
-    </el-row>
+    </el-row> -->
 
     <el-row :gutter="16" class="mt-16">
       <el-col :span="24">
@@ -285,6 +389,12 @@ const createDefaultFilters = () => ({
 })
 
 const filters = reactive(createDefaultFilters())
+
+const pickLen = (arr) => (Array.isArray(arr) ? arr.length : 0)
+
+const labelForDimension = (key) => dimensions.value[key] || key
+
+const labelForMetric = (key) => metrics.value[key] || key
 
 const serializeParams = () => ({
   announcement_ids: JSON.stringify(filters.announcement_ids),
@@ -455,6 +565,123 @@ onBeforeUnmount(() => {
 
 .filter-form {
   margin-top: 4px;
+}
+
+.filter-form :deep(.el-col) {
+  position: relative;
+}
+
+.filter-hover-field {
+  position: relative;
+  width: 100%;
+  z-index: 1;
+}
+
+.filter-hover-field:hover {
+  z-index: 30;
+}
+
+.filter-hover-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  color: #606266;
+  cursor: default;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.filter-hover-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-hover-tip {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #c0c4cc;
+  transition: color 0.15s ease;
+}
+
+.filter-hover-field:hover .filter-hover-strip {
+  border-color: #409eff;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.filter-hover-field:hover .filter-hover-tip {
+  color: #409eff;
+}
+
+.filter-hover-field .filter-checkbox-wrap,
+.filter-hover-field .filter-radio-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: -1px;
+  max-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #fafbfc;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  transition:
+    max-height 0.22s ease,
+    opacity 0.18s ease,
+    padding 0.18s ease,
+    visibility 0.18s ease,
+    border-color 0.15s ease;
+  pointer-events: none;
+}
+
+.filter-hover-field:hover .filter-checkbox-wrap,
+.filter-hover-field:hover .filter-radio-wrap {
+  max-height: 280px;
+  opacity: 1;
+  visibility: visible;
+  padding: 10px 12px;
+  border-color: #dcdfe6;
+  border-top-color: #e4e7ed;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  overflow: auto;
+  pointer-events: auto;
+}
+
+.filter-checkbox-group,
+.filter-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+.filter-checkbox-group :deep(.el-checkbox),
+.filter-radio-group :deep(.el-radio) {
+  margin-right: 0;
+  height: auto;
+  white-space: normal;
+  align-items: flex-start;
+}
+
+.filter-radio-group :deep(.el-radio__label) {
+  white-space: normal;
+  line-height: 1.45;
 }
 
 .action-row {
