@@ -1,5 +1,33 @@
 import request from '@/utils/request'
 
+export const login = (data) => {
+  return request.post('/auth/login', data)
+}
+
+export const registerNormalUser = (data) => {
+  return request.post('/auth/register', data)
+}
+
+export const logout = () => {
+  return request.post('/auth/logout')
+}
+
+export const getCurrentUser = () => {
+  return request.get('/auth/me')
+}
+
+export const updateCurrentUserPassword = (data) => {
+  return request.put('/auth/me/password', data)
+}
+
+export const getOperationLogs = (params) => {
+  return request.get('/auth/operation-logs', { params })
+}
+
+export const createOperationLog = (data) => {
+  return request.post('/auth/operation-logs', data)
+}
+
 // 仪表板
 export const getDashboardStats = () => {
   return request.get('/dashboard/stats')

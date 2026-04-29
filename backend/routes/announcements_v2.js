@@ -26,6 +26,7 @@ const {
   updatePublishedAnnouncementStagingBody,
   updateAnnouncementStagingProductType
 } = require('../utils/announcementStaging');
+const { requireRoles } = require('../utils/auth');
 
 
 
@@ -755,7 +756,7 @@ router.get('/:announcementId/product-details', async (req, res) => {
 });
 
 // 更新公告关联的批次不符合规定化妆品明细
-router.put('/:announcementId/product-details/:detailId', async (req, res) => {
+router.put('/:announcementId/product-details/:detailId', requireRoles(['developer', 'data_admin']), async (req, res) => {
   let connection;
 
   try {
@@ -852,7 +853,7 @@ router.put('/:announcementId/product-details/:detailId', async (req, res) => {
 });
 
 // 删除公告关联的批次不符合规定化妆品明细
-router.delete('/:announcementId/product-details/:detailId', async (req, res) => {
+router.delete('/:announcementId/product-details/:detailId', requireRoles(['developer', 'data_admin']), async (req, res) => {
   let connection;
 
   try {

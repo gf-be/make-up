@@ -144,7 +144,7 @@
                   <span v-else class="remark-text">{{ row.remarks && row.remarks !== '/' ? '有备注' : '无' }}</span>
                 </template>
               </el-table-column> -->
-              <el-table-column label="操作" width="140" fixed="right" align="center">
+              <el-table-column v-if="canManageProductDetails" label="操作" width="140" fixed="right" align="center">
                 <template #default="{ row }">
                   <el-button link type="primary" @click="openEditProductDetail(row)">编辑</el-button>
                   <el-button link type="danger" @click="handleDeleteProductDetail(row)">删除</el-button>
@@ -361,6 +361,7 @@ import {
   updateAnnouncementProductDetail,
   updateAnnouncementProductType
 } from '@/api/index'
+import { canManageAnnouncementProducts } from '@/utils/auth'
 
 
 import dayjs from 'dayjs'
@@ -392,6 +393,7 @@ const editDialogVisible = ref(false)
 // const contentDialogVisible = ref(false)
 const productTypeDialogVisible = ref(false)
 const productDetailFormRef = ref(null)
+const canManageProductDetails = computed(() => canManageAnnouncementProducts())
 
 const productDetailFilters = ref({
   unqualified_item: '',
@@ -668,11 +670,19 @@ const resetProductDetailFilters = () => {
 }
 
 const openEditProductDetail = (row) => {
+  if (!canManageProductDetails.value) {
+    ElMessage.warning('当前账号无编辑权限')
+    return
+  }
   applyProductDetailRow(row)
   editDialogVisible.value = true
 }
 
 const handleSaveProductDetail = async () => {
+  if (!canManageProductDetails.value) {
+    ElMessage.warning('当前账号无编辑权限')
+    return
+  }
   if (!productDetailFormRef.value || !currentAnnouncementId.value || !productDetailForm.id) {
     return
   }
@@ -718,6 +728,10 @@ const handleSaveProductDetail = async () => {
 }
 
 const handleDeleteProductDetail = async (row) => {
+  if (!canManageProductDetails.value) {
+    ElMessage.warning('当前账号无删除权限')
+    return
+  }
   if (!currentAnnouncementId.value || !row?.id) {
     return
   }

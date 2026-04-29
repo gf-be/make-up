@@ -1,5 +1,6 @@
 <template>
-  <el-container class="layout-container">
+  <router-view v-if="route.path === '/login'" />
+  <el-container v-else class="layout-container">
     <el-header class="header">
       <div class="header-content">
         <div class="logo">
@@ -9,70 +10,18 @@
           <span>化妆品资讯系统</span>
         </div>
         <el-menu :default-active="activeMenu" mode="horizontal" router class="nav-menu">
-          <el-menu-item index="/unqualified-products">
+          <el-menu-item v-for="item in visibleMenus" :key="item.index" :index="item.index">
             <el-icon>
-              <Document />
+              <component :is="item.icon" />
             </el-icon>
-            <span>不合格产品</span>
+            <span>{{ item.label }}</span>
           </el-menu-item>
-          <el-menu-item index="/pivot-analysis">
-            <el-icon>
-              <DataAnalysis />
-            </el-icon>
-            <span>数据矩阵</span>
-          </el-menu-item>
-          <!-- <el-menu-item index="/sampling-search">
-            <el-icon><Search /></el-icon>
-            <span>数据检索</span>
-          </el-menu-item> -->
-          <el-menu-item index="/announcement-staging">
-            <el-icon>
-              <DataAnalysis />
-            </el-icon>
-            <span>导入检查</span>
-          </el-menu-item>
-          <el-menu-item index="/announcement-tracebacks">
-            <el-icon>
-              <Warning />
-            </el-icon>
-            <span>倒溯处理</span>
-          </el-menu-item>
-          <el-menu-item index="/announcements">
-
-            <el-icon>
-              <Bell />
-            </el-icon>
-            <span>抽检通告</span>
-          </el-menu-item>
-
-          <el-menu-item index="/inspections">
-            <el-icon>
-              <Checked />
-            </el-icon>
-            <span>抽样检查</span>
-          </el-menu-item>
-          <el-menu-item index="/companies">
-            <el-icon>
-              <OfficeBuilding />
-            </el-icon>
-            <span>企业管理</span>
-          </el-menu-item>
-          <el-menu-item index="/companies/unqualified">
-            <el-icon>
-              <TrendCharts />
-            </el-icon>
-            <span>不合格企业</span>
-          </el-menu-item>
-
-          <el-menu-item index="/supervisions">
-            <el-icon>
-              <Warning />
-            </el-icon>
-            <span>飞行检查</span>
-          </el-menu-item>
-
-
         </el-menu>
+        <div class="user-box">
+          <el-tag effect="dark">{{ currentUser?.role_label || '未登录' }}</el-tag>
+          <span class="username">{{ currentUser?.username }}</span>
+          <el-button size="small" plain @click="handleLogout">退出</el-button>
+        </div>
       </div>
     </el-header>
 
@@ -84,11 +33,31 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { logout } from '@/api'
+import { clearAuthSession, currentUser, hasModuleAccess } from '@/utils/auth'
 
 const route = useRoute()
+const router = useRouter()
+
+const menus = [
+  { index: '/home', key: 'home', label: '首页', icon: 'House' },
+  { index: '/unqualified-products', key: 'unqualified-products', label: '不合格产品', icon: 'Document' },
+  { index: '/pivot-analysis', key: 'pivot-analysis', label: '数据矩阵', icon: 'DataAnalysis' },
+  { index: '/sampling-search', key: 'sampling-search', label: '数据检索', icon: 'Search' },
+  { index: '/announcement-staging', key: 'announcement-staging', label: '导入检查', icon: 'DataAnalysis' },
+  { index: '/announcement-tracebacks', key: 'announcement-tracebacks', label: '倒溯处理', icon: 'Warning' },
+  { index: '/announcements', key: 'announcements', label: '抽检通告', icon: 'Bell' },
+  { index: '/inspections', key: 'inspections', label: '抽样检查', icon: 'Checked' },
+  { index: '/companies', key: 'companies', label: '企业管理', icon: 'OfficeBuilding' },
+  { index: '/companies/unqualified', key: 'unqualified-companies', label: '不合格企业', icon: 'TrendCharts' },
+  { index: '/supervisions', key: 'supervisions', label: '飞行检查', icon: 'Warning' }
+]
+
+const visibleMenus = computed(() => menus.filter((item) => hasModuleAccess(item.key)))
 
 const activeMenu = computed(() => {
+  if (route.path.startsWith('/home') || route.path.startsWith('/dashboard')) return '/home'
   if (route.path.startsWith('/announcements')) return '/announcements'
   if (route.path.startsWith('/announcement-staging')) return '/announcement-staging'
   if (route.path.startsWith('/announcement-tracebacks')) return '/announcement-tracebacks'
@@ -105,6 +74,16 @@ const activeMenu = computed(() => {
 
   return route.path
 })
+
+const handleLogout = async () => {
+  try {
+    await logout()
+  } catch (error) {
+    // 本地会话仍需清理，避免后端会话过期时无法退出。
+  }
+  clearAuthSession()
+  router.replace('/login')
+}
 
 </script>
 
@@ -146,6 +125,19 @@ const activeMenu = computed(() => {
   border: none;
   flex: 1;
   justify-content: flex-end;
+}
+
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 16px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.username {
+  font-size: 13px;
 }
 
 .nav-menu .el-menu-item {

@@ -171,6 +171,7 @@ const copyTextValue = (value) => {
   if (value == null) return ''
   const text = String(value).trim()
   if (!text || ['nan', 'none', 'null', 'undefined'].includes(text.toLowerCase())) return ''
+  console.log(text)
   return text
 }
 
@@ -216,16 +217,18 @@ const splitIssueItems = (value) => {
 }
 
 const getTopIssueItem = (rows = []) => {
-  const counts = new Map()
+  const counts = new Map();
   rows.forEach((row) => {
     uniqueCopyValues(splitIssueItems(row?.unqualified_items)).forEach((item) => {
-      counts.set(item, (counts.get(item) || 0) + 1)
-    })
-  })
+      counts.set(item, (counts.get(item) || 0) + 1);
+    });
+  });
 
   return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN'))
-    .map(([item]) => item)[0] || ''
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh-CN"))
+    .slice(0, 3)
+    .map(([name]) => name); // 只返回名称
+
 }
 
 const regionForSampling = (rawAddress) => {
@@ -261,8 +264,9 @@ const pickCopyRows = (rows, max = 6) => {
 const buildProductLine = (row, issueItem = '') => {
   const product = copyTextValue(row?.product_name)
   const producer = copyTextValue(row?.manufacturer)
-  const region = regionForSampling(row?.sample_source)
+  const region = row?.sample_source
   const issues = issueItem || issuesForVoice(row?.unqualified_items)
+  console.log(issues)
   const head = producer && product
     ? `由${producer}生产的${product}`
     : (product || (producer ? `${producer}相关批次产品` : '有关产品'))
@@ -273,8 +277,10 @@ const buildProductLine = (row, issueItem = '') => {
 
 const buildInspectionCopyText = () => {
   const rows = detail.value?.details || []
+  console.log(rows)
   const unqualifiedRows = getUnqualifiedRows()
   const topIssue = getTopIssueItem(unqualifiedRows)
+  console.log(topIssue)
   const topIssueRows = topIssue
     ? unqualifiedRows.filter((row) => splitIssueItems(row?.unqualified_items).includes(topIssue))
     : []
@@ -287,6 +293,7 @@ const buildInspectionCopyText = () => {
   const unqualifiedCount = Number(detail.value?.unqualified_count || unqualifiedRows.length || 0)
   const qualifiedCount = Number(detail.value?.qualified_count || Math.max(total - unqualifiedCount, 0))
   const issues = topIssue ? [shortForVoice(topIssue, 96)] : []
+  console.log(issues)
   const products = uniqueCopyValues(unqualifiedRows.map((row) => row?.product_name))
   const producers = uniqueCopyValues(unqualifiedRows.map((row) => row?.manufacturer))
   const regions = uniqueCopyValues(rows.map((row) => regionForSampling(row?.sample_source)).filter(Boolean))
@@ -300,7 +307,7 @@ const buildInspectionCopyText = () => {
   if (selectedRows.length) {
     lines.push(`以下按通报节选 ${selectedRows.length} 个典型产品，口播时可按序号稍作停顿：`)
     selectedRows.forEach((row, index) => {
-      lines.push(`${index + 1}. ${buildProductLine(row, issues[0])}`)
+      lines.push(`${index + 1}. ${buildProductLine(row)}`)
     })
   }
 

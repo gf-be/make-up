@@ -6,9 +6,12 @@ USE cosmetics_info;
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
-    email VARCHAR(100) NOT NULL UNIQUE,
+    email VARCHAR(100) UNIQUE,
     password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'editor', 'viewer') DEFAULT 'viewer',
+    display_name VARCHAR(100),
+    role ENUM('developer', 'data_admin', 'normal_user') DEFAULT 'normal_user',
+    status ENUM('active', 'disabled') DEFAULT 'active',
+    last_login_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -617,6 +620,8 @@ CREATE TABLE IF NOT EXISTS operation_logs (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 插入默认管理员用户（密码需要加密，这里为示例）
-INSERT INTO users (username, email, password, role) VALUES
-('admin', 'admin@cosmetics.com', '$2b$10$placeholder_hash_password_here', 'admin');
+-- 插入默认用户（后端首次登录会将历史明文密码自动升级为带盐哈希）
+INSERT IGNORE INTO users (username, email, password, display_name, role, status) VALUES
+('admin', 'admin@cosmetics.com', 'admin', '开发人员', 'developer', 'active'),
+('data_admin', 'data_admin@cosmetics.com', 'data_admin', '数据管理员', 'data_admin', 'active'),
+('user', 'user@cosmetics.com', 'user', '普通用户', 'normal_user', 'active');

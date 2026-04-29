@@ -517,8 +517,10 @@ import {
   getUnqualifiedProductNodeDetails,
   getUnqualifiedProductStats,
   getUnqualifiedProductTree,
-  getUnqualifiedProductTreeChildren
+  getUnqualifiedProductTreeChildren,
+  createOperationLog
 } from '@/api/index'
+import { currentUser } from '@/utils/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -1376,6 +1378,41 @@ function buildVideoCopyText(rows) {
   return lines.join('\n')
 }
 
+function buildCurrentDimensionLabel() {
+  const order = dimensionOrder.value?.length ? dimensionOrder.value : DEFAULT_DIMENSION_ORDER
+  return order.map((key) => getDimensionLabel(key)).join(' > ')
+}
+
+function buildCurrentRangeLabel() {
+  const labels = []
+  if (currentNode.value?.label) {
+    labels.push(currentNode.value.label)
+  }
+  const checkedNodes = treeRef.value?.getCheckedNodes?.() || []
+  if (checkedNodes.length) {
+    labels.push(`勾选 ${checkedNodes.length} 个节点`)
+  }
+  return labels.join('；') || '当前维度树范围'
+}
+
+async function recordVideoCopyLog(rows) {
+  if (currentUser.value?.role !== 'normal_user') return
+  try {
+    await createOperationLog({
+      action: 'generate_video_copy',
+      module: 'unqualified_products',
+      details: {
+        dimension_label: buildCurrentDimensionLabel(),
+        dimension_order: dimensionOrder.value || [],
+        range_label: buildCurrentRangeLabel(),
+        detail_count: rows.length
+      }
+    })
+  } catch (error) {
+    console.error('记录文案生成日志失败:', error)
+  }
+}
+
 async function openVideoCopyDialog() {
   const pathsPayload = getNodeDetailsPathsPayload()
   if (!pathsPayload.length) {
@@ -1396,6 +1433,7 @@ async function openVideoCopyDialog() {
       return
     }
     videoCopyText.value = buildVideoCopyText(rows)
+    await recordVideoCopyLog(rows)
   } catch (error) {
     console.error('生成视频文案失败:', error)
     ElMessage.error(error?.message || '生成视频文案失败')
