@@ -189,8 +189,12 @@ function appendUnqualifiedProductFilters(conditions, params, filters = {}) {
       up.product_name LIKE ? OR
       up.company_names LIKE ? OR
       up.company_addresses LIKE ? OR
+      up.manufacturer_name LIKE ? OR
+      up.manufacturer_address LIKE ? OR
       up.sample_unit_name LIKE ? OR
       up.sample_unit_address LIKE ? OR
+      up.operator_name LIKE ? OR
+      up.operator_address LIKE ? OR
       up.inspection_institution LIKE ? OR
       up.batch_title LIKE ? OR
       up.product_region LIKE ? OR
@@ -205,13 +209,35 @@ function appendUnqualifiedProductFilters(conditions, params, filters = {}) {
       `%${normalizedKeyword}%`,
       `%${normalizedKeyword}%`,
       `%${normalizedKeyword}%`,
+      `%${normalizedKeyword}%`,
+      `%${normalizedKeyword}%`,
+      `%${normalizedKeyword}%`,
+      `%${normalizedKeyword}%`,
       `%${normalizedKeyword}%`
     );
   }
 
   if (normalizedCompanyKeyword) {
-    conditions.push('(up.company_names LIKE ? OR up.company_addresses LIKE ? OR up.sample_unit_name LIKE ?)');
-    params.push(`%${normalizedCompanyKeyword}%`, `%${normalizedCompanyKeyword}%`, `%${normalizedCompanyKeyword}%`);
+    conditions.push(`(
+      up.company_names LIKE ?
+      OR up.company_addresses LIKE ?
+      OR up.manufacturer_name LIKE ?
+      OR up.manufacturer_address LIKE ?
+      OR up.sample_unit_name LIKE ?
+      OR up.sample_unit_address LIKE ?
+      OR up.operator_name LIKE ?
+      OR up.operator_address LIKE ?
+    )`);
+    params.push(
+      `%${normalizedCompanyKeyword}%`,
+      `%${normalizedCompanyKeyword}%`,
+      `%${normalizedCompanyKeyword}%`,
+      `%${normalizedCompanyKeyword}%`,
+      `%${normalizedCompanyKeyword}%`,
+      `%${normalizedCompanyKeyword}%`,
+      `%${normalizedCompanyKeyword}%`,
+      `%${normalizedCompanyKeyword}%`
+    );
   }
 
   if (normalizedSourceKeyword) {
@@ -235,8 +261,18 @@ function appendUnqualifiedProductFilters(conditions, params, filters = {}) {
   }
 
   if (normalizedProvince) {
-    conditions.push('up.province_display = ?');
-    params.push(normalizedProvince);
+    conditions.push('(up.manufacturer_province = ? OR up.sampled_province = ? OR up.province_display = ?)');
+    params.push(normalizedProvince, normalizedProvince, normalizedProvince);
+  }
+
+  if (normalizeOptionalText(filters.manufacturer_province)) {
+    conditions.push('up.manufacturer_province = ?');
+    params.push(normalizeOptionalText(filters.manufacturer_province));
+  }
+
+  if (normalizeOptionalText(filters.sampled_province)) {
+    conditions.push('up.sampled_province = ?');
+    params.push(normalizeOptionalText(filters.sampled_province));
   }
 
   if (normalizedProductCategory) {
@@ -278,17 +314,25 @@ function appendUnqualifiedProductFilters(conditions, params, filters = {}) {
 
 const TREE_DIMENSION_DEFS = {
   source: { key: 'source', label: '来源编号', multi: false },
-  province: { key: 'province', label: '省份', multi: false },
+  province: { key: 'province', label: '综合省份', multi: false },
+  manufacturer_province: { key: 'manufacturer_province', label: '生产企业省份', multi: false },
+  manufacturer_city: { key: 'manufacturer_city', label: '生产企业城市', multi: false },
+  sampled_province: { key: 'sampled_province', label: '样品省份', multi: false },
+  sampled_city: { key: 'sampled_city', label: '样品城市', multi: false },
   product_category: { key: 'product_category', label: '产品类别', multi: true },
   issue_item: { key: 'issue_item', label: '不符合项目', multi: true },
   year: { key: 'year', label: '年份', multi: false }
 };
 
-const DEFAULT_TREE_DIMENSIONS = ['source', 'province', 'product_category', 'issue_item'];
-const MAX_TREE_DIMENSIONS = 4;
+const DEFAULT_TREE_DIMENSIONS = ['source', 'manufacturer_province', 'manufacturer_city', 'product_category', 'issue_item'];
+const MAX_TREE_DIMENSIONS = 5;
 const TREE_DIMENSION_COLUMN_MAP = {
   source: 'source_key',
   province: 'province_display',
+  manufacturer_province: 'manufacturer_province',
+  manufacturer_city: 'manufacturer_city',
+  sampled_province: 'sampled_province',
+  sampled_city: 'sampled_city',
   product_category: 'product_category',
   issue_item: 'issue_item',
   year: 'year_value'
@@ -619,7 +663,7 @@ async function loadTreeSummary(filters = {}) {
       SELECT
         COUNT(*) AS matched_count,
         COUNT(DISTINCT up.source_key) AS source_count,
-        COUNT(DISTINCT up.province_display) AS province_count
+        COUNT(DISTINCT up.manufacturer_province) AS province_count
       FROM unqualified_products up
       WHERE ${whereClause}
     `,
@@ -656,6 +700,10 @@ function parseSourceCompositeValue(value) {
 function buildRowDimensionValues(row) {
   const sourceValue = `${row.source_type}:${row.source_id || 0}`;
   const provinceValue = normalizeOptionalText(row.province_display) || '未标注省份';
+  const manufacturerProvince = normalizeOptionalText(row.manufacturer_province) || provinceValue;
+  const manufacturerCity = normalizeOptionalText(row.manufacturer_city) || '未标注城市';
+  const sampledProvince = normalizeOptionalText(row.sampled_province) || '未标注省份';
+  const sampledCity = normalizeOptionalText(row.sampled_city) || '未标注城市';
   const productCategories = splitJoinedValues(row.product_categories_joined, row.product_category || '其他');
   const issueItems = splitJoinedValues(row.issue_items_joined, row.unqualified_items ? '' : '未拆分项目');
   const sourceYear = Number.parseInt(row.source_year, 10);
@@ -664,6 +712,10 @@ function buildRowDimensionValues(row) {
   return {
     source: [{ value: sourceValue, label: normalizeOptionalText(row.source_no) || '未命名来源' }],
     province: [{ value: provinceValue, label: provinceValue }],
+    manufacturer_province: [{ value: manufacturerProvince, label: manufacturerProvince }],
+    manufacturer_city: [{ value: manufacturerCity, label: manufacturerCity }],
+    sampled_province: [{ value: sampledProvince, label: sampledProvince }],
+    sampled_city: [{ value: sampledCity, label: sampledCity }],
     product_category: (productCategories.length ? productCategories : ['其他']).map((value) => ({ value, label: value })),
     issue_item: (issueItems.length ? issueItems : ['未拆分项目']).map((value) => ({ value, label: value })),
     year: [{ value: yearValue, label: yearValue === '未标注年份' ? yearValue : `${yearValue}年` }]
@@ -840,6 +892,10 @@ async function loadConfiguredTreeBySelectedPaths(filters = {}, dimensions = DEFA
         up.source_year,
         up.source_no,
         up.province_display,
+        up.manufacturer_province,
+        up.manufacturer_city,
+        up.sampled_province,
+        up.sampled_city,
         up.product_category,
         up.unqualified_items,
         ${buildSourceTypeExpr('up')} AS source_type,
@@ -993,7 +1049,7 @@ router.get('/stats/overview', async (req, res) => {
 router.get('/filter-options', async (req, res) => {
   try {
     await ensureUnqualifiedProductsReady();
-    const [productCategories, issueItems, productTypeRows, announcementTypeRows, provinceRows, yearRows] = await Promise.all([
+    const [productCategories, issueItems, productTypeRows, announcementTypeRows, provinceRows, manufacturerProvinceRows, sampledProvinceRows, yearRows] = await Promise.all([
       getUnqualifiedProductCategoryOptions(pool, 300),
       getUnqualifiedProductIssueOptions(pool, 300),
       pool.query(`
@@ -1009,10 +1065,23 @@ router.get('/filter-options', async (req, res) => {
         ORDER BY announcement_type ASC
       `),
       pool.query(`
-        SELECT DISTINCT province_display AS province
+        SELECT DISTINCT COALESCE(NULLIF(TRIM(manufacturer_province), ''), NULLIF(TRIM(sampled_province), ''), NULLIF(TRIM(province_display), '')) AS province
         FROM unqualified_products
-        WHERE province_display IS NOT NULL
-          AND TRIM(province_display) != ''
+        WHERE COALESCE(NULLIF(TRIM(manufacturer_province), ''), NULLIF(TRIM(sampled_province), ''), NULLIF(TRIM(province_display), '')) IS NOT NULL
+        ORDER BY province ASC
+      `),
+      pool.query(`
+        SELECT DISTINCT manufacturer_province AS province
+        FROM unqualified_products
+        WHERE manufacturer_province IS NOT NULL
+          AND TRIM(manufacturer_province) != ''
+        ORDER BY province ASC
+      `),
+      pool.query(`
+        SELECT DISTINCT sampled_province AS province
+        FROM unqualified_products
+        WHERE sampled_province IS NOT NULL
+          AND TRIM(sampled_province) != ''
         ORDER BY province ASC
       `),
       pool.query(`
@@ -1025,6 +1094,8 @@ router.get('/filter-options', async (req, res) => {
     const productTypes = getProductTypeOptions((productTypeRows[0] || []).map((row) => row.product_type));
     const announcementTypes = getAnnouncementTypeOptions((announcementTypeRows[0] || []).map((row) => row.announcement_type));
     const provinces = buildOptionItems(provinceRows[0] || [], 'province');
+    const manufacturerProvinces = buildOptionItems(manufacturerProvinceRows[0] || [], 'province');
+    const sampledProvinces = buildOptionItems(sampledProvinceRows[0] || [], 'province');
     const years = (yearRows[0] || [])
       .map((row) => Number(row.year))
       .filter((value) => Number.isInteger(value) && value > 0)
@@ -1038,6 +1109,8 @@ router.get('/filter-options', async (req, res) => {
         product_types: productTypes,
         announcement_types: announcementTypes,
         provinces,
+        manufacturer_provinces: manufacturerProvinces,
+        sampled_provinces: sampledProvinces,
         years
       }
     });
@@ -1285,6 +1358,8 @@ router.get('/', async (req, res) => {
       product_type = '',
       announcement_type = '',
       province = '',
+      manufacturer_province = '',
+      sampled_province = '',
       product_category = '',
       year = '',
       year_start = '',
@@ -1310,6 +1385,8 @@ router.get('/', async (req, res) => {
       product_type,
       announcement_type,
       province,
+      manufacturer_province,
+      sampled_province,
       product_category,
       year,
       year_start,
@@ -1347,7 +1424,7 @@ router.get('/', async (req, res) => {
           COUNT(*) AS loaded_count,
           COUNT(*) AS total_batches,
           COUNT(DISTINCT up.source_key) AS source_count,
-          COUNT(DISTINCT up.province_display) AS province_count,
+          COUNT(DISTINCT up.manufacturer_province) AS province_count,
           CASE
             WHEN COUNT(DISTINCT up.source_key) = 1 THEN MAX(up.source_title)
             ELSE '全部问题通告'
@@ -1391,6 +1468,8 @@ router.get('/', async (req, res) => {
         product_type: normalizeOptionalText(product_type),
         announcement_type: normalizeOptionalText(announcement_type),
         province: normalizeOptionalText(province),
+        manufacturer_province: normalizeOptionalText(manufacturer_province),
+        sampled_province: normalizeOptionalText(sampled_province),
         product_category: normalizeOptionalText(product_category),
         year: normalizeOptionalText(year),
         year_start: normalizeOptionalText(year_start),

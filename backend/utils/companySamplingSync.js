@@ -408,7 +408,8 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
 
   const [detailRows] = await connection.query(
     `
-      SELECT id, product_name, company_names, company_addresses, product_region
+      SELECT id, product_name, company_names, company_addresses,
+             manufacturer_name, manufacturer_address, product_region
       FROM announcement_product_details
       WHERE announcement_id = ?
       ORDER BY sequence_no ASC, id ASC
@@ -418,9 +419,9 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
 
 
   for (const detail of detailRows) {
-    const companyNames = splitCompanyValues(detail.company_names);
-    const companyAddresses = splitCompanyValues(detail.company_addresses);
-    const defaultAddress = companyAddresses[0] || normalizeText(detail.company_addresses) || null;
+    const companyNames = splitCompanyValues(detail.manufacturer_name || detail.company_names);
+    const companyAddresses = splitCompanyValues(detail.manufacturer_address || detail.company_addresses);
+    const defaultAddress = companyAddresses[0] || normalizeText(detail.manufacturer_address || detail.company_addresses) || null;
 
     for (const [index, companyName] of companyNames.entries()) {
       const companyAddress = companyAddresses[index] || defaultAddress;

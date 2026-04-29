@@ -31,6 +31,28 @@ function buildSourceCondition(filter = {}, params = []) {
   return '1 = ?'
 }
 
+async function ensureRollupColumn(connection, columnName, definition) {
+  const [rows] = await connection.query('SHOW COLUMNS FROM unqualified_product_tree_rollups LIKE ?', [columnName])
+  if (!rows.length) {
+    try {
+      await connection.query(`ALTER TABLE unqualified_product_tree_rollups ADD COLUMN ${columnName} ${definition}`)
+    } catch (error) {
+      if (error?.code !== 'ER_DUP_FIELDNAME') throw error
+    }
+  }
+}
+
+async function ensureRollupIndex(connection, indexName, definition) {
+  const [rows] = await connection.query('SHOW INDEX FROM unqualified_product_tree_rollups WHERE Key_name = ?', [indexName])
+  if (!rows.length) {
+    try {
+      await connection.query(`ALTER TABLE unqualified_product_tree_rollups ADD ${definition}`)
+    } catch (error) {
+      if (error?.code !== 'ER_DUP_KEYNAME') throw error
+    }
+  }
+}
+
 function expandRollupRows(row = {}) {
   const sourceKey = normalizeText(row.source_key)
   if (!sourceKey) {
@@ -40,6 +62,10 @@ function expandRollupRows(row = {}) {
   const sourceLabel = normalizeText(row.source_no) || '未命名来源'
   const sourceTitle = normalizeText(row.source_title) || row.batch_title || ''
   const provinceDisplay = normalizeText(row.province_display) || '未标注省份'
+  const manufacturerProvince = normalizeText(row.manufacturer_province) || provinceDisplay
+  const manufacturerCity = normalizeText(row.manufacturer_city) || '未标注城市'
+  const sampledProvince = normalizeText(row.sampled_province) || '未标注省份'
+  const sampledCity = normalizeText(row.sampled_city) || '未标注城市'
   const yearValue = normalizeText(row.source_year) || '未标注年份'
   const productCategories = splitJoinedValues(row.product_categories_joined, row.product_category || '其他')
   const issueItems = splitJoinedValues(row.issue_items_joined, row.unqualified_items ? '' : '未拆分项目')
@@ -56,6 +82,10 @@ function expandRollupRows(row = {}) {
         sourceTitle,
         row.source_publish_date || null,
         provinceDisplay,
+        manufacturerProvince,
+        manufacturerCity,
+        sampledProvince,
+        sampledCity,
         productCategory,
         issueItem,
         yearValue
@@ -76,6 +106,10 @@ async function ensureUnqualifiedProductTreeRollupTable(connection) {
       source_title VARCHAR(500) NULL,
       source_publish_date DATETIME NULL,
       province_display VARCHAR(100) NOT NULL,
+      manufacturer_province VARCHAR(100) NOT NULL DEFAULT '未标注省份',
+      manufacturer_city VARCHAR(100) NOT NULL DEFAULT '未标注城市',
+      sampled_province VARCHAR(100) NOT NULL DEFAULT '未标注省份',
+      sampled_city VARCHAR(100) NOT NULL DEFAULT '未标注城市',
       product_category VARCHAR(100) NOT NULL,
       issue_item VARCHAR(255) NOT NULL,
       year_value VARCHAR(20) NOT NULL,
@@ -91,10 +125,33 @@ async function ensureUnqualifiedProductTreeRollupTable(connection) {
       INDEX idx_uptr_product (unqualified_product_id),
       INDEX idx_uptr_source_key (source_key),
       INDEX idx_uptr_province (province_display),
+      INDEX idx_uptr_manufacturer_region (manufacturer_province, manufacturer_city),
+      INDEX idx_uptr_sampled_region (sampled_province, sampled_city),
       INDEX idx_uptr_product_category (product_category),
       INDEX idx_uptr_issue_item (issue_item),
       INDEX idx_uptr_year_value (year_value)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
+
+  await ensureRollupColumn(connection, 'manufacturer_province', "VARCHAR(100) NOT NULL DEFAULT '未标注省份' AFTER province_display")
+  await ensureRollupColumn(connection, 'manufacturer_city', "VARCHAR(100) NOT NULL DEFAULT '未标注城市' AFTER manufacturer_province")
+  await ensureRollupColumn(connection, 'sampled_province', "VARCHAR(100) NOT NULL DEFAULT '未标注省份' AFTER manufacturer_city")
+  await ensureRollupColumn(connection, 'sampled_city', "VARCHAR(100) NOT NULL DEFAULT '未标注城市' AFTER sampled_province")
+  await ensureRollupIndex(connection, 'idx_uptr_manufacturer_region', 'INDEX idx_uptr_manufacturer_region (manufacturer_province, manufacturer_city)')
+  await ensureRollupIndex(connection, 'idx_uptr_sampled_region', 'INDEX idx_uptr_sampled_region (sampled_province, sampled_city)')
+
+  await connection.query(`
+    UPDATE unqualified_product_tree_rollups utr
+    INNER JOIN unqualified_products up ON up.id = utr.unqualified_product_id
+    SET
+      utr.manufacturer_province = COALESCE(NULLIF(TRIM(up.manufacturer_province), ''), NULLIF(TRIM(up.province_display), ''), '未标注省份'),
+      utr.manufacturer_city = COALESCE(NULLIF(TRIM(up.manufacturer_city), ''), '未标注城市'),
+      utr.sampled_province = COALESCE(NULLIF(TRIM(up.sampled_province), ''), '未标注省份'),
+      utr.sampled_city = COALESCE(NULLIF(TRIM(up.sampled_city), ''), '未标注城市')
+    WHERE utr.manufacturer_province = '未标注省份'
+       OR utr.manufacturer_city = '未标注城市'
+       OR utr.sampled_province = '未标注省份'
+       OR utr.sampled_city = '未标注城市'
   `)
 
   const [fkRows] = await connection.query(
@@ -134,6 +191,10 @@ async function rebuildUnqualifiedProductTreeRollupsForSource(connection, filter 
         up.source_publish_date,
         up.source_year,
         up.province_display,
+        up.manufacturer_province,
+        up.manufacturer_city,
+        up.sampled_province,
+        up.sampled_city,
         up.product_category,
         up.unqualified_items,
         upii_agg.issue_items_joined,
@@ -184,10 +245,14 @@ async function rebuildUnqualifiedProductTreeRollupsForSource(connection, filter 
           source_title,
           source_publish_date,
           province_display,
+          manufacturer_province,
+          manufacturer_city,
+          sampled_province,
+          sampled_city,
           product_category,
           issue_item,
           year_value
-        ) VALUES ${chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}
+        ) VALUES ${chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}
       `,
       chunk.flat()
     )

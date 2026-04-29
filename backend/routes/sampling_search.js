@@ -63,11 +63,17 @@ const FIELD_SCHEMA = [
     fields: [
       { key: 'company_names', label: '标示企业名称', defaultVisible: true },
       { key: 'company_addresses', label: '企业地址', defaultVisible: false, sensitive: true },
+      { key: 'manufacturer_name', label: '生产企业名称', defaultVisible: true },
+      { key: 'manufacturer_address', label: '生产企业地址', defaultVisible: false, sensitive: true },
+      { key: 'operator_name', label: '经营企业名称', defaultVisible: true },
+      { key: 'operator_address', label: '经营企业地址', defaultVisible: false, sensitive: true },
       { key: 'sample_unit_name', label: '被抽样单位', defaultVisible: true },
       { key: 'sample_unit_address', label: '抽样单位地址', defaultVisible: false, sensitive: true },
       { key: 'province_display', label: '省份(综合)', defaultVisible: true },
       { key: 'manufacturer_province', label: '生产/备案地区', defaultVisible: false },
-      { key: 'sampled_province', label: '抽样地区', defaultVisible: false }
+      { key: 'manufacturer_city', label: '生产企业城市', defaultVisible: false },
+      { key: 'sampled_province', label: '样品省份', defaultVisible: false },
+      { key: 'sampled_city', label: '样品城市', defaultVisible: false }
     ]
   },
   {
@@ -158,6 +164,12 @@ function maskRow(row, maskSensitive) {
   const next = { ...row };
   if (next.company_addresses) {
     next.company_addresses = '[已脱敏]';
+  }
+  if (next.manufacturer_address) {
+    next.manufacturer_address = '[已脱敏]';
+  }
+  if (next.operator_address) {
+    next.operator_address = '[已脱敏]';
   }
   if (next.sample_unit_address) {
     next.sample_unit_address = '[已脱敏]';

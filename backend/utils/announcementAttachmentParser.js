@@ -27,8 +27,16 @@ const BASE_FIELDS = [
 const DB_FIELDS = [
   'sequence_no',
   ...BASE_FIELDS,
+  'manufacturer_name',
+  'manufacturer_address',
+  'operator_name',
+  'operator_address',
   'is_counterfeit'
 ];
+
+const ENTITY_LABEL_PATTERN = /(注册人|备案人|受托生产企业|委托生产企业|标称生产企业|生产企业|境内责任人|经销商|经营企业|经营者|被抽样单位)[：:]/g;
+const MANUFACTURER_LABELS = ['受托生产企业', '委托生产企业', '标称生产企业', '生产企业'];
+const OPERATOR_LABELS = ['经营企业', '经营者', '经销商', '被抽样单位'];
 
 function normalizeToken(token) {
   return String(token || '')
@@ -57,6 +65,66 @@ function finalizeDetailText(primaryValue, extraValues, formatter = normalizeToke
     .map((value) => formatter(value))
     .filter(Boolean)
     .join('\n');
+}
+
+function stripEdgeSeparators(value) {
+  return normalizeToken(value).replace(/^[，,；;\s]+|[，,；;\s]+$/g, '');
+}
+
+function parseLabeledEntityParts(value) {
+  const text = normalizeToken(value);
+  if (!text) {
+    return [];
+  }
+
+  const matches = [];
+  let match = ENTITY_LABEL_PATTERN.exec(text);
+  while (match) {
+    matches.push({
+      label: match[1],
+      start: match.index,
+      valueStart: ENTITY_LABEL_PATTERN.lastIndex
+    });
+    match = ENTITY_LABEL_PATTERN.exec(text);
+  }
+  ENTITY_LABEL_PATTERN.lastIndex = 0;
+
+  return matches.map((item, index) => {
+    const next = matches[index + 1];
+    return {
+      label: item.label,
+      value: stripEdgeSeparators(text.slice(item.valueStart, next ? next.start : text.length))
+    };
+  }).filter((item) => item.value);
+}
+
+function getFirstEntityValue(value, labels) {
+  const parts = parseLabeledEntityParts(value);
+  for (const label of labels) {
+    const item = parts.find((part) => part.label === label);
+    if (item?.value) {
+      return item.value;
+    }
+  }
+  return '';
+}
+
+function buildStructuredCompanyFields(record) {
+  const manufacturerName = getFirstEntityValue(record.company_names, MANUFACTURER_LABELS)
+    || normalizeToken(record.company_names);
+  const manufacturerAddress = getFirstEntityValue(record.company_addresses, MANUFACTURER_LABELS)
+    || normalizeToken(record.company_addresses);
+  const operatorName = normalizeToken(record.sample_unit_name)
+    || getFirstEntityValue(record.company_names, OPERATOR_LABELS);
+  const operatorAddress = normalizeToken(record.sample_unit_address)
+    || getFirstEntityValue(record.company_addresses, OPERATOR_LABELS);
+
+  return {
+    manufacturer_name: manufacturerName || null,
+    manufacturer_address: manufacturerAddress || null,
+    operator_name: operatorName || null,
+    operator_address: operatorAddress || null
+  };
 }
 
 
@@ -184,6 +252,7 @@ function parseAnnouncementProductDetails(rawText) {
 
     record.remarks = normalizeToken(record.remarks || '/');
     record.is_counterfeit = buildCounterfeitFlag(record.remarks);
+    Object.assign(record, buildStructuredCompanyFields(record));
 
     records.push(record);
   }
@@ -227,6 +296,10 @@ async function ensureAnnouncementProductDetailsTable(pool) {
       product_name VARCHAR(255) NOT NULL,
       company_names TEXT,
       company_addresses TEXT,
+      manufacturer_name VARCHAR(500),
+      manufacturer_address TEXT,
+      operator_name VARCHAR(500),
+      operator_address TEXT,
       sample_unit_name VARCHAR(500),
       sample_unit_address TEXT,
       package_spec VARCHAR(255),
@@ -252,9 +325,41 @@ async function ensureAnnouncementProductDetailsTable(pool) {
       INDEX idx_apd_is_counterfeit (is_counterfeit)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  await ensureDetailColumn(pool, 'manufacturer_name', 'VARCHAR(500) NULL AFTER company_addresses');
+  await ensureDetailColumn(pool, 'manufacturer_address', 'TEXT NULL AFTER manufacturer_name');
+  await ensureDetailColumn(pool, 'operator_name', 'VARCHAR(500) NULL AFTER manufacturer_address');
+  await ensureDetailColumn(pool, 'operator_address', 'TEXT NULL AFTER operator_name');
+
+  await pool.query(`
+    UPDATE announcement_product_details
+    SET
+      manufacturer_name = COALESCE(NULLIF(TRIM(manufacturer_name), ''), company_names),
+      manufacturer_address = COALESCE(NULLIF(TRIM(manufacturer_address), ''), company_addresses),
+      operator_name = COALESCE(NULLIF(TRIM(operator_name), ''), sample_unit_name),
+      operator_address = COALESCE(NULLIF(TRIM(operator_address), ''), sample_unit_address)
+    WHERE manufacturer_name IS NULL
+       OR manufacturer_address IS NULL
+       OR operator_name IS NULL
+       OR operator_address IS NULL
+  `);
+}
+
+async function ensureDetailColumn(pool, columnName, definition) {
+  const [rows] = await pool.query('SHOW COLUMNS FROM announcement_product_details LIKE ?', [columnName]);
+  if (rows.length === 0) {
+    try {
+      await pool.query(`ALTER TABLE announcement_product_details ADD COLUMN ${columnName} ${definition}`);
+    } catch (error) {
+      if (error?.code !== 'ER_DUP_FIELDNAME') {
+        throw error;
+      }
+    }
+  }
 }
 
 async function replaceAnnouncementProductDetails(connection, announcementId, rows) {
+  await ensureAnnouncementProductDetailsTable(connection);
   await connection.query('DELETE FROM announcement_product_details WHERE announcement_id = ?', [announcementId]);
 
   if (!rows || rows.length === 0) {

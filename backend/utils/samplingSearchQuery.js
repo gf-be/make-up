@@ -147,8 +147,26 @@ function buildSamplingSearchFilters(input = {}) {
   }
 
   if (companyKeyword) {
-    conditions.push('(up.company_names LIKE ? OR up.company_addresses LIKE ? OR up.sample_unit_name LIKE ?)');
-    params.push(`%${companyKeyword}%`, `%${companyKeyword}%`, `%${companyKeyword}%`);
+    conditions.push(`(
+      up.company_names LIKE ?
+      OR up.company_addresses LIKE ?
+      OR up.manufacturer_name LIKE ?
+      OR up.manufacturer_address LIKE ?
+      OR up.sample_unit_name LIKE ?
+      OR up.sample_unit_address LIKE ?
+      OR up.operator_name LIKE ?
+      OR up.operator_address LIKE ?
+    )`);
+    params.push(
+      `%${companyKeyword}%`,
+      `%${companyKeyword}%`,
+      `%${companyKeyword}%`,
+      `%${companyKeyword}%`,
+      `%${companyKeyword}%`,
+      `%${companyKeyword}%`,
+      `%${companyKeyword}%`,
+      `%${companyKeyword}%`
+    );
   }
 
   if (productCategories.length) {

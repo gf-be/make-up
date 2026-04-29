@@ -93,13 +93,20 @@
               <el-button @click="resetFilters">重置</el-button>
             </div>
           </el-col>
-          <!-- <el-col :span="4">
-            <el-form-item label="所在省份">
-              <el-select v-model="filters.province" clearable filterable placeholder="全部省份" style="width: 100%">
-                <el-option v-for="item in filterOptions.provinces" :key="item.value" :label="item.label" :value="item.value" />
+          <el-col :span="4">
+            <el-form-item label="生产省份">
+              <el-select v-model="filters.manufacturer_province" clearable filterable placeholder="全部生产省份" style="width: 100%">
+                <el-option v-for="item in filterOptions.manufacturer_provinces" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
             </el-form-item>
-          </el-col> -->
+          </el-col>
+          <el-col :span="4">
+            <el-form-item label="样品省份">
+              <el-select v-model="filters.sampled_province" clearable filterable placeholder="全部样品省份" style="width: 100%">
+                <el-option v-for="item in filterOptions.sampled_provinces" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
         </el-row>
 
         <!-- <el-row :gutter="16">
@@ -120,7 +127,7 @@
       <div class="result-summary mb-20">
         <el-tag type="danger" effect="dark">命中 {{ summary.matched_count || 0 }} 条</el-tag>
         <el-tag type="info">树根节点 {{ summary.root_count || treeRootCount || 0 }} 个</el-tag>
-        <el-tag type="success">涉及省份 {{ summary.province_count || 0 }} 个</el-tag>
+        <el-tag type="success">涉及生产省份 {{ summary.province_count || 0 }} 个</el-tag>
         <el-tag type="warning">当前详情 {{ pagination.total || 0 }} 条</el-tag>
         <el-tag v-if="activeYearLabel" type="warning">年份：{{ activeYearLabel }}</el-tag>
         <el-tag v-if="filters.announcement_id" type="warning">已锁定来源通告</el-tag>
@@ -161,7 +168,7 @@
               <div class="panel-header">
                 <div>
                   <div class="panel-title">层级设计器</div>
-                  <div class="panel-subtitle">从可选字段拖入「行标签」；自上而下最多 4 级，未选满则树随之变短。</div>
+                  <div class="panel-subtitle">从可选字段拖入「行标签」；自上而下最多 5 级，未选满则树随之变短。</div>
                 </div>
                 <div class="dimension-actions">
                   <el-button size="small" type="primary" @click="applyDimensionDraft">应用层级</el-button>
@@ -211,7 +218,7 @@
               <div class="pivot-panel pivot-panel--rows">
                 <div class="pivot-panel-head">
                   <span class="pivot-panel-title">行标签</span>
-                  <span class="pivot-panel-hint">自上而下最多 4 级；可拖拽排序，未满则树高度变短</span>
+                  <span class="pivot-panel-hint">自上而下最多 5 级；可拖拽排序，未满则树高度变短</span>
                 </div>
                 <div
                   class="pivot-rows-drop"
@@ -362,15 +369,19 @@
                       <el-descriptions-item label="来源日期">{{ row.source_publish_date || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="产品类型">{{ row.product_type_label || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="通告类型">{{ row.announcement_type_label || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="企业地址">{{ row.company_addresses || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="被抽样单位地址">{{ row.sample_unit_address || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="生产企业名称">{{ row.manufacturer_name || row.company_names || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="生产企业地址">{{ row.manufacturer_address || row.company_addresses || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="经营企业名称">{{ row.operator_name || row.sample_unit_name || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="经营企业地址">{{ row.operator_address || row.sample_unit_address || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="原始标示企业">{{ row.company_names || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="原始企业地址">{{ row.company_addresses || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="包装规格">{{ row.package_spec || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="标示批号">{{ row.batch_no || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="标示生产日期">{{ row.production_date || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="限期使用日期/保质期">{{ row.expiry_date || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="所在地/进口地区">{{ row.product_region || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="生产企业省份">{{ row.manufacturer_province || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="抽样单位省份">{{ row.sampled_province || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="生产企业省市">{{ [row.manufacturer_province, row.manufacturer_city].filter(Boolean).join(' / ') || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="样品省市">{{ [row.sampled_province, row.sampled_city].filter(Boolean).join(' / ') || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="注册/备案编号">{{ row.registration_no || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="生产许可证号">{{ row.production_license_no || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="问题类型">{{ row.issue_category || '-' }}</el-descriptions-item>
@@ -384,8 +395,14 @@
                 <el-table-column prop="source_publish_date" label="日期" width="120" />
                 <el-table-column prop="source_title" label="来源通告" min-width="240" show-overflow-tooltip />
                 <el-table-column prop="product_name" label="问题对象/标题" min-width="220" show-overflow-tooltip />
-                <el-table-column prop="company_names" label="企业名称" min-width="220" show-overflow-tooltip />
-                <el-table-column prop="province_display" label="所在省份" width="120" show-overflow-tooltip />
+                <el-table-column prop="manufacturer_name" label="生产企业" min-width="220" show-overflow-tooltip>
+                  <template #default="{ row }">{{ row.manufacturer_name || row.company_names || '-' }}</template>
+                </el-table-column>
+                <el-table-column prop="operator_name" label="经营企业" min-width="200" show-overflow-tooltip>
+                  <template #default="{ row }">{{ row.operator_name || row.sample_unit_name || '-' }}</template>
+                </el-table-column>
+                <el-table-column prop="manufacturer_province" label="生产省份" width="120" show-overflow-tooltip />
+                <el-table-column prop="manufacturer_city" label="生产城市" width="120" show-overflow-tooltip />
                 <el-table-column prop="unqualified_items" label="不符合规定项目/检查问题" min-width="240" show-overflow-tooltip />
                 <el-table-column label="操作" width="80" fixed="right">
                   <template #default="{ row }">
@@ -531,8 +548,12 @@ const NODE_DETAIL_CHART_FIELDS = [
   { key: 'source_publish_date', label: '日期' },
   { key: 'source_title', label: '来源通告' },
   { key: 'product_name', label: '问题对象/标题' },
-  { key: 'company_names', label: '企业名称' },
-  { key: 'province_display', label: '所在省份' },
+  { key: 'manufacturer_name', label: '生产企业' },
+  { key: 'operator_name', label: '经营企业' },
+  { key: 'manufacturer_province', label: '生产省份' },
+  { key: 'manufacturer_city', label: '生产城市' },
+  { key: 'sampled_province', label: '样品省份' },
+  { key: 'sampled_city', label: '样品城市' },
   { key: 'unqualified_items', label: '不符合规定项目' },
   { key: 'product_type_label', label: '产品类型' },
   { key: 'announcement_type_label', label: '通告类型' },
@@ -542,7 +563,7 @@ const NODE_DETAIL_CHART_FIELDS = [
 
 const detailChartDialogVisible = ref(false)
 const detailChartType = ref('bar')
-const detailChartDimension = ref('province_display')
+const detailChartDimension = ref('manufacturer_province')
 const detailChartRef = ref(null)
 /** 图表统计：与导出一致，为当前 path + 筛选下的全部分页明细 */
 const detailChartAllRows = ref([])
@@ -674,7 +695,7 @@ function updateDetailChart() {
 
 const currentNode = ref(null)
 const currentNodeKey = ref('')
-const DEFAULT_DIMENSION_ORDER = ['source', 'province', 'product_category', 'issue_item']
+const DEFAULT_DIMENSION_ORDER = ['source', 'manufacturer_province', 'manufacturer_city', 'product_category', 'issue_item']
 /** 上次在页面点击「应用层级」后写入，下次进入本页时自动恢复 */
 const APPLIED_DIMENSION_ORDER_STORAGE_KEY = 'unqualifiedProducts.appliedDimensionOrder'
 const APPLIED_DIMENSION_HISTORY_STORAGE_KEY = 'unqualifiedProducts.appliedDimensionHistory'
@@ -682,7 +703,7 @@ const APPLIED_DIMENSION_HISTORY_LIMIT = 8
 const availableDimensions = ref([])
 const dimensionOrder = ref([...DEFAULT_DIMENSION_ORDER])
 const dimensionDraft = ref([...DEFAULT_DIMENSION_ORDER])
-/** 行标签顺序（与数据透视表行字段一致），最多 4 项 */
+/** 行标签顺序（与数据透视表行字段一致），最多 5 项 */
 const hierarchyRow = ref([...DEFAULT_DIMENSION_ORDER])
 const appliedDimensionHistory = ref([])
 const dragContext = ref(null)
@@ -702,6 +723,8 @@ const filterOptions = ref({
   product_types: [],
   announcement_types: [],
   provinces: [],
+  manufacturer_provinces: [],
+  sampled_provinces: [],
   years: []
 })
 const filters = ref(createDefaultFilters())
@@ -744,7 +767,11 @@ const dimensionLabelMap = computed(() => {
   const map = {}
   const list = availableDimensions.value?.length ? availableDimensions.value : [
     { key: 'source', label: '来源编号' },
-    { key: 'province', label: '省份' },
+    { key: 'province', label: '综合省份' },
+    { key: 'manufacturer_province', label: '生产企业省份' },
+    { key: 'manufacturer_city', label: '生产企业城市' },
+    { key: 'sampled_province', label: '样品省份' },
+    { key: 'sampled_city', label: '样品城市' },
     { key: 'product_category', label: '产品类别' },
     { key: 'issue_item', label: '不符合项目' },
     { key: 'year', label: '年份' }
@@ -763,7 +790,11 @@ const poolDimensions = computed(() => {
   const inRow = new Set(hierarchyRow.value)
   const list = availableDimensions.value?.length ? availableDimensions.value : [
     { key: 'source', label: '来源编号' },
-    { key: 'province', label: '省份' },
+    { key: 'province', label: '综合省份' },
+    { key: 'manufacturer_province', label: '生产企业省份' },
+    { key: 'manufacturer_city', label: '生产企业城市' },
+    { key: 'sampled_province', label: '样品省份' },
+    { key: 'sampled_city', label: '样品城市' },
     { key: 'product_category', label: '产品类别' },
     { key: 'issue_item', label: '不符合项目' },
     { key: 'year', label: '年份' }
@@ -888,11 +919,11 @@ function removeHierarchyAt(index) {
 }
 
 function normalizeDimensionOrder(raw) {
-  const allowed = new Set(['source', 'province', 'product_category', 'issue_item', 'year'])
+  const allowed = new Set(['source', 'province', 'manufacturer_province', 'manufacturer_city', 'sampled_province', 'sampled_city', 'product_category', 'issue_item', 'year'])
   const list = Array.isArray(raw) ? raw : []
   const unique = []
   list.forEach((key) => {
-    if (allowed.has(key) && !unique.includes(key) && unique.length < 4) {
+    if (allowed.has(key) && !unique.includes(key) && unique.length < 5) {
       unique.push(key)
     }
   })
@@ -1042,6 +1073,8 @@ function createDefaultFilters() {
     product_type: '',
     announcement_type: '',
     province: '',
+    manufacturer_province: '',
+    sampled_province: '',
     year_start: '',
     year_end: '',
     announcement_id: '',
@@ -1072,6 +1105,8 @@ function applyRouteFilters() {
     product_type: String(route.query.product_type || ''),
     announcement_type: String(route.query.announcement_type || ''),
     province: String(route.query.province || ''),
+    manufacturer_province: String(route.query.manufacturer_province || ''),
+    sampled_province: String(route.query.sampled_province || ''),
     year_start: String(route.query.year_start || fallbackYear || ''),
     year_end: String(route.query.year_end || fallbackYear || ''),
     announcement_id: String(route.query.announcement_id || ''),
@@ -1089,6 +1124,8 @@ const hasActiveFilters = computed(() => Boolean(
   || filters.value.product_type
   || filters.value.announcement_type
   || filters.value.province
+  || filters.value.manufacturer_province
+  || filters.value.sampled_province
   || filters.value.year_start
   || filters.value.year_end
   || filters.value.announcement_id
@@ -1163,6 +1200,7 @@ function uniqueCopyValues(values) {
 }
 
 function cleanProvinceLabel(raw) {
+  console.log(raw)
   return copyTextValue(raw).replace(/^(注册人|备案人|境内责任人|标称生产企业)[：:]\s*/, '').trim()
 }
 
@@ -1176,7 +1214,7 @@ function formatCopyList(items, max = 6) {
 function topProvincePhrase(rows, maxShow = 5) {
   const counts = new Map()
   for (const row of rows || []) {
-    const province = cleanProvinceLabel(row?.manufacturer_province || row?.province_display || row?.sampled_province)
+    const province = cleanProvinceLabel(row?.manufacturer_province || row?.product_region || row?.sampled_province)
     if (!province) continue
     counts.set(province, (counts.get(province) || 0) + 1)
   }
@@ -1249,8 +1287,8 @@ function rowCompletenessScore(row) {
   let score = 0
   if (copyTextValue(row?.product_name)) score += 2
   if (copyTextValue(row?.unqualified_items)) score += 2
-  if (copyTextValue(row?.company_names)) score += 1
-  if (copyTextValue(row?.sample_unit_address)) score += 1
+  if (copyTextValue(row?.manufacturer_name || row?.company_names)) score += 1
+  if (copyTextValue(row?.operator_address || row?.sample_unit_address)) score += 1
   return score
 }
 
@@ -1272,7 +1310,7 @@ function pickVideoCopyRows(rows, maxN = VIDEO_COPY_PRODUCT_LIMIT) {
         row,
         index,
         product,
-        familiarity: familiarityScore(product, row?.company_names, freqBonus),
+        familiarity: familiarityScore(product, row?.manufacturer_name || row?.company_names, freqBonus),
         completeness: rowCompletenessScore(row)
       }
     })
@@ -1301,10 +1339,11 @@ function pickVideoCopyRows(rows, maxN = VIDEO_COPY_PRODUCT_LIMIT) {
 
 function buildVideoProductLine(row) {
   const product = copyTextValue(row?.product_name)
-  const producer = extractProducerForVoice(row?.company_names)
-  const region = regionForSampling(row?.sample_unit_address)
+  const producer = extractProducerForVoice(row?.manufacturer_name || row?.company_names)
+  const region = regionForSampling(row?.operator_address)
+    || regionForSampling(row?.sample_unit_address)
     || regionForSampling(row?.sampled_province)
-    || cleanProvinceLabel(row?.province_display)
+    || cleanProvinceLabel(row?.product_region)
   const issues = issuesForVoice(row?.unqualified_items)
 
   const head = producer && product
@@ -1686,13 +1725,17 @@ const NODE_DETAILS_EXPORT_COLUMNS = [
   { key: 'source_publish_date', header: '日期' },
   { key: 'source_title', header: '来源通告' },
   { key: 'product_name', header: '问题对象/标题' },
-  { key: 'company_names', header: '企业名称' },
-  { key: 'province_display', header: '所在省份' },
+  { key: 'manufacturer_name', header: '生产企业名称' },
+  { key: 'manufacturer_address', header: '生产企业地址' },
+  { key: 'operator_name', header: '经营企业名称' },
+  { key: 'operator_address', header: '经营企业地址' },
+  { key: 'company_names', header: '原始标示企业名称' },
+  { key: 'product_region', header: '所在省份' },
   { key: 'unqualified_items', header: '不符合规定项目/检查问题' },
   { key: 'batch_title', header: '来源标题(批)' },
   { key: 'product_type_label', header: '产品类型' },
   { key: 'announcement_type_label', header: '通告类型' },
-  { key: 'company_addresses', header: '企业地址' },
+  { key: 'company_addresses', header: '原始企业地址' },
   { key: 'sample_unit_address', header: '被抽样单位地址' },
   { key: 'package_spec', header: '包装规格' },
   { key: 'batch_no', header: '标示批号' },
@@ -1700,7 +1743,9 @@ const NODE_DETAILS_EXPORT_COLUMNS = [
   { key: 'expiry_date', header: '限期使用日期/保质期' },
   { key: 'product_region', header: '所在地/进口地区' },
   { key: 'manufacturer_province', header: '生产企业省份' },
-  { key: 'sampled_province', header: '抽样单位省份' },
+  { key: 'manufacturer_city', header: '生产企业城市' },
+  { key: 'sampled_province', header: '样品省份' },
+  { key: 'sampled_city', header: '样品城市' },
   { key: 'registration_no', header: '注册/备案编号' },
   { key: 'production_license_no', header: '生产许可证号' },
   { key: 'issue_category', header: '问题类型' },
@@ -1863,7 +1908,7 @@ function appendDetailsSheet(wb, allRows) {
   for (let c = 1; c <= maxCol; c += 1) {
     const w = NODE_DETAILS_EXPORT_COLUMNS[c - 1]
     if (!w) continue
-    const prop = w.key === 'source_title' || w.key === 'unqualified_items' || w.key === 'company_names' ? 32 : 18
+    const prop = ['source_title', 'unqualified_items', 'company_names', 'manufacturer_name', 'manufacturer_address', 'operator_name', 'operator_address'].includes(w.key) ? 32 : 18
     ws.getColumn(c).width = Math.min(48, Math.max(10, prop))
   }
   ws.views = [{ state: 'frozen', ySplit: 1 }]

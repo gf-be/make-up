@@ -61,6 +61,10 @@ const UNQUALIFIED_PRODUCT_FIELDS = [
   'product_name',
   'company_names',
   'company_addresses',
+  'manufacturer_name',
+  'manufacturer_address',
+  'operator_name',
+  'operator_address',
   'sample_unit_name',
   'sample_unit_address',
   'package_spec',
@@ -77,7 +81,9 @@ const UNQUALIFIED_PRODUCT_FIELDS = [
   'remarks',
   'product_category',
   'manufacturer_province',
+  'manufacturer_city',
   'sampled_province',
+  'sampled_city',
   'issue_category',
   'product_type',
   'announcement_type',
@@ -230,6 +236,10 @@ function enrichPayload(payload = {}) {
     ...payload,
     company_names: normalizeRequiredTextField(payload.company_names),
     company_addresses: normalizeRequiredTextField(payload.company_addresses),
+    manufacturer_name: normalizeRequiredTextField(payload.manufacturer_name || payload.company_names),
+    manufacturer_address: normalizeRequiredTextField(payload.manufacturer_address || payload.company_addresses),
+    operator_name: normalizeRequiredTextField(payload.operator_name || payload.sample_unit_name),
+    operator_address: normalizeRequiredTextField(payload.operator_address || payload.sample_unit_address),
     sample_unit_name: normalizeRequiredTextField(payload.sample_unit_name),
     sample_unit_address: normalizeRequiredTextField(payload.sample_unit_address),
     unqualified_items: normalizeRequiredTextField(payload.unqualified_items),
@@ -280,7 +290,9 @@ function resolveSourceYear(value) {
 function buildProvinceDisplayValue(payload = {}) {
   return String(
     payload.manufacturer_province
+    || payload.manufacturer_city
     || payload.sampled_province
+    || payload.sampled_city
     || payload.product_region
     || ''
   ).trim() || null;
@@ -472,11 +484,14 @@ async function syncProductCategoryItemsForSource(connection, filter = {}) {
 
 async function backfillDerivedFields(connection) {
   const [rows] = await connection.query(`
-    SELECT id, product_name, company_addresses, product_region, sample_unit_address, unqualified_items, inspection_result, requirement
+    SELECT id, product_name, company_addresses, manufacturer_address, product_region,
+           sample_unit_address, operator_address, unqualified_items, inspection_result, requirement
     FROM unqualified_products
     WHERE product_category IS NULL
        OR manufacturer_province IS NULL
+       OR manufacturer_city IS NULL
        OR sampled_province IS NULL
+       OR sampled_city IS NULL
        OR issue_category IS NULL
     LIMIT 5000
   `);
@@ -486,13 +501,16 @@ async function backfillDerivedFields(connection) {
     await connection.query(
       `
         UPDATE unqualified_products
-        SET product_category = ?, manufacturer_province = ?, sampled_province = ?, issue_category = ?
+        SET product_category = ?, manufacturer_province = ?, manufacturer_city = ?,
+            sampled_province = ?, sampled_city = ?, issue_category = ?
         WHERE id = ?
       `,
       [
         derived.product_category,
         derived.manufacturer_province,
+        derived.manufacturer_city,
         derived.sampled_province,
+        derived.sampled_city,
         derived.issue_category,
         row.id
       ]
@@ -580,6 +598,12 @@ async function backfillSearchHotFields(connection) {
       OR up.source_publish_date IS NULL
       OR up.source_year IS NULL
       OR up.province_display IS NULL
+      OR COALESCE(up.province_display, '') <> COALESCE(
+        NULLIF(TRIM(up.manufacturer_province), ''),
+        NULLIF(TRIM(up.sampled_province), ''),
+        NULLIF(TRIM(up.product_region), ''),
+        ''
+      )
       OR up.company_id IS NULL
     )
       AND (up.announcement_id IS NOT NULL OR up.supervision_id IS NOT NULL)
@@ -759,6 +783,10 @@ async function ensureUnqualifiedProductsTable(connection) {
       product_name VARCHAR(255) NOT NULL,
       company_names TEXT,
       company_addresses TEXT,
+      manufacturer_name VARCHAR(500),
+      manufacturer_address TEXT,
+      operator_name VARCHAR(500),
+      operator_address TEXT,
       sample_unit_name VARCHAR(500),
       sample_unit_address TEXT,
       package_spec VARCHAR(255),
@@ -775,7 +803,9 @@ async function ensureUnqualifiedProductsTable(connection) {
       remarks LONGTEXT,
       product_category VARCHAR(100) NULL,
       manufacturer_province VARCHAR(100) NULL,
+      manufacturer_city VARCHAR(100) NULL,
       sampled_province VARCHAR(100) NULL,
+      sampled_city VARCHAR(100) NULL,
       issue_category VARCHAR(100) NULL,
       product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
       announcement_type VARCHAR(50) NOT NULL DEFAULT 'sampling',
@@ -803,8 +833,24 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'product_name', 'VARCHAR(255) NOT NULL');
   await ensureColumn(connection, 'company_names', 'TEXT NULL');
   await ensureColumn(connection, 'company_addresses', 'TEXT NULL');
+  await ensureColumn(connection, 'manufacturer_name', 'VARCHAR(500) NULL AFTER company_addresses');
+  await ensureColumn(connection, 'manufacturer_address', 'TEXT NULL AFTER manufacturer_name');
+  await ensureColumn(connection, 'operator_name', 'VARCHAR(500) NULL AFTER manufacturer_address');
+  await ensureColumn(connection, 'operator_address', 'TEXT NULL AFTER operator_name');
   await ensureColumn(connection, 'sample_unit_name', 'VARCHAR(500) NULL');
   await ensureColumn(connection, 'sample_unit_address', 'TEXT NULL');
+  await connection.query(`
+    UPDATE unqualified_products
+    SET
+      manufacturer_name = COALESCE(NULLIF(TRIM(manufacturer_name), ''), company_names),
+      manufacturer_address = COALESCE(NULLIF(TRIM(manufacturer_address), ''), company_addresses),
+      operator_name = COALESCE(NULLIF(TRIM(operator_name), ''), sample_unit_name),
+      operator_address = COALESCE(NULLIF(TRIM(operator_address), ''), sample_unit_address)
+    WHERE manufacturer_name IS NULL
+       OR manufacturer_address IS NULL
+       OR operator_name IS NULL
+       OR operator_address IS NULL
+  `);
   await ensureColumn(connection, 'package_spec', 'VARCHAR(255) NULL');
   await ensureColumn(connection, 'batch_no', 'VARCHAR(255) NULL');
   await ensureColumn(connection, 'production_date', 'VARCHAR(100) NULL');
@@ -819,8 +865,10 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'remarks', 'LONGTEXT NULL');
   await ensureColumn(connection, 'product_category', 'VARCHAR(100) NULL AFTER remarks');
   await ensureColumn(connection, 'manufacturer_province', 'VARCHAR(100) NULL AFTER product_category');
-  await ensureColumn(connection, 'sampled_province', 'VARCHAR(100) NULL AFTER manufacturer_province');
-  await ensureColumn(connection, 'issue_category', 'VARCHAR(100) NULL AFTER sampled_province');
+  await ensureColumn(connection, 'manufacturer_city', 'VARCHAR(100) NULL AFTER manufacturer_province');
+  await ensureColumn(connection, 'sampled_province', 'VARCHAR(100) NULL AFTER manufacturer_city');
+  await ensureColumn(connection, 'sampled_city', 'VARCHAR(100) NULL AFTER sampled_province');
+  await ensureColumn(connection, 'issue_category', 'VARCHAR(100) NULL AFTER sampled_city');
   await ensureColumn(connection, 'product_type', "VARCHAR(50) NOT NULL DEFAULT 'cosmetics' AFTER issue_category");
   await ensureColumn(connection, 'announcement_type', "VARCHAR(50) NOT NULL DEFAULT 'sampling' AFTER product_type");
   await ensureColumn(connection, 'source_key', 'VARCHAR(80) NULL AFTER announcement_type');
@@ -839,6 +887,8 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
 
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_sample_unit_name', 'INDEX idx_unqualified_products_sample_unit_name (sample_unit_name)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_manufacturer_name', 'INDEX idx_unqualified_products_manufacturer_name (manufacturer_name)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_operator_name', 'INDEX idx_unqualified_products_operator_name (operator_name)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_inspection_institution', 'INDEX idx_unqualified_products_inspection_institution (inspection_institution)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_announcement', 'INDEX idx_unqualified_products_announcement (announcement_id)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_announcement_detail', 'INDEX idx_unqualified_products_announcement_detail (announcement_detail_id)');
@@ -849,7 +899,9 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_product_region', 'INDEX idx_unqualified_products_product_region (product_region)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_product_category', 'INDEX idx_unqualified_products_product_category (product_category)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_manufacturer_province', 'INDEX idx_unqualified_products_manufacturer_province (manufacturer_province)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_manufacturer_city', 'INDEX idx_unqualified_products_manufacturer_city (manufacturer_city)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_sampled_province', 'INDEX idx_unqualified_products_sampled_province (sampled_province)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_sampled_city', 'INDEX idx_unqualified_products_sampled_city (sampled_city)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_issue_category', 'INDEX idx_unqualified_products_issue_category (issue_category)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_product_type', 'INDEX idx_unqualified_products_product_type (product_type)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_announcement_type', 'INDEX idx_unqualified_products_announcement_type (announcement_type)');
@@ -950,7 +1002,7 @@ async function seedDefaultUnqualifiedProducts(connection) {
               production_date = ?, expiry_date = ?, product_region = ?, registration_no = ?,
               production_license_no = ?, inspection_institution = ?, unqualified_items = ?,
               inspection_result = ?, requirement = ?, remarks = ?, product_category = ?,
-              manufacturer_province = ?, sampled_province = ?, issue_category = ?,
+              manufacturer_province = ?, manufacturer_city = ?, sampled_province = ?, sampled_city = ?, issue_category = ?,
               product_type = ?, announcement_type = ?, is_counterfeit = 0,
               announcement_id = NULL, announcement_detail_id = NULL,
               supervision_id = NULL, supervision_detail_id = NULL
@@ -977,7 +1029,9 @@ async function seedDefaultUnqualifiedProducts(connection) {
           payload.remarks,
           payload.product_category,
           payload.manufacturer_province,
+          payload.manufacturer_city,
           payload.sampled_province,
+          payload.sampled_city,
           payload.issue_category,
           payload.product_type,
           payload.announcement_type,
@@ -1028,8 +1082,9 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
 
   const [detailRows] = await connection.query(
     `
-      SELECT id, sequence_no, product_name, company_names, company_addresses, sample_unit_name,
-             sample_unit_address, package_spec, batch_no, production_date, expiry_date,
+      SELECT id, sequence_no, product_name, company_names, company_addresses,
+             manufacturer_name, manufacturer_address, operator_name, operator_address,
+             sample_unit_name, sample_unit_address, package_spec, batch_no, production_date, expiry_date,
              product_region, registration_no, production_license_no, inspection_institution,
              unqualified_items, inspection_result, requirement, remarks, is_counterfeit
       FROM announcement_product_details
@@ -1067,6 +1122,10 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
     product_name: row.product_name,
     company_names: row.company_names,
     company_addresses: row.company_addresses,
+    manufacturer_name: row.manufacturer_name,
+    manufacturer_address: row.manufacturer_address,
+    operator_name: row.operator_name,
+    operator_address: row.operator_address,
     sample_unit_name: row.sample_unit_name,
     sample_unit_address: row.sample_unit_address,
     package_spec: row.package_spec,
@@ -1190,6 +1249,10 @@ async function replaceUnqualifiedProductsFromFlightInspectionDetails(connection,
     product_name: row.title || `${row.company_name || supervision.company_name || '企业'}飞行检查问题项`,
     company_names: row.company_name || supervision.company_name || null,
     company_addresses: row.company_address || supervision.company_address || null,
+    manufacturer_name: row.company_name || supervision.company_name || null,
+    manufacturer_address: row.company_address || supervision.company_address || null,
+    operator_name: null,
+    operator_address: null,
     sample_unit_name: null,
     sample_unit_address: null,
     package_spec: null,

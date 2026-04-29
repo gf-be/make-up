@@ -144,6 +144,10 @@ async function ensureFoodInspectionSchema(connection) {
       product_name VARCHAR(500) NOT NULL,
       company_names TEXT NULL,
       company_addresses TEXT NULL,
+      manufacturer_name VARCHAR(500) NULL,
+      manufacturer_address TEXT NULL,
+      operator_name VARCHAR(500) NULL,
+      operator_address TEXT NULL,
       sample_unit_name VARCHAR(500) NULL,
       sample_unit_address TEXT NULL,
       package_spec VARCHAR(255) NULL,
@@ -167,6 +171,10 @@ async function ensureFoodInspectionSchema(connection) {
       INDEX idx_food_product_issue (unqualified_items(191))
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  await ensureColumn(connection, 'food_inspection_products', 'manufacturer_name', 'VARCHAR(500) NULL AFTER company_addresses');
+  await ensureColumn(connection, 'food_inspection_products', 'manufacturer_address', 'TEXT NULL AFTER manufacturer_name');
+  await ensureColumn(connection, 'food_inspection_products', 'operator_name', 'VARCHAR(500) NULL AFTER manufacturer_address');
+  await ensureColumn(connection, 'food_inspection_products', 'operator_address', 'TEXT NULL AFTER operator_name');
 }
 
 function getPayloadAttachments(payload = {}) {
@@ -188,6 +196,10 @@ function normalizeProductRow(row = {}, sequenceNo = 1) {
     product_name: normalizeNullableText(row.product_name),
     company_names: normalizeNullableMultiline(row.company_names),
     company_addresses: normalizeNullableMultiline(row.company_addresses),
+    manufacturer_name: normalizeNullableText(row.manufacturer_name || row.company_names),
+    manufacturer_address: normalizeNullableMultiline(row.manufacturer_address || row.company_addresses),
+    operator_name: normalizeNullableText(row.operator_name || row.sample_unit_name),
+    operator_address: normalizeNullableMultiline(row.operator_address || row.sample_unit_address),
     sample_unit_name: normalizeNullableText(row.sample_unit_name),
     sample_unit_address: normalizeNullableMultiline(row.sample_unit_address),
     package_spec: normalizeNullableText(row.package_spec),
@@ -307,11 +319,12 @@ async function upsertFoodInspectionPayload(connection, payload = {}, sourceJsonF
         `
           INSERT INTO food_inspection_products (
             food_inspection_id, attachment_id, sequence_no, product_name,
-            company_names, company_addresses, sample_unit_name, sample_unit_address,
+            company_names, company_addresses, manufacturer_name, manufacturer_address,
+            operator_name, operator_address, sample_unit_name, sample_unit_address,
             package_spec, batch_no, production_date, expiry_date, product_region,
             inspection_institution, unqualified_items, inspection_result,
             requirement, remarks, raw_payload
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           foodInspectionId,
@@ -320,6 +333,10 @@ async function upsertFoodInspectionPayload(connection, payload = {}, sourceJsonF
           normalized.product_name,
           normalized.company_names,
           normalized.company_addresses,
+          normalized.manufacturer_name,
+          normalized.manufacturer_address,
+          normalized.operator_name,
+          normalized.operator_address,
           normalized.sample_unit_name,
           normalized.sample_unit_address,
           normalized.package_spec,

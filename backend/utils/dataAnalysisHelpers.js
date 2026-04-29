@@ -7,13 +7,121 @@ function normalizeText(value) {
 }
 
 function extractProvince(text) {
+  return extractProvinceCity(text).province;
+}
+
+const MUNICIPALITIES = ['北京市', '天津市', '上海市', '重庆市'];
+const REGION_ALIASES = {
+  北京: '北京市',
+  天津: '天津市',
+  上海: '上海市',
+  重庆: '重庆市',
+  内蒙古: '内蒙古自治区',
+  广西: '广西壮族自治区',
+  西藏: '西藏自治区',
+  宁夏: '宁夏回族自治区',
+  新疆: '新疆维吾尔自治区',
+  香港: '香港特别行政区',
+  澳门: '澳门特别行政区',
+  广东: '广东省',
+  浙江: '浙江省',
+  江苏: '江苏省',
+  福建: '福建省',
+  山东: '山东省',
+  河南: '河南省',
+  湖北: '湖北省',
+  湖南: '湖南省',
+  安徽: '安徽省',
+  江西: '江西省',
+  河北: '河北省',
+  山西: '山西省',
+  辽宁: '辽宁省',
+  吉林: '吉林省',
+  黑龙江: '黑龙江省',
+  四川: '四川省',
+  贵州: '贵州省',
+  云南: '云南省',
+  陕西: '陕西省',
+  甘肃: '甘肃省',
+  青海: '青海省',
+  海南: '海南省'
+};
+
+const CITY_PROVINCE_MAP = {
+  广州市: '广东省', 深圳市: '广东省', 珠海市: '广东省', 汕头市: '广东省', 佛山市: '广东省', 韶关市: '广东省', 湛江市: '广东省', 肇庆市: '广东省', 江门市: '广东省', 茂名市: '广东省', 惠州市: '广东省', 梅州市: '广东省', 汕尾市: '广东省', 河源市: '广东省', 阳江市: '广东省', 清远市: '广东省', 东莞市: '广东省', 中山市: '广东省', 潮州市: '广东省', 揭阳市: '广东省', 云浮市: '广东省', 英德市: '广东省',
+  杭州市: '浙江省', 宁波市: '浙江省', 温州市: '浙江省', 嘉兴市: '浙江省', 湖州市: '浙江省', 绍兴市: '浙江省', 金华市: '浙江省', 衢州市: '浙江省', 舟山市: '浙江省', 台州市: '浙江省', 丽水市: '浙江省',
+  南京市: '江苏省', 无锡市: '江苏省', 徐州市: '江苏省', 常州市: '江苏省', 苏州市: '江苏省', 南通市: '江苏省', 连云港市: '江苏省', 淮安市: '江苏省', 盐城市: '江苏省', 扬州市: '江苏省', 镇江市: '江苏省', 泰州市: '江苏省', 宿迁市: '江苏省',
+  福州市: '福建省', 厦门市: '福建省', 莆田市: '福建省', 三明市: '福建省', 泉州市: '福建省', 漳州市: '福建省', 南平市: '福建省', 龙岩市: '福建省', 宁德市: '福建省',
+  济南市: '山东省', 青岛市: '山东省', 淄博市: '山东省', 枣庄市: '山东省', 东营市: '山东省', 烟台市: '山东省', 潍坊市: '山东省', 济宁市: '山东省', 泰安市: '山东省', 威海市: '山东省', 日照市: '山东省', 临沂市: '山东省', 德州市: '山东省', 聊城市: '山东省', 滨州市: '山东省', 菏泽市: '山东省',
+  郑州市: '河南省', 开封市: '河南省', 洛阳市: '河南省', 平顶山市: '河南省', 安阳市: '河南省', 鹤壁市: '河南省', 新乡市: '河南省', 焦作市: '河南省', 濮阳市: '河南省', 许昌市: '河南省', 漯河市: '河南省', 三门峡市: '河南省', 南阳市: '河南省', 商丘市: '河南省', 信阳市: '河南省', 周口市: '河南省', 驻马店市: '河南省',
+  武汉市: '湖北省', 黄石市: '湖北省', 十堰市: '湖北省', 宜昌市: '湖北省', 襄阳市: '湖北省', 鄂州市: '湖北省', 荆门市: '湖北省', 孝感市: '湖北省', 荆州市: '湖北省', 黄冈市: '湖北省', 咸宁市: '湖北省', 随州市: '湖北省',
+  长沙市: '湖南省', 株洲市: '湖南省', 湘潭市: '湖南省', 衡阳市: '湖南省', 邵阳市: '湖南省', 岳阳市: '湖南省', 常德市: '湖南省', 张家界市: '湖南省', 益阳市: '湖南省', 郴州市: '湖南省', 永州市: '湖南省', 怀化市: '湖南省', 娄底市: '湖南省',
+  成都市: '四川省', 自贡市: '四川省', 攀枝花市: '四川省', 泸州市: '四川省', 德阳市: '四川省', 绵阳市: '四川省', 广元市: '四川省', 遂宁市: '四川省', 内江市: '四川省', 乐山市: '四川省', 南充市: '四川省', 眉山市: '四川省', 宜宾市: '四川省', 广安市: '四川省', 达州市: '四川省', 雅安市: '四川省', 巴中市: '四川省', 资阳市: '四川省',
+  昆明市: '云南省', 曲靖市: '云南省', 玉溪市: '云南省', 保山市: '云南省', 昭通市: '云南省', 丽江市: '云南省', 普洱市: '云南省', 临沧市: '云南省',
+  西安市: '陕西省', 铜川市: '陕西省', 宝鸡市: '陕西省', 咸阳市: '陕西省', 渭南市: '陕西省', 延安市: '陕西省', 汉中市: '陕西省', 榆林市: '陕西省', 安康市: '陕西省', 商洛市: '陕西省'
+};
+
+function normalizeProvinceName(value) {
+  const text = normalizeText(value);
+  if (!text || text === '未标注') {
+    return '未标注';
+  }
+  if (REGION_ALIASES[text]) {
+    return REGION_ALIASES[text];
+  }
+  if (MUNICIPALITIES.includes(text)) {
+    return text;
+  }
+  if (/自治区|特别行政区|省$/.test(text)) {
+    return text;
+  }
+  return text.endsWith('市') ? (CITY_PROVINCE_MAP[text] || text) : `${text}省`;
+}
+
+function extractCity(text) {
   const normalized = normalizeText(text);
   if (!normalized) {
     return '未标注';
   }
-
-  const match = normalized.match(/(北京市|天津市|上海市|重庆市|内蒙古自治区|广西壮族自治区|西藏自治区|宁夏回族自治区|新疆维吾尔自治区|香港特别行政区|澳门特别行政区|[^\s，,；;（）()]+省|[^\s，,；;（）()]+市)/);
+  for (const city of MUNICIPALITIES) {
+    if (normalized.includes(city)) {
+      return city;
+    }
+  }
+  const match = normalized.match(/([^\s，,；;（）()省自治区]+?(?:市|自治州|地区|盟))/);
   return match ? match[1] : '未标注';
+}
+
+function extractProvinceCity(text) {
+  const normalized = normalizeText(text);
+  if (!normalized) {
+    return { province: '未标注', city: '未标注' };
+  }
+
+  for (const city of MUNICIPALITIES) {
+    if (normalized.includes(city)) {
+      return { province: city, city };
+    }
+  }
+
+  const provinceMatch = normalized.match(/(内蒙古自治区|广西壮族自治区|西藏自治区|宁夏回族自治区|新疆维吾尔自治区|香港特别行政区|澳门特别行政区|[^\s，,；;（）()]+省)/);
+  const city = extractCity(normalized);
+  if (provinceMatch) {
+    return {
+      province: normalizeProvinceName(provinceMatch[1]),
+      city
+    };
+  }
+
+  if (CITY_PROVINCE_MAP[city]) {
+    return { province: CITY_PROVINCE_MAP[city], city };
+  }
+
+  const provinceAlias = Object.keys(REGION_ALIASES).find((alias) => normalized === alias || normalized.startsWith(alias));
+  return {
+    province: provinceAlias ? REGION_ALIASES[provinceAlias] : '未标注',
+    city
+  };
 }
 
 function deriveProductCategory(productName) {
@@ -90,10 +198,14 @@ function extractIssueItems(unqualifiedItems) {
 }
 
 function buildDerivedAnalyticsFields(row = {}) {
+  const manufacturerRegion = extractProvinceCity(row.manufacturer_address || row.company_addresses || row.product_region);
+  const sampledRegion = extractProvinceCity(row.operator_address || row.sample_unit_address);
   return {
     product_category: deriveProductCategory(row.product_name),
-    manufacturer_province: extractProvince(row.company_addresses || row.product_region),
-    sampled_province: extractProvince(row.sample_unit_address),
+    manufacturer_province: manufacturerRegion.province,
+    manufacturer_city: manufacturerRegion.city,
+    sampled_province: sampledRegion.province,
+    sampled_city: sampledRegion.city,
     issue_category: deriveIssueCategory(row.unqualified_items, row.inspection_result, row.requirement)
   };
 }
@@ -101,6 +213,8 @@ function buildDerivedAnalyticsFields(row = {}) {
 module.exports = {
   normalizeText,
   extractProvince,
+  extractCity,
+  extractProvinceCity,
   deriveProductCategory,
   deriveIssueCategory,
   normalizeIssueItem,

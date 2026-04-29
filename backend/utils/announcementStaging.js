@@ -37,6 +37,10 @@ const STAGING_DETAIL_FIELDS = [
   'product_name',
   'company_names',
   'company_addresses',
+  'manufacturer_name',
+  'manufacturer_address',
+  'operator_name',
+  'operator_address',
   'sample_unit_name',
   'sample_unit_address',
   'package_spec',
@@ -403,6 +407,10 @@ function normalizeDetailRow(row = {}, index = 0) {
     product_name: normalizeNullableText(row.product_name),
     company_names: normalizeNullableMultilineText(row.company_names),
     company_addresses: normalizeNullableMultilineText(row.company_addresses),
+    manufacturer_name: normalizeNullableText(row.manufacturer_name),
+    manufacturer_address: normalizeNullableMultilineText(row.manufacturer_address),
+    operator_name: normalizeNullableText(row.operator_name || row.sample_unit_name),
+    operator_address: normalizeNullableMultilineText(row.operator_address || row.sample_unit_address),
     sample_unit_name: normalizeNullableText(row.sample_unit_name),
     sample_unit_address: normalizeNullableMultilineText(row.sample_unit_address),
     package_spec: normalizeNullableText(row.package_spec),
@@ -952,6 +960,10 @@ async function ensureAnnouncementStagingSchema(connection) {
       product_name VARCHAR(255) NOT NULL,
       company_names TEXT NULL,
       company_addresses TEXT NULL,
+      manufacturer_name VARCHAR(500) NULL,
+      manufacturer_address TEXT NULL,
+      operator_name VARCHAR(500) NULL,
+      operator_address TEXT NULL,
       sample_unit_name VARCHAR(500) NULL,
       sample_unit_address TEXT NULL,
       package_spec VARCHAR(255) NULL,
@@ -976,6 +988,11 @@ async function ensureAnnouncementStagingSchema(connection) {
         FOREIGN KEY (staging_batch_id) REFERENCES announcement_staging_batches(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  await ensureColumnExists(connection, 'announcement_staging_items', 'manufacturer_name', 'VARCHAR(500) NULL AFTER company_addresses');
+  await ensureColumnExists(connection, 'announcement_staging_items', 'manufacturer_address', 'TEXT NULL AFTER manufacturer_name');
+  await ensureColumnExists(connection, 'announcement_staging_items', 'operator_name', 'VARCHAR(500) NULL AFTER manufacturer_address');
+  await ensureColumnExists(connection, 'announcement_staging_items', 'operator_address', 'TEXT NULL AFTER operator_name');
 
   await ensureAnnouncementTablePublishColumns(connection);
   await ensureSupervisionTablePublishColumns(connection);
