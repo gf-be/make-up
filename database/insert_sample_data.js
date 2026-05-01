@@ -6,7 +6,7 @@ const config = {
   host: 'localhost',
   port: 3306,
   user: 'root',
-  password: 'qwaszx12',  // 请根据实际情况修改
+  password: 'root',  // 请根据实际情况修改
   database: 'cosmetics_info',
   charset: 'utf8mb4'
 };

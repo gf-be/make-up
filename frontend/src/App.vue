@@ -1,22 +1,24 @@
 <template>
   <router-view v-if="route.path === '/login'" />
   <el-container v-else class="layout-container">
-    <el-header class="header">
+    <el-header class="header" height="auto">
       <div class="header-content">
         <div class="logo">
           <el-icon :size="28">
             <Document />
           </el-icon>
-          <span>化妆品资讯系统</span>
+          <span class="logo-title">化妆品资讯系统</span>
         </div>
-        <el-menu :default-active="activeMenu" mode="horizontal" router class="nav-menu">
-          <el-menu-item v-for="item in visibleMenus" :key="item.index" :index="item.index">
-            <el-icon>
-              <component :is="item.icon" />
-            </el-icon>
-            <span>{{ item.label }}</span>
-          </el-menu-item>
-        </el-menu>
+        <div class="nav-scroll">
+          <el-menu :default-active="activeMenu" mode="horizontal" router class="nav-menu">
+            <el-menu-item v-for="item in visibleMenus" :key="item.index" :index="item.index">
+              <el-icon>
+                <component :is="item.icon" />
+              </el-icon>
+              <span>{{ item.label }}</span>
+            </el-menu-item>
+          </el-menu>
+        </div>
         <div class="user-box">
           <el-tag effect="dark">{{ currentUser?.role_label || '未登录' }}</el-tag>
           <span class="username">{{ currentUser?.username }}</span>
@@ -62,7 +64,7 @@ const activeMenu = computed(() => {
   if (route.path.startsWith('/announcement-staging')) return '/announcement-staging'
   if (route.path.startsWith('/announcement-tracebacks')) return '/announcement-tracebacks'
   if (route.path.startsWith('/pivot-analysis')) return '/pivot-analysis'
-  // if (route.path.startsWith('/sampling-search')) return '/sampling-search'
+  if (route.path.startsWith('/sampling-search')) return '/sampling-search'
 
   if (route.path.startsWith('/inspections')) return '/inspections'
   if (route.path.startsWith('/companies/unqualified')) return '/companies/unqualified'
@@ -108,8 +110,11 @@ const handleLogout = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 100%;
-  padding: 0 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 60px;
+  padding: 8px 16px;
+  box-sizing: border-box;
 }
 
 .logo {
@@ -118,22 +123,61 @@ const handleLogout = async () => {
   gap: 10px;
   font-size: 20px;
   font-weight: bold;
+  flex-shrink: 0;
+}
+
+.logo-title {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .logo {
+    font-size: 16px;
+  }
+  .logo :deep(.el-icon) {
+    font-size: 22px !important;
+  }
+}
+
+.nav-scroll {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.nav-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.nav-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
 }
 
 .nav-menu {
   background: transparent;
   border: none;
-  flex: 1;
+  width: max-content;
+  min-width: 100%;
   justify-content: flex-end;
 }
 
 .user-box {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-left: 16px;
+  gap: 8px;
+  margin-left: auto;
   color: #fff;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .user-box .username {
+    display: none;
+  }
 }
 
 .username {
@@ -159,7 +203,14 @@ const handleLogout = async () => {
 
 .main-content {
   background: #f5f7fa;
-  padding: 20px;
+  padding: 16px;
   overflow-y: auto;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .main-content {
+    padding: 20px;
+  }
 }
 </style>

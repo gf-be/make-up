@@ -17,7 +17,7 @@
         <div>开发人员：admin / admin</div>
         <div>数据管理员：data_admin / data_admin</div>
         <div>普通用户：user / user</div>
-      </div> -->
+      </div>  -->
     </el-card>
 
     <el-dialog v-model="registerDialogVisible" title="注册普通用户" width="420px" :close-on-click-modal="false">
@@ -104,11 +104,14 @@ const handleRegister = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .login-card {
-  width: 420px;
+  width: 100%;
+  max-width: 420px;
   border: none;
   border-radius: 14px;
 }

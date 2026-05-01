@@ -1,7 +1,7 @@
 <template>
   <div class="home-page">
     <el-row :gutter="20">
-      <el-col :span="8">
+      <el-col :xs="24" :sm="24" :md="8" :lg="8">
         <el-card shadow="never">
           <template #header>
             <div class="card-header">
@@ -19,7 +19,7 @@
           <el-button type="primary" plain class="password-button" @click="passwordDialogVisible = true">修改密码</el-button>
         </el-card>
       </el-col>
-      <el-col :span="16">
+      <el-col :xs="24" :sm="24" :md="16" :lg="16">
         <el-card shadow="never">
           <template #header>
             <div class="card-header">

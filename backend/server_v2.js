@@ -11,6 +11,20 @@ const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map((item) => item.trim().replace(/\/$/, ''))
   .filter(Boolean);
+const allowAllOrigins = process.env.CORS_ALLOW_ALL === 'true';
+
+function matchConfiguredOrigin(origin) {
+  return allowedOrigins.some((pattern) => {
+    if (pattern === origin) return true;
+    if (!pattern.includes('*')) return false;
+
+    const regexPattern = pattern
+      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '.*');
+
+    return new RegExp(`^${regexPattern}$`).test(origin);
+  });
+}
 
 app.use(cors({
   origin(origin, callback) {
@@ -19,9 +33,9 @@ app.use(cors({
     const normalizedOrigin = origin.replace(/\/$/, '');
     const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalizedOrigin);
     const isCloudflareTunnel = /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(normalizedOrigin);
-    const isConfigured = allowedOrigins.includes(normalizedOrigin);
+    const isConfigured = matchConfiguredOrigin(normalizedOrigin);
 
-    if (isLocalhost || isCloudflareTunnel || isConfigured) {
+    if (allowAllOrigins || isLocalhost || isCloudflareTunnel || isConfigured) {
       return callback(null, true);
     }
 
@@ -90,12 +104,12 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: '服务器内部错误' });
 });
 
-// const PORT = process.env.PORT || 3001;
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 3003;
+const HOST = process.env.HOST || '0.0.0.0';
 
-app.listen(PORT, () => {
-  console.log(`化妆品资讯系统API服务器运行在端口 ${PORT}`);
-  console.log(`访问 http://localhost:${PORT} 查看API文档`);
+app.listen(PORT, HOST, () => {
+  console.log(`化妆品资讯系统API服务器运行在 ${HOST}:${PORT}`);
+  console.log(`本机访问: http://localhost:${PORT}`);
 });
 
 module.exports = app;

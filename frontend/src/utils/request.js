@@ -2,7 +2,9 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { clearAuthSession, getAuthToken } from './auth'
 
-const apiBaseURL = (import.meta.env.VITE_API_BASE_URL || 'https://match-completed-ruled-grip.trycloudflare.com/api').replace(/\/$/, '')
+const apiBaseURL = (
+  import.meta.env.VITE_API_BASE_URL || 'http://47.106.104.48:3003/api'
+).replace(/\/$/, '')
 
 const request = axios.create({
   baseURL: apiBaseURL,

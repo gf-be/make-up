@@ -122,7 +122,7 @@
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'qwaszx12',
+    'password': 'root',
     'database': 'cosmetics_info'
 }
 ```
