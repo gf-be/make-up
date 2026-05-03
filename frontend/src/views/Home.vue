@@ -35,6 +35,18 @@
             <el-table-column prop="dimension_label" label="维度线" min-width="220" show-overflow-tooltip />
             <el-table-column prop="range_label" label="生成范围" min-width="220" show-overflow-tooltip />
             <el-table-column prop="detail_count" label="明细数" width="90" align="center" />
+            <el-table-column label="复用文案" width="120" align="center">
+              <template #default="{ row }">
+                <el-button
+                  link
+                  type="primary"
+                  :disabled="!row?.details?.copy_text"
+                  @click="handleReuseCopy(row)"
+                >
+                  复制
+                </el-button>
+              </template>
+            </el-table-column>
           </el-table>
         </el-card>
       </el-col>
@@ -57,6 +69,14 @@
         <el-button type="primary" :loading="savingPassword" @click="handleUpdatePassword">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="reuseDialogVisible" title="复用文案" width="720px" :close-on-click-modal="false">
+      <el-input v-model="reuseCopyText" type="textarea" :rows="14" readonly />
+      <template #footer>
+        <el-button @click="reuseDialogVisible = false">关闭</el-button>
+        <el-button type="primary" :disabled="!reuseCopyText" @click="copyReuseText">复制文案</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -70,7 +90,9 @@ import { MODULE_PERMISSIONS, currentUser, getRoleLabel } from '@/utils/auth'
 const loading = ref(false)
 const savingPassword = ref(false)
 const passwordDialogVisible = ref(false)
+const reuseDialogVisible = ref(false)
 const logs = ref([])
+const reuseCopyText = ref('')
 const passwordForm = reactive({
   current_password: '',
   new_password: '',
@@ -107,6 +129,27 @@ const loadLogs = async () => {
     logs.value = res.data || []
   } finally {
     loading.value = false
+  }
+}
+
+const handleReuseCopy = async (row) => {
+  const copyText = row?.details?.copy_text || ''
+  if (!copyText) {
+    ElMessage.warning('该条日志暂无可复用文案')
+    return
+  }
+  reuseCopyText.value = copyText
+  reuseDialogVisible.value = true
+}
+
+const copyReuseText = async () => {
+  if (!reuseCopyText.value) return
+  try {
+    await navigator.clipboard.writeText(reuseCopyText.value)
+    ElMessage.success('文案已复制')
+  } catch (error) {
+    console.error('复制复用文案失败:', error)
+    ElMessage.error('复制失败，请手动复制')
   }
 }
 

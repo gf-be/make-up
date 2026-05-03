@@ -1395,7 +1395,7 @@ function buildCurrentRangeLabel() {
   return labels.join('；') || '当前维度树范围'
 }
 
-async function recordVideoCopyLog(rows) {
+async function recordVideoCopyLog(rows, copyText) {
   if (currentUser.value?.role !== 'normal_user') return
   try {
     await createOperationLog({
@@ -1405,7 +1405,8 @@ async function recordVideoCopyLog(rows) {
         dimension_label: buildCurrentDimensionLabel(),
         dimension_order: dimensionOrder.value || [],
         range_label: buildCurrentRangeLabel(),
-        detail_count: rows.length
+        detail_count: rows.length,
+        copy_text: copyText || ''
       }
     })
   } catch (error) {
@@ -1433,7 +1434,7 @@ async function openVideoCopyDialog() {
       return
     }
     videoCopyText.value = buildVideoCopyText(rows)
-    await recordVideoCopyLog(rows)
+    await recordVideoCopyLog(rows, videoCopyText.value)
   } catch (error) {
     console.error('生成视频文案失败:', error)
     ElMessage.error(error?.message || '生成视频文案失败')
