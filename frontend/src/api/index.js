@@ -158,6 +158,15 @@ export const importAnnouncementStagingJson = (data = {}) => {
   return request.post('/announcement-staging/import-json', data)
 }
 
+export const uploadAnnouncementStagingJson = (formData) => {
+  return request.post('/announcement-staging/import-json-upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+    timeout: 120000
+  })
+}
+
 export const confirmAnnouncementStaging = (id) => {
   return request.post(`/announcement-staging/${id}/confirm`)
 }

@@ -530,6 +530,12 @@ CREATE TABLE IF NOT EXISTS announcement_staging_batches (
     status ENUM('pending', 'confirmed') DEFAULT 'pending',
     published_announcement_id INT NULL,
     published_supervision_id INT NULL,
+    imported_by_user_id INT NULL,
+    imported_by_username VARCHAR(50) NULL,
+    imported_at DATETIME NULL,
+    import_source VARCHAR(50) NOT NULL DEFAULT 'server_directory',
+    source_file_name VARCHAR(255) NULL,
+    source_relative_path VARCHAR(500) NULL,
     confirmed_at DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -605,6 +611,39 @@ CREATE TABLE IF NOT EXISTS announcement_publish_backups (
     CONSTRAINT fk_publish_backup_supervision FOREIGN KEY (supervision_id) REFERENCES supervisions(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 公告导入倒溯记录表
+CREATE TABLE IF NOT EXISTS announcement_staging_tracebacks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    trace_type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    announcement_no VARCHAR(100) NULL,
+    source_json_file VARCHAR(500) NOT NULL,
+    source_detail_url VARCHAR(500) NULL,
+    source_page VARCHAR(500) NULL,
+    product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+    announcement_type VARCHAR(50) NOT NULL DEFAULT 'sampling',
+    reason VARCHAR(500) NOT NULL,
+    attachment_summary_json LONGTEXT NULL,
+    raw_payload LONGTEXT NULL,
+    existing_batch_id INT NULL,
+    existing_announcement_id INT NULL,
+    existing_supervision_id INT NULL,
+    imported_by_user_id INT NULL,
+    imported_by_username VARCHAR(50) NULL,
+    imported_at DATETIME NULL,
+    import_source VARCHAR(50) NOT NULL DEFAULT 'server_directory',
+    source_file_name VARCHAR(255) NULL,
+    source_relative_path VARCHAR(500) NULL,
+    handled_status ENUM('pending', 'resolved') DEFAULT 'pending',
+    handled_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_tracebacks_status_type (handled_status, trace_type),
+    INDEX idx_tracebacks_existing_batch (existing_batch_id),
+    INDEX idx_tracebacks_source_json_file (source_json_file(191)),
+    INDEX idx_tracebacks_source_detail_url (source_detail_url(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 -- 操作日志表
 CREATE TABLE IF NOT EXISTS operation_logs (
@@ -622,6 +661,6 @@ CREATE TABLE IF NOT EXISTS operation_logs (
 
 -- 插入默认用户（后端首次登录会将历史明文密码自动升级为带盐哈希）
 INSERT IGNORE INTO users (username, email, password, display_name, role, status) VALUES
-('admin', 'admin@cosmetics.com', 'admin', '开发人员', 'developer', 'active'),
+('admin', 'admin@cosmetics.com', 'admin', '系统管理员', 'developer', 'active'),
 ('data_admin', 'data_admin@cosmetics.com', 'data_admin', '数据管理员', 'data_admin', 'active'),
 ('user', 'user@cosmetics.com', 'user', '普通用户', 'normal_user', 'active');

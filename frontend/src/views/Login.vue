@@ -1,7 +1,7 @@
 <template>
   <div class="login-page">
     <el-card class="login-card" shadow="always">
-      <div class="login-title">化妆品资讯系统</div>
+      <div class="login-title">视频、文案管理系统</div>
       <div class="login-subtitle">请选择账号角色登录</div>
       <el-form :model="form" label-width="72px" @keyup.enter="handleLogin">
         <el-form-item label="账号">
@@ -78,6 +78,8 @@ const handleLogin = async () => {
     setAuthSession(res.data?.token, res.data?.user)
     ElMessage.success('登录成功')
     router.replace(route.query.redirect || '/home')
+  } catch (error) {
+    console.error('登录失败:', error)
   } finally {
     loading.value = false
   }

@@ -1,168 +1,164 @@
 <template>
-  <div class="announcement-tracebacks">
-    <el-card class="page-card">
-      <template #header>
-        <div class="card-header">
-          <div>
-            <div class="title">倒溯处理中心</div>
-            <div class="subtitle">集中处理重复导入、附件解析失败和导入异常的通告记录，支持定位批次、查看正式稿和删除清理。</div>
-          </div>
-          <div class="header-actions">
-            <el-button @click="goToStaging">返回导入检查</el-button>
-            <el-button :loading="loading || overviewLoading" @click="refreshAll">刷新</el-button>
-          </div>
-        </div>
-      </template>
+  <div class="tracebacks-panel-root">
+    <el-alert
+      v-if="pinnedTracebackId"
+      type="info"
+      :closable="false"
+      show-icon
+      class="mb-16"
+      :title="`当前已按倒溯记录 #${pinnedTracebackId} 精确定位，可清空筛选查看完整列表。`"
+    />
 
-      <el-alert
-        v-if="pinnedTracebackId"
-        type="info"
-        :closable="false"
-        show-icon
-        class="mb-16"
-        :title="`当前已按倒溯记录 #${pinnedTracebackId} 精确定位，可清空筛选查看完整列表。`"
-      />
-
-      <div class="stats-grid" v-loading="overviewLoading">
-        <div class="stat-card danger">
-          <div class="stat-label">待处理倒溯</div>
-          <div class="stat-value">{{ overview.pending_traceback_count || 0 }}</div>
-          <div class="stat-meta">总计 {{ overview.traceback_count || 0 }} 条</div>
-        </div>
-        <div class="stat-card warning">
-          <div class="stat-label">重复导入</div>
-          <div class="stat-value">{{ overview.duplicate_traceback_count || 0 }}</div>
-          <div class="stat-meta">已识别重复来源记录</div>
-        </div>
-        <div class="stat-card primary">
-          <div class="stat-label">解析失败</div>
-          <div class="stat-value">{{ overview.parse_failed_traceback_count || 0 }}</div>
-          <div class="stat-meta">附件未正常解析成功</div>
-        </div>
-        <div class="stat-card info">
-          <div class="stat-label">导入异常</div>
-          <div class="stat-value">{{ overview.import_failed_traceback_count || 0 }}</div>
-          <div class="stat-meta">JSON 导入过程发生错误</div>
-        </div>
-        <div class="stat-card success">
-          <div class="stat-label">已导入有误</div>
-          <div class="stat-value">{{ overview.published_incorrect_traceback_count || 0 }}</div>
-          <div class="stat-meta">正式库通告已退回倒溯处理</div>
-        </div>
-
+    <div class="stats-grid" v-loading="overviewLoading">
+      <div class="stat-card danger">
+        <div class="stat-label">待处理倒溯</div>
+        <div class="stat-value">{{ overview.pending_traceback_count || 0 }}</div>
+        <div class="stat-meta">总计 {{ overview.traceback_count || 0 }} 条</div>
       </div>
-
-      <el-form :model="filters" inline class="filter-form">
-        <el-form-item label="状态">
-          <el-select v-model="filters.handled_status" clearable placeholder="全部状态" style="width: 150px">
-            <el-option label="待处理" value="pending" />
-            <el-option label="已处理" value="resolved" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="类型">
-          <el-select v-model="filters.trace_type" clearable placeholder="全部类型" style="width: 170px">
-            <el-option label="重复导入" value="duplicate" />
-            <el-option label="解析失败" value="parse_failed" />
-            <el-option label="导入异常" value="import_failed" />
-            <el-option label="已导入有误" value="published_incorrect" />
-
-          </el-select>
-        </el-form-item>
-        <el-form-item label="产品类型">
-          <el-select v-model="filters.product_type" clearable placeholder="全部产品类型" style="width: 150px">
-            <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="关键词">
-          <el-input v-model="filters.keyword" clearable placeholder="标题 / 原因 / 通告网址 / 来源 JSON" style="width: 320px" @keyup.enter="loadTracebacks" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="loadTracebacks">搜索</el-button>
-          <el-button @click="resetFilters">清空筛选</el-button>
-        </el-form-item>
-      </el-form>
-
-      <div class="list-meta-row mb-16">
-        <span>当前展示 {{ tracebacks.length }} 条倒溯记录</span>
-        <div class="bulk-actions">
-          <el-button
-            v-if="selectedTracebackIds.length > 0"
-            type="danger"
-            :loading="batchDeleting"
-            @click="handleBatchDelete"
-          >
-            <el-icon><Delete /></el-icon>
-            批量删除 ({{ selectedTracebackIds.length }})
-          </el-button>
-          <span v-else>支持直接返回导入检查页定位批次继续核验</span>
-        </div>
+      <div class="stat-card warning">
+        <div class="stat-label">重复导入</div>
+        <div class="stat-value">{{ overview.duplicate_traceback_count || 0 }}</div>
+        <div class="stat-meta">已识别重复来源记录</div>
       </div>
+      <div class="stat-card primary">
+        <div class="stat-label">解析失败</div>
+        <div class="stat-value">{{ overview.parse_failed_traceback_count || 0 }}</div>
+        <div class="stat-meta">附件未正常解析成功</div>
+      </div>
+      <div class="stat-card info">
+        <div class="stat-label">导入异常</div>
+        <div class="stat-value">{{ overview.import_failed_traceback_count || 0 }}</div>
+        <div class="stat-meta">JSON 导入过程发生错误</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-label">已导入有误</div>
+        <div class="stat-value">{{ overview.published_incorrect_traceback_count || 0 }}</div>
+        <div class="stat-meta">正式库通告已退回倒溯处理</div>
+      </div>
+    </div>
 
-      <el-table
-        ref="tableRef"
-        :data="tracebacks"
-        size="small"
-        stripe
-        border
-        v-loading="loading"
-        max-height="720"
-        @selection-change="handleSelectionChange"
-      >
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="类型" width="110" align="center">
-          <template #default="{ row }">
-            <el-tag :type="getTraceTypeTagType(row.trace_type)">{{ row.trace_type_label || row.trace_type }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="title" label="通告标题" min-width="260" show-overflow-tooltip>
-          <template #default="{ row }">
-            <div class="title-cell">
-              <div class="title-main">{{ row.title || '-' }}</div>
-              <div class="title-sub">
-                {{ row.product_type_label || '-' }} / {{ row.announcement_type_label || '-' }}
-                <span v-if="row.announcement_no"> · {{ row.announcement_no }}</span>
-              </div>
+    <el-form :model="filters" inline class="filter-form">
+      <el-form-item label="状态">
+        <el-select v-model="filters.handled_status" clearable placeholder="全部状态" style="width: 150px">
+          <el-option label="待处理" value="pending" />
+          <el-option label="已处理" value="resolved" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="类型">
+        <el-select v-model="filters.trace_type" clearable placeholder="全部类型" style="width: 170px">
+          <el-option label="重复导入" value="duplicate" />
+          <el-option label="解析失败" value="parse_failed" />
+          <el-option label="导入异常" value="import_failed" />
+          <el-option label="已导入有误" value="published_incorrect" />
+          <el-option label="核验打回" value="manual_reject" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="产品类型">
+        <el-select v-model="filters.product_type" clearable placeholder="全部产品类型" style="width: 150px">
+          <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="关键词">
+        <el-input
+          v-model="filters.keyword"
+          clearable
+          placeholder="标题 / 原因 / 网址 / 来源用户"
+          style="width: 320px"
+          @keyup.enter="loadTracebacks"
+        />
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" @click="loadTracebacks">搜索</el-button>
+        <el-button @click="resetFilters">清空筛选</el-button>
+      </el-form-item>
+    </el-form>
+
+    <div class="list-meta-row mb-16">
+      <span>当前展示 {{ tracebacks.length }} 条倒溯记录</span>
+      <div class="bulk-actions">
+        <el-button
+          v-if="selectedTracebackIds.length > 0"
+          type="danger"
+          :loading="batchDeleting"
+          @click="handleBatchDelete"
+        >
+          <el-icon><Delete /></el-icon>
+          批量删除 ({{ selectedTracebackIds.length }})
+        </el-button>
+        <span v-else>删除后会同步清理临时区相关数据，便于再次导入不报重复</span>
+      </div>
+    </div>
+
+    <el-table
+      ref="tableRef"
+      :data="tracebacks"
+      size="small"
+      stripe
+      border
+      v-loading="loading"
+      max-height="720"
+      @selection-change="handleSelectionChange"
+    >
+      <el-table-column type="selection" width="55" align="center" />
+      <el-table-column label="类型" width="110" align="center">
+        <template #default="{ row }">
+          <el-tag :type="getTraceTypeTagType(row.trace_type)">{{ row.trace_type_label || row.trace_type }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="title" label="通告标题" min-width="240" show-overflow-tooltip>
+        <template #default="{ row }">
+          <div class="title-cell">
+            <div class="title-main">{{ row.title || '-' }}</div>
+            <div class="title-sub">
+              {{ row.product_type_label || '-' }} / {{ row.announcement_type_label || '-' }}
+              <span v-if="row.announcement_no"> · {{ row.announcement_no }}</span>
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="来源 JSON" min-width="220" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ getJsonFileName(row.source_json_file) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="通告网址" min-width="300" show-overflow-tooltip>
-          <template #default="{ row }">
-            <a v-if="row.source_detail_url" :href="row.source_detail_url" target="_blank" rel="noreferrer">{{ row.source_detail_url }}</a>
-            <span v-else class="muted-text">-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="reason" label="原因" min-width="320" show-overflow-tooltip />
-        <el-table-column label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.handled_status === 'resolved' ? 'success' : 'warning'">
-              {{ row.handled_status === 'resolved' ? '已处理' : '待处理' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="updated_at" label="更新时间" width="180" align="center" />
-        <el-table-column label="操作" min-width="300" fixed="right">
-          <template #default="{ row }">
-            <div class="row-actions">
-              <el-button v-if="row.source_detail_url" link type="primary" @click="openSourceUrl(row.source_detail_url)">查看网址</el-button>
-              <el-button v-if="row.existing_batch_id" link type="primary" @click="goToBatch(row.existing_batch_id)">定位批次</el-button>
-              <el-button v-if="row.existing_announcement_id || row.existing_supervision_id" link type="success" @click="goToPublished(row)">查看正式稿</el-button>
-              <el-button v-if="row.handled_status !== 'resolved'" link type="warning" @click="handleResolveTraceback(row)">标记已处理</el-button>
-              <el-button link type="danger" @click="handleDeleteTraceback(row)">删除</el-button>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column label="临时批次" width="100" align="center" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ row.existing_batch_id != null && row.existing_batch_id !== '' ? row.existing_batch_id : '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="来源用户" min-width="140" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ getSourceUserLabel(row) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="reason" label="原因" min-width="280" show-overflow-tooltip />
+      <el-table-column prop="created_at" label="创建时间" width="170" align="center" />
+      <el-table-column prop="updated_at" label="更新时间" width="170" align="center" />
+      <el-table-column label="通告网址" min-width="260" show-overflow-tooltip>
+        <template #default="{ row }">
+          <a v-if="row.source_detail_url" :href="row.source_detail_url" target="_blank" rel="noreferrer">{{ row.source_detail_url }}</a>
+          <span v-else class="muted-text">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="状态" width="90" align="center">
+        <template #default="{ row }">
+          <el-tag :type="row.handled_status === 'resolved' ? 'success' : 'warning'">
+            {{ row.handled_status === 'resolved' ? '已处理' : '待处理' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" min-width="280" fixed="right">
+        <template #default="{ row }">
+          <div class="row-actions">
+            <el-button v-if="row.source_detail_url" link type="primary" @click="openSourceUrl(row.source_detail_url)">查看网址</el-button>
+            <el-button v-if="row.existing_batch_id" link type="primary" @click="goToStagingBatch(row.existing_batch_id)">定位批次</el-button>
+            <el-button v-if="row.existing_announcement_id || row.existing_supervision_id" link type="success" @click="goToPublished(row)">查看正式稿</el-button>
+            <el-button v-if="row.handled_status !== 'resolved'" link type="warning" @click="handleResolveTraceback(row)">标记已处理</el-button>
+            <el-button link type="danger" @click="handleDeleteTraceback(row)">删除</el-button>
+          </div>
+        </template>
+      </el-table-column>
+    </el-table>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Delete } from '@element-plus/icons-vue'
 import {
@@ -183,7 +179,6 @@ const productTypeOptions = [
   { label: '医疗器械', value: 'medical_device' },
   { label: '未知', value: 'unknown' }
 ]
-
 
 const route = useRoute()
 const router = useRouter()
@@ -217,10 +212,10 @@ function createEmptyOverview() {
     duplicate_traceback_count: 0,
     parse_failed_traceback_count: 0,
     import_failed_traceback_count: 0,
-    published_incorrect_traceback_count: 0
+    published_incorrect_traceback_count: 0,
+    manual_reject_traceback_count: 0
   }
 }
-
 
 function safeQueryValue(value) {
   if (Array.isArray(value)) {
@@ -232,6 +227,7 @@ function safeQueryValue(value) {
 function getTraceTypeTagType(traceType) {
   if (traceType === 'parse_failed') return 'danger'
   if (traceType === 'import_failed') return 'info'
+  if (traceType === 'manual_reject') return 'warning'
   return 'warning'
 }
 
@@ -239,6 +235,10 @@ function getJsonFileName(filePath) {
   const normalized = String(filePath || '').trim()
   if (!normalized) return '-'
   return normalized.split(/[\\/]/).pop() || normalized
+}
+
+function getSourceUserLabel(row = {}) {
+  return row.imported_by_username || row.uploaded_by_username || row.created_by_username || row.username || getJsonFileName(row.source_json_file)
 }
 
 function buildWorkspacePayload() {
@@ -349,18 +349,13 @@ function openSourceUrl(url) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-function goToStaging() {
-  router.push('/announcement-staging')
-}
-
-function goToBatch(batchId) {
+function goToStagingBatch(batchId) {
   if (!batchId) return
-  router.push({
-    path: '/announcement-staging',
-    query: {
-      focusBatchId: String(batchId)
-    }
-  })
+  const stagingPath = '/announcement-staging'
+  const q = { ...route.query, view: 'review', focusBatchId: String(batchId) }
+  delete q.tracebackId
+  delete q.id
+  router.replace({ path: stagingPath, query: q })
 }
 
 function goToPublished(row = {}) {
@@ -374,13 +369,20 @@ function goToPublished(row = {}) {
   }
 }
 
+function tracebackQueryCleanup() {
+  const q = { ...route.query }
+  delete q.tracebackId
+  delete q.id
+  return q
+}
+
 function resetFilters() {
   filters.handled_status = 'pending'
   filters.trace_type = ''
   filters.product_type = ''
   filters.keyword = ''
   pinnedTracebackId.value = ''
-  router.replace({ path: '/announcement-tracebacks', query: {} })
+  router.replace({ path: route.path, query: tracebackQueryCleanup() })
   loadTracebacks()
 }
 
@@ -432,7 +434,7 @@ async function handleDeleteTraceback(row) {
 
     if (String(pinnedTracebackId.value || '') === String(row.id)) {
       pinnedTracebackId.value = ''
-      router.replace({ path: '/announcement-tracebacks', query: {} })
+      router.replace({ path: route.path, query: tracebackQueryCleanup() })
     }
 
     await refreshAll()
@@ -445,7 +447,7 @@ async function handleDeleteTraceback(row) {
 }
 
 function handleSelectionChange(selection) {
-  selectedTracebackIds.value = selection.map(row => row.id)
+  selectedTracebackIds.value = selection.map((item) => item.id)
 }
 
 async function handleBatchDelete() {
@@ -466,20 +468,18 @@ async function handleBatchDelete() {
     )
 
     batchDeleting.value = true
-    const deletePromises = selectedTracebackIds.value.map(id => deleteAnnouncementStagingTraceback(id))
+    const deletePromises = selectedTracebackIds.value.map((id) => deleteAnnouncementStagingTraceback(id))
 
     try {
       await Promise.all(deletePromises)
       ElMessage.success(`成功删除 ${selectedTracebackIds.value.length} 条倒溯记录`)
 
-      // 检查是否有被精确定位的记录被删除
-      const pinnedDeleted = selectedTracebackIds.value.some(id => String(id) === String(pinnedTracebackId.value))
+      const pinnedDeleted = selectedTracebackIds.value.some((id) => String(id) === String(pinnedTracebackId.value))
       if (pinnedDeleted) {
         pinnedTracebackId.value = ''
-        router.replace({ path: '/announcement-tracebacks', query: {} })
+        router.replace({ path: route.path, query: tracebackQueryCleanup() })
       }
 
-      // 清空选择
       selectedTracebackIds.value = []
       await refreshAll()
     } catch (error) {
@@ -510,6 +510,13 @@ watch(
     if (!routeSyncReady.value) {
       return
     }
+    if (route.path !== '/announcement-staging') {
+      return
+    }
+    const view = safeQueryValue(route.query.view)
+    if (view !== 'traceback') {
+      return
+    }
     applyRouteQuery(route.query)
     await refreshAll()
   }
@@ -518,7 +525,12 @@ watch(
 onMounted(async () => {
   const cachePayload = await loadWorkspaceCache()
   applyWorkspacePayload(cachePayload)
-  applyRouteQuery(route.query)
+
+  const view = safeQueryValue(route.query.view)
+  if (route.path === '/announcement-staging' && view === 'traceback') {
+    applyRouteQuery(route.query)
+  }
+
   await refreshAll()
   workspaceCacheReady.value = true
   routeSyncReady.value = true
@@ -530,41 +542,13 @@ onBeforeUnmount(() => {
     workspaceSaveTimer = null
   }
 })
+
+defineExpose({ refreshAll })
 </script>
 
 <style scoped>
-.announcement-tracebacks {
-  max-width: 1760px;
-  margin: 0 auto;
-}
-
-.page-card {
-  border-radius: 18px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1f2937;
-}
-
-.subtitle {
-  margin-top: 6px;
-  font-size: 14px;
-  color: #6b7280;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+.tracebacks-panel-root {
+  min-width: 0;
 }
 
 .stats-grid {
@@ -573,11 +557,6 @@ onBeforeUnmount(() => {
   gap: 16px;
   margin-bottom: 16px;
 }
-
-.stat-card.success {
-  background: linear-gradient(135deg, #eefbf3 0%, #dbf5e5 100%);
-}
-
 
 .stat-card {
   padding: 18px 20px;
@@ -600,6 +579,10 @@ onBeforeUnmount(() => {
 
 .stat-card.info {
   background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+}
+
+.stat-card.success {
+  background: linear-gradient(135deg, #eefbf3 0%, #dbf5e5 100%);
 }
 
 .stat-label {
@@ -676,7 +659,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
-  .card-header,
   .list-meta-row {
     flex-direction: column;
     align-items: flex-start;

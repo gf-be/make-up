@@ -1,14 +1,14 @@
 import { ref } from 'vue'
 
 export const ROLE_LABELS = {
-  developer: '开发人员',
+  developer: '系统管理 员',
   data_admin: '数据管理员',
   normal_user: '普通用户'
 }
 
 export const MODULE_PERMISSIONS = {
-  developer: ['home', 'unqualified-products', 'pivot-analysis', 'announcement-staging', 'announcement-tracebacks', 'announcements', 'inspections', 'companies', 'unqualified-companies', 'supervisions'],
-  data_admin: ['home', 'announcement-staging', 'announcement-tracebacks', 'announcements', 'companies', 'unqualified-companies'],
+  developer: ['home', 'unqualified-products', 'pivot-analysis', 'announcement-staging', 'announcements', 'inspections', 'companies', 'unqualified-companies', 'supervisions'],
+  data_admin: ['home', 'announcement-staging', 'announcements', 'companies', 'unqualified-companies'],
   normal_user: ['home', 'unqualified-products', 'pivot-analysis', 'sampling-search', 'inspections', 'companies']
 }
 

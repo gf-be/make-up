@@ -15,6 +15,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         // target: 'https://match-completed-ruled-grip.trycloudflare.com/',
+        // 后端端口号
         target: 'http://localhost:3003',
         changeOrigin: true
       }

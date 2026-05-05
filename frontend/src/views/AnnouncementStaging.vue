@@ -5,23 +5,26 @@
         <div class="card-header">
           <div>
             <div class="title">导入核验工作台</div>
-            <div class="subtitle">将 `data_get/output/items` 下的爬虫 JSON 自动识别导入临时表；重复导入会直接跳过，解析提示或附件异常的通告也会保留在临时区并同步进入倒溯处理中心，便于人工继续核验。</div>
+            <div class="subtitle">按“上传临时区 → 人工核验 → 导入正式库”的顺序操作，减少无关按钮干扰。</div>
           </div>
           <div class="header-actions">
-            <el-button :loading="importing" type="primary" @click="handleImport">
-              <el-icon><Upload /></el-icon>
-              导入爬虫 JSON
-            </el-button>
-            <el-button
-              type="success"
-              :loading="bulkConfirming"
-              :disabled="!overview.pending_batch_count"
-              @click="handleConfirmAll"
+            <input
+              ref="folderInputRef"
+              type="file"
+              class="hidden-file-input"
+              multiple
+              webkitdirectory
+              accept=".json,application/json"
+              @change="handleUploadInputChange"
             >
-              <el-icon><Finished /></el-icon>
-              一键导入正式库
-            </el-button>
-            <el-button @click="goTracebackCenter()">倒溯处理中心</el-button>
+            <input
+              ref="fileInputRef"
+              type="file"
+              class="hidden-file-input"
+              multiple
+              accept=".json,application/json"
+              @change="handleUploadInputChange"
+            >
             <el-button :loading="loading || overviewLoading" @click="refreshAll">
               <el-icon><Refresh /></el-icon>
               刷新
@@ -36,26 +39,90 @@
         :closable="false"
         show-icon
         class="mb-16"
-        title="当前页面已支持三级导入核验：一级按产品类别目录选择，二级按年号目录切换，三级查看通告正文或附件解析产品列表；处理中断后会自动记住上次筛选与定位。"
+        title="当前页面支持从本机选择 JSON 文件夹批量上传到服务器临时区，系统解析后在本页展示给用户人工核验，再确认导入正式库。"
       />
 
-      <el-card class="traceback-panel mb-16" shadow="never">
-        <div class="panel-header panel-header-wrap">
-          <div>
-            <div class="panel-title">倒溯处理已独立到新页面</div>
-            <div class="panel-subtitle">重复导入、附件解析失败与导入异常已统一沉淀到倒溯处理中心，便于集中删除、标记处理和跨页面定位。</div>
+      <div class="workbench-shell">
+        <aside class="stage-nav">
+          <div class="stage-nav-title">操作阶段</div>
+          <button
+            type="button"
+            class="stage-nav-item"
+            :class="{ active: activeWorkbenchView === 'staging' }"
+            @click="setWorkbenchView('staging')"
+          >
+            <span>临时区</span>
+            <small>上传 JSON 与查看导入结果</small>
+          </button>
+          <button
+            type="button"
+            class="stage-nav-item"
+            :class="{ active: activeWorkbenchView === 'review' }"
+            @click="setWorkbenchView('review')"
+          >
+            <span>人工核验</span>
+            <small>按类型核验后导入正式库</small>
+          </button>
+          <button
+            type="button"
+            class="stage-nav-item"
+            :class="{ active: activeWorkbenchView === 'traceback' }"
+            @click="setWorkbenchView('traceback')"
+          >
+            <span>倒溯处理</span>
+            <small>异常修正与删除（本页视图）</small>
+          </button>
+        </aside>
+
+        <section class="workbench-main">
+          <template v-if="activeWorkbenchView === 'staging'">
+            <el-card shadow="never" class="recent-card import-entry-card">
+              <template #header>
+                <div class="recent-header">
+                  <div>
+                    <div class="recent-title">JSON 上传入口</div>
+                    <div class="recent-subtitle">用户只需要选择文件夹或多个 JSON，系统会上传到临时区并记录当前登录用户。</div>
+                  </div>
+                  <div class="header-actions">
+                    <el-button :loading="importing" type="primary" @click="selectUploadFolder">
+                      <el-icon><Upload /></el-icon>
+                      选择文件夹
+                    </el-button>
+                    <el-button :disabled="importing" @click="selectUploadFiles">选择 JSON</el-button>
+                  </div>
+                </div>
+              </template>
+              <div class="quick-guide">
+                <span>1. 选择本机 JSON</span>
+                <span>2. 上传进入临时区</span>
+                <span>3. 到“人工核验”逐条确认</span>
+              </div>
+            </el-card>
+
+      <el-card v-if="uploadFileRows.length" shadow="never" class="recent-card upload-preview-card">
+        <template #header>
+          <div class="recent-header">
+            <div>
+              <div class="recent-title">待上传 JSON 文件</div>
+              <div class="recent-subtitle">已选择 {{ uploadFileRows.length }} 个 JSON 文件，上传后会写入临时区并记录当前登录用户与上传时间。</div>
+            </div>
+            <div class="header-actions">
+              <el-button @click="clearUploadSelection">清空</el-button>
+              <el-button type="primary" :loading="importing" @click="handleUploadSelectedJson">上传并导入临时区</el-button>
+            </div>
           </div>
-          <div class="inline-tags">
-            <el-tag type="warning">待处理 {{ overview.pending_traceback_count || 0 }}</el-tag>
-            <el-tag>总计 {{ overview.traceback_count || 0 }}</el-tag>
-            <el-button type="primary" @click="goTracebackCenter()">进入倒溯处理中心</el-button>
-          </div>
-        </div>
+        </template>
+        <el-table :data="uploadFileRows" size="small" max-height="240">
+          <el-table-column type="index" label="#" width="60" />
+          <el-table-column prop="name" label="文件名" min-width="220" show-overflow-tooltip />
+          <el-table-column prop="relativePath" label="相对路径" min-width="300" show-overflow-tooltip />
+          <el-table-column prop="sizeLabel" label="大小" width="110" align="right" />
+        </el-table>
       </el-card>
 
       <div class="stats-grid" v-loading="overviewLoading">
 
-        <div class="stat-card primary">
+        <!-- <div class="stat-card primary">
           <div class="stat-label">JSON 文件数</div>
           <div class="stat-value">{{ overview.json_file_count || 0 }}</div>
           <div class="stat-meta">当前待导入 {{ overview.unimported_json_count || 0 }}</div>
@@ -64,7 +131,7 @@
           <div class="stat-label">临时批次数</div>
           <div class="stat-value">{{ overview.staging_batch_count || 0 }}</div>
           <div class="stat-meta">抽检 {{ overview.sampling_batch_count || 0 }} · 飞检 {{ overview.flight_batch_count || 0 }}</div>
-        </div>
+        </div> -->
         <div class="stat-card warning">
           <div class="stat-label">待导入正式库</div>
           <div class="stat-value">{{ overview.pending_batch_count || 0 }}</div>
@@ -76,10 +143,10 @@
           <div class="stat-meta">重复 {{ overview.duplicate_traceback_count || 0 }} · 解析失败 {{ overview.parse_failed_traceback_count || 0 }} · 异常 {{ overview.import_failed_traceback_count || 0 }}</div>
         </div>
 
-      </div>
+      <!-- </div>
 
-      <div class="progress-grid" v-loading="overviewLoading">
-        <div class="progress-card">
+      <div class="progress-grid" v-loading="overviewLoading"> -->
+        <!-- <div class="progress-card">
           <div class="progress-header-row">
             <div>
               <div class="progress-title">JSON → 临时表</div>
@@ -92,7 +159,7 @@
             <span>已入临时表 {{ overview.staging_batch_count || 0 }} · 当前目录剩余 {{ overview.json_file_count || 0 }}</span>
             <span>来源目录：{{ overview.source_dir || '-' }}</span>
           </div>
-        </div>
+        </div> -->
 
         <div class="progress-card">
           <div class="progress-header-row">
@@ -115,7 +182,7 @@
           <div class="recent-header">
             <div>
               <div class="recent-title">最近一次导入结果</div>
-              <div class="recent-subtitle">新增、重复跳过、待人工核验和导入异常都会在这里展示；可直接定位批次或跳到倒溯处理中心。</div>
+              <div class="recent-subtitle">新增、重复跳过、待人工核验和导入异常都会在这里展示；可定位批次或切换到左侧「倒溯处理」视图。</div>
 
             </div>
             <div class="recent-tags">
@@ -140,9 +207,9 @@
               {{ row.warning_message || row.delete_message || '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="来源 JSON" min-width="220" show-overflow-tooltip>
+          <el-table-column label="来源用户" min-width="160" show-overflow-tooltip>
             <template #default="{ row }">
-              {{ row.source_json_name || row.source_json_file || '-' }}
+              {{ getSourceUserLabel(row) }}
             </template>
           </el-table-column>
           <el-table-column label="操作" width="130" align="center">
@@ -156,21 +223,27 @@
         </el-table>
       </el-card>
 
-      <el-form :model="filters" inline class="filter-form">
+          </template>
+
+          <template v-else-if="activeWorkbenchView === 'review'">
+            <el-card shadow="never" class="recent-card review-entry-card">
+              <div class="review-stage-header">
+                <div>
+                  <div class="recent-title">人工核验</div>
+                  <div class="recent-subtitle">先按通告类型进入列表，再在右侧查看正文、附件和企业预览。单个通告通过后点击“可导入”。</div>
+                </div>
+                <el-tabs v-model="reviewAnnouncementType" class="review-type-tabs" @tab-change="handleReviewTypeTabChange">
+                  <el-tab-pane label="抽检通告" name="sampling" />
+                  <el-tab-pane label="飞行检查" name="flight_inspection" />
+                </el-tabs>
+              </div>
+            </el-card>
+
+      <!-- <el-form :model="filters" inline class="filter-form">
         <el-form-item label="状态">
           <el-select v-model="filters.status" style="width: 180px" clearable placeholder="全部状态">
             <el-option label="待确认" value="pending" />
             <el-option label="已确认" value="confirmed" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="产品类型">
-          <el-select v-model="filters.product_type" style="width: 180px" clearable placeholder="全部产品类型">
-            <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="通告类型">
-          <el-select v-model="filters.announcement_type" style="width: 180px" clearable placeholder="全部通告类型">
-            <el-option v-for="item in announcementTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="关键词">
@@ -180,76 +253,64 @@
           <el-button type="primary" @click="applyFilters">搜索</el-button>
           <el-button @click="resetFilters">重置</el-button>
         </el-form-item>
-      </el-form>
+      </el-form> -->
 
-      <div class="workspace-layout">
+      <div class="workspace-layout workspace-layout-review">
         <div class="left-column">
-          <el-card class="directory-panel" shadow="never" v-loading="loading">
-            <template #header>
-              <div class="panel-header panel-header-wrap">
-                <div>
-                  <div class="panel-title">目录选择</div>
-                  <div class="panel-subtitle">左侧按产品类别与年号快速切换，当前目录中的通告在右侧详情区查看与切换。</div>
-                </div>
-                <div class="inline-tags">
-                  <el-tag type="warning">待确认 {{ overview.pending_batch_count || 0 }}</el-tag>
-                  <el-tag type="success">已确认 {{ overview.confirmed_batch_count || 0 }}</el-tag>
-                </div>
+          <div class="filter-sidebar" v-loading="loading">
+            <div class="filter-sidebar-section">
+              <button type="button" class="filter-sidebar-head" @click="filterNavProductExpanded = !filterNavProductExpanded">
+                <el-icon class="filter-sidebar-head-icon"><Grid /></el-icon>
+                <span class="filter-sidebar-head-title">产品类别</span>
+                <el-icon class="filter-sidebar-chevron" :class="{ 'is-collapsed': !filterNavProductExpanded }">
+                  <ArrowDown />
+                </el-icon>
+              </button>
+              <div v-show="filterNavProductExpanded" class="filter-sidebar-list">
+                <button
+                  v-for="item in productDirectoryOptions"
+                  :key="item.value"
+                  type="button"
+                  class="filter-sidebar-row"
+                  :class="{ active: item.value === selectedProductType, disabled: !item.count }"
+                  :disabled="!item.count"
+                  @click="handleProductSelect(item.value)"
+                >
+                  <span class="filter-sidebar-label">{{ item.label }}</span>
+                  <span class="filter-sidebar-count">{{ item.count }}</span>
+                </button>
               </div>
-            </template>
+            </div>
 
-            <div class="directory-picker simple">
-              <div class="product-rail-wrap">
-                <div class="directory-title">一级 · 产品类别</div>
-                <div class="product-rail simple">
+            <div class="filter-sidebar-divider" />
+
+            <div class="filter-sidebar-section">
+              <button type="button" class="filter-sidebar-head" @click="filterNavYearExpanded = !filterNavYearExpanded">
+                <el-icon class="filter-sidebar-head-icon"><Calendar /></el-icon>
+                <span class="filter-sidebar-head-title">年度分布</span>
+                <el-icon class="filter-sidebar-chevron" :class="{ 'is-collapsed': !filterNavYearExpanded }">
+                  <ArrowDown />
+                </el-icon>
+              </button>
+              <div v-show="filterNavYearExpanded" class="filter-sidebar-list filter-sidebar-list--year">
+                <div class="filter-sidebar-hint">{{ currentProductLabel }} · 共 {{ visibleTreeRows.length }} 条通告</div>
+                <div class="filter-sidebar-scroll">
                   <button
-                    v-for="item in productDirectoryOptions"
+                    v-for="item in yearDirectoryOptions"
                     :key="item.value"
                     type="button"
-                    class="product-rail-item simple"
-                    :class="{ active: item.value === selectedProductType, disabled: !item.count }"
+                    class="filter-sidebar-row"
+                    :class="{ active: item.value === selectedYearKey, disabled: !item.count }"
                     :disabled="!item.count"
-                    @click="handleProductSelect(item.value)"
+                    @click="handleYearSelect(item.value)"
                   >
-                    <span class="product-rail-label">{{ item.label }}</span>
-                    <span class="product-rail-count">{{ item.count }}</span>
+                    <span class="filter-sidebar-label">{{ item.label }}</span>
+                    <span class="filter-sidebar-count">{{ item.count }}</span>
                   </button>
                 </div>
               </div>
-
-              <div class="year-stage simple">
-                <div class="directory-title">二级 · 年号</div>
-                <div class="year-stage-header simple">
-                  <div>
-                    <div class="year-stage-title">{{ currentProductLabel }}</div>
-                    <div class="year-stage-subtitle">{{ currentYearLabel }} · 共 {{ visibleTreeRows.length }} 个通告</div>
-                  </div>
-                  <el-tag type="info">{{ yearDirectoryOptions.filter((item) => item.count > 0).length }} 个年号</el-tag>
-                </div>
-
-                <div class="year-stage-scroll">
-                  <div class="year-option-grid simple">
-                    <button
-                      v-for="item in yearDirectoryOptions"
-                      :key="item.value"
-                      type="button"
-                      class="year-option-card simple"
-                      :class="{ active: item.value === selectedYearKey, disabled: !item.count }"
-                      :disabled="!item.count"
-                      @click="handleYearSelect(item.value)"
-                    >
-                      <div class="year-option-row">
-                        <span class="year-option-label">{{ item.label }}</span>
-                        <span class="year-option-count">{{ item.count }}</span>
-                      </div>
-                      <div class="year-option-meta">{{ getYearMeta(item) }}</div>
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
-          </el-card>
-
+          </div>
         </div>
 
 
@@ -300,23 +361,14 @@
                   >
                     下一个通告
                   </el-button>
-                  <el-button v-if="currentPublishedId" @click="goPublished(currentPublishedId)">查看正式稿</el-button>
                   <el-button
-                    v-if="currentBatch.status === 'confirmed'"
+                    v-if="currentBatch && (currentBatch.status === 'pending' || currentBatch.status === 'confirmed')"
                     type="warning"
                     plain
                     :loading="retreatingTracebackId === currentBatch.id"
                     @click="handleRetreatToTraceback(currentBatch)"
                   >
-                    退至倒溯处理
-                  </el-button>
-                  <el-button
-                    type="danger"
-                    plain
-                    :loading="deletingBatchId === currentBatch.id"
-                    @click="handleDeleteBatch(currentBatch)"
-                  >
-                    删除当前通告
+                    打回
                   </el-button>
 
                   <el-button
@@ -324,7 +376,7 @@
                     :loading="confirmingId === currentBatch.id"
                     @click="handleConfirm(currentBatch)"
                   >
-                    {{ currentBatch.status === 'confirmed' ? '重新导入正式库' : '导入正式库' }}
+                    {{ currentBatch.status === 'confirmed' ? '重新导入' : '可导入' }}
                   </el-button>
                 </div>
 
@@ -374,7 +426,7 @@
                 <el-descriptions-item label="检验/检查单位">{{ currentBatch.inspection_unit || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="正式表">{{ currentTypeInfo.target_table }}</el-descriptions-item>
                 <el-descriptions-item label="主附件">{{ currentBatch.primary_attachment_name || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="来源 JSON">{{ currentBatch.source_json_file || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="来源用户">{{ getSourceUserLabel(currentBatch) }}</el-descriptions-item>
                 <el-descriptions-item label="通告网址" :span="2">
                   <a v-if="currentBatch.source_detail_url" :href="currentBatch.source_detail_url" target="_blank" rel="noreferrer">{{ currentBatch.source_detail_url }}</a>
                   <span v-else class="muted-text">-</span>
@@ -542,6 +594,14 @@
         </div>
       </div>
 
+          </template>
+
+          <template v-else-if="activeWorkbenchView === 'traceback'">
+            <AnnouncementTracebacksPanel ref="tracebacksPanelRef" />
+          </template>
+        </section>
+      </div>
+
     </el-card>
 
     <el-dialog
@@ -589,28 +649,30 @@
 
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 
 import { useRoute, useRouter } from 'vue-router'
-import { Finished, Refresh, Upload } from '@element-plus/icons-vue'
+import { ArrowDown, Calendar, Grid, Refresh, Upload } from '@element-plus/icons-vue'
 import {
   getAnnouncementStagingOverview,
   getAnnouncementStagingTree,
   getAnnouncementStagingDetail,
   getAnnouncementStagingWorkspaceCache,
   saveAnnouncementStagingWorkspaceCache,
-  importAnnouncementStagingJson,
+  uploadAnnouncementStagingJson,
   confirmAnnouncementStaging,
   updateAnnouncementStagingBody,
   updateAnnouncementStagingProductType,
-  deleteAnnouncementStagingBatch,
   retreatAnnouncementStagingToTraceback,
-
 
   confirmAllAnnouncementStaging
 } from '@/api/index'
 
+import AnnouncementTracebacksPanel from '@/components/AnnouncementTracebacksPanel.vue'
+
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+const ALLOWED_WORKBENCH_VIEWS = ['staging', 'review', 'traceback']
 
 const productTypeOptions = [
   { label: '化妆品', value: 'cosmetics' },
@@ -627,19 +689,27 @@ const announcementTypeOptions = [
 
 const route = useRoute()
 const router = useRouter()
+const tracebacksPanelRef = ref(null)
+const activeWorkbenchView = ref('staging')
+const reviewAnnouncementType = ref('sampling')
+const filterNavProductExpanded = ref(true)
+const filterNavYearExpanded = ref(true)
 const loading = ref(false)
 const overviewLoading = ref(false)
 const importing = ref(false)
 const bulkConfirming = ref(false)
 const detailLoadingId = ref(null)
 const confirmingId = ref(null)
-const deletingBatchId = ref(null)
 const savingBodyId = ref(null)
 
 const retreatingTracebackId = ref(null)
 const switchingBatchId = ref(null)
 const treeRows = ref([])
 const detailMap = ref({})
+
+const folderInputRef = ref(null)
+const fileInputRef = ref(null)
+const selectedUploadFiles = ref([])
 
 const lastImportResult = ref(null)
 const selectedBatchId = ref(null)
@@ -667,7 +737,7 @@ const preloadingBatchIds = new Set()
 const filters = reactive({
   status: 'pending',
   product_type: '',
-  announcement_type: '',
+  announcement_type: 'sampling',
   keyword: ''
 })
 
@@ -678,6 +748,195 @@ const detailFilters = reactive({
 
 const overview = reactive(createEmptyOverview())
 
+function formatFileSize(bytes) {
+  const n = Number(bytes) || 0
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const uploadFileRows = computed(() => {
+  const list = Array.isArray(selectedUploadFiles.value) ? selectedUploadFiles.value : []
+  return list.map((item) => ({
+    name: item.name || item.relativePath || '未命名',
+    relativePath: item.relativePath || item.webkitRelativePath || item.name || '',
+    sizeLabel: formatFileSize(item.size)
+  }))
+})
+
+function selectUploadFolder() {
+  folderInputRef.value?.click()
+}
+
+function selectUploadFiles() {
+  fileInputRef.value?.click()
+}
+
+function handleUploadInputChange(event) {
+  const input = event.target
+  const files = input?.files
+  if (!files?.length) {
+    if (input) input.value = ''
+    return
+  }
+  const next = []
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i]
+    const nameLower = String(f.name || '').toLowerCase()
+    if (!nameLower.endsWith('.json')) continue
+    next.push({
+      file: f,
+      name: f.name,
+      relativePath: f.webkitRelativePath || f.name,
+      size: f.size
+    })
+  }
+  selectedUploadFiles.value = next
+  if (input) input.value = ''
+  if (!next.length) {
+    ElMessage.warning('所选内容中未包含 .json 文件')
+  }
+}
+
+function clearUploadSelection() {
+  selectedUploadFiles.value = []
+}
+
+function safeQueryValue(value) {
+  if (Array.isArray(value)) {
+    return String(value[0] || '').trim()
+  }
+  return String(value || '').trim()
+}
+
+function mergeStagingQuery(patch = {}) {
+  const q = { ...route.query }
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined || v === null || v === '') {
+      delete q[k]
+      continue
+    }
+    q[k] = typeof v === 'string' ? v : String(v)
+  }
+  router.replace({
+    path: '/announcement-staging',
+    query: q
+  })
+}
+
+function resolveWorkbenchView(cachePayload = {}) {
+  const qView = safeQueryValue(route.query.view)
+  if (ALLOWED_WORKBENCH_VIEWS.includes(qView)) {
+    activeWorkbenchView.value = qView
+    return
+  }
+  const cached = cachePayload?.workbenchView
+  if (ALLOWED_WORKBENCH_VIEWS.includes(cached)) {
+    activeWorkbenchView.value = cached
+    mergeStagingQuery({ view: cached })
+  }
+}
+
+function setWorkbenchView(view) {
+  if (!ALLOWED_WORKBENCH_VIEWS.includes(view)) {
+    return
+  }
+  activeWorkbenchView.value = view
+  if (view === 'staging') {
+    mergeStagingQuery({
+      view: 'staging',
+      tracebackId: '',
+      id: '',
+      focusBatchId: ''
+    })
+  } else if (view === 'review') {
+    mergeStagingQuery({ view: 'review', tracebackId: '', id: '' })
+  } else {
+    mergeStagingQuery({
+      view: 'traceback',
+      focusBatchId: '',
+      tracebackId: '',
+      id: '',
+      keyword: ''
+    })
+  }
+}
+
+function handleReviewTypeTabChange(name) {
+  reviewAnnouncementType.value = name || 'sampling'
+  filters.announcement_type = reviewAnnouncementType.value
+  selectedTreeKey.value = ''
+  selectedBatchId.value = null
+  loadTreeData({ force: true })
+}
+
+function getSourceUserLabel(row = {}) {
+  return row.imported_by_username || row.uploaded_by_username || row.created_by_username || row.username || '-'
+}
+
+async function handleUploadSelectedJson() {
+  if (importing.value) {
+    return
+  }
+
+  const rows = selectedUploadFiles.value
+  if (!Array.isArray(rows) || !rows.length) {
+    ElMessage.warning('请先选择 JSON 文件')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确认将本地选中的 ${rows.length} 个 JSON 上传到服务器并导入临时区吗？已存在的批次可能跳过或进入倒溯处理。`,
+      '上传并导入临时区',
+      {
+        type: 'warning',
+        confirmButtonText: '开始上传',
+        cancelButtonText: '取消'
+      }
+    )
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    throw error
+  }
+
+  importing.value = true
+  try {
+    const formData = new FormData()
+    const paths = []
+    rows.forEach((row, index) => {
+      formData.append('files', row.file, row.name)
+      paths.push(row.relativePath || row.name || `file_${index}.json`)
+    })
+    formData.append('relative_paths', JSON.stringify(paths))
+
+    const res = await uploadAnnouncementStagingJson(formData)
+    const data = res.data || {}
+    lastImportResult.value = data
+
+    const createdCount = data.created_count || 0
+    const duplicateCount = data.duplicate_count || 0
+    const parseWarningCount = data.parse_warning_count ?? data.parse_failed_count ?? 0
+    const errorCount = data.error_count || 0
+
+    if (duplicateCount > 0 || parseWarningCount > 0 || errorCount > 0) {
+      ElMessage.warning(`上传导入完成：新增 ${createdCount} 个，重复跳过 ${duplicateCount} 个，待人工核验 ${parseWarningCount} 个，异常 ${errorCount} 个`)
+    } else {
+      ElMessage.success(`上传导入完成：新增 ${createdCount} 个临时批次`)
+    }
+
+    selectedUploadFiles.value = []
+    const firstCreatedItem = (data.items || []).find((item) => item.id)
+    await refreshAll({ preferredKey: firstCreatedItem?.id ? `body:${firstCreatedItem.id}` : selectedTreeKey.value, force: true })
+  } catch (error) {
+    console.error('上传导入临时区失败:', error)
+    ElMessage.error(error?.response?.data?.message || error?.message || '上传导入失败')
+  } finally {
+    importing.value = false
+  }
+}
 
 function createEmptyOverview() {
   return {
@@ -705,6 +964,7 @@ function createEmptyOverview() {
     parse_failed_traceback_count: 0,
     import_failed_traceback_count: 0,
     published_incorrect_traceback_count: 0,
+    manual_reject_traceback_count: 0,
     import_progress_percent: 0,
 
 
@@ -940,7 +1200,8 @@ function buildWorkspacePayload() {
     selectedYearKey: selectedYearKey.value,
     activeDetailTab: activeDetailTab.value,
     selectedAttachmentIndex: selectedAttachmentIndex.value,
-    lastImportResult: lastImportResult.value
+    lastImportResult: lastImportResult.value,
+    workbenchView: activeWorkbenchView.value
   }
 }
 
@@ -948,7 +1209,8 @@ function applyWorkspacePayload(payload = {}) {
   const nextFilters = payload.filters || {}
   filters.status = nextFilters.status ?? 'pending'
   filters.product_type = nextFilters.product_type ?? ''
-  filters.announcement_type = nextFilters.announcement_type ?? ''
+  filters.announcement_type = nextFilters.announcement_type || 'sampling'
+  reviewAnnouncementType.value = filters.announcement_type
   filters.keyword = nextFilters.keyword ?? ''
 
   const nextDetailFilters = payload.detailFilters || {}
@@ -1463,6 +1725,14 @@ async function loadTreeData(options = {}) {
 
 
 async function refreshAll(options = {}) {
+  if (activeWorkbenchView.value === 'traceback') {
+    await Promise.all([
+      loadOverview(),
+      tracebacksPanelRef.value?.refreshAll?.() ?? Promise.resolve()
+    ])
+    return
+  }
+
   const preferredKey = options.preferredKey || selectedTreeKey.value
   await Promise.all([
     loadOverview(),
@@ -1477,10 +1747,20 @@ async function refreshAll(options = {}) {
 
 
 
-async function focusBatchById(batchId) {
+async function focusBatchById(batchId, options = {}) {
 
   if (!batchId) {
     return
+  }
+
+  activeWorkbenchView.value = 'review'
+  if (!options.skipMerge) {
+    mergeStagingQuery({
+      view: 'review',
+      focusBatchId: String(batchId),
+      tracebackId: '',
+      id: ''
+    })
   }
 
   const preferredKey = `body:${batchId}`
@@ -1502,12 +1782,11 @@ function goTracebackCenter(row = {}) {
   const tracebackId = row.traceback_id || row.id || ''
   const keyword = row.source_detail_url || row.title || row.source_json_name || ''
 
-  router.push({
-    path: '/announcement-tracebacks',
-    query: {
-      ...(tracebackId ? { tracebackId: String(tracebackId) } : {}),
-      ...(keyword ? { keyword } : {})
-    }
+  activeWorkbenchView.value = 'traceback'
+  mergeStagingQuery({
+    view: 'traceback',
+    ...(tracebackId ? { tracebackId: String(tracebackId) } : {}),
+    ...(keyword ? { keyword } : {})
   })
 }
 
@@ -1623,16 +1902,27 @@ async function handleRetreatToTraceback(row) {
     return
   }
 
+  const isConfirmed = row.status === 'confirmed'
+  const currentVisibleRows = [...visibleTreeRows.value]
+  const currentIndex = currentVisibleRows.findIndex((item) => Number(item.id) === Number(row.id))
+  const fallbackBatch = currentVisibleRows[currentIndex + 1] || currentVisibleRows[currentIndex - 1] || null
+
   try {
     const { value } = await ElMessageBox.prompt(
-      `请填写“${row.title || '该批次'}”退至倒溯处理中心的原因，系统会同时删除正式库记录并恢复为待确认批次。`,
-      '退至倒溯处理',
+      isConfirmed
+        ? `请填写「${row.title || '该批次'}」从正式库退回的原因，系统将删除对应正式稿并把该通告记入倒溯，临时批次恢复为待确认。`
+        : `请填写「${row.title || '该批次'}」核验打回的原因（不通过核验），系统将记入倒溯并从临时区移除此通告。`,
+      isConfirmed ? '退回正式库录入' : '核验打回',
       {
         type: 'warning',
-        confirmButtonText: '确认退回',
+        confirmButtonText: '确认打回',
         cancelButtonText: '取消',
-        inputPlaceholder: '例如：正文有误、来源内容不完整、导入后发现通告正文错误',
-        inputValue: '已导入正式库后发现通告内容有误，需要退回倒溯处理中心'
+        inputPlaceholder: isConfirmed
+          ? '例如：正文有误、需在倒溯中心修正后再导入'
+          : '例如：附件解析不完整、内容与官网不一致',
+        inputValue: isConfirmed
+          ? '已导入正式库后发现通告内容有误，需要退回倒溯视图人工处理'
+          : '人工核验未通过，需要退回倒溯处理'
       }
     )
 
@@ -1642,22 +1932,30 @@ async function handleRetreatToTraceback(row) {
     })
     const data = res.data || {}
 
-    detailMap.value = {
-      ...detailMap.value,
-      [row.id]: {
-        ...(detailMap.value[row.id] || createEmptyDetail()),
-        batch: {
-          ...(detailMap.value[row.id]?.batch || {}),
-          status: 'pending',
-          published_announcement_id: null,
-          published_supervision_id: null,
-          confirmed_at: null
+    if (isConfirmed) {
+      detailMap.value = {
+        ...detailMap.value,
+        [row.id]: {
+          ...(detailMap.value[row.id] || createEmptyDetail()),
+          batch: {
+            ...(detailMap.value[row.id]?.batch || {}),
+            status: 'pending',
+            published_announcement_id: null,
+            published_supervision_id: null,
+            confirmed_at: null
+          }
         }
       }
+      ElMessage.success(res.message || '已退回正式库并完成倒溯关联，请在「倒溯处理」查看')
+      await refreshAll({ preferredKey: `body:${row.id}`, force: true })
+    } else {
+      const nextDetailMap = { ...detailMap.value }
+      delete nextDetailMap[row.id]
+      detailMap.value = nextDetailMap
+      ElMessage.success(res.message || '核验打回已记入倒溯，临时区已移除该批次')
+      await refreshAll({ preferredKey: fallbackBatch?.id ? `body:${fallbackBatch.id}` : '', force: true })
     }
 
-    ElMessage.success('已退至倒溯处理中心，正在为你定位对应记录')
-    await refreshAll({ preferredKey: `body:${row.id}`, force: true })
     goTracebackCenter({
       traceback_id: data.traceback_id,
       title: row.title,
@@ -1667,7 +1965,7 @@ async function handleRetreatToTraceback(row) {
     if (error === 'cancel' || error === 'close') {
       return
     }
-    console.error('退至倒溯处理失败:', error)
+    console.error('打回 / 退回倒溯失败:', error)
   } finally {
     if (retreatingTracebackId.value === row?.id) {
       retreatingTracebackId.value = null
@@ -1753,50 +2051,6 @@ function selectAttachmentFilter(index = null) {
   activeDetailTab.value = 'attachments'
 }
 
-async function handleImport() {
-  if (importing.value) {
-    return
-  }
-
-  try {
-    await ElMessageBox.confirm(
-      '确认开始导入当前爬虫 JSON 吗？系统会自动识别产品类型与通告类型；已存在的不会重复导入，附件未解析成功的会跳过并写入倒溯处理池。',
-      '导入爬虫 JSON',
-      {
-        type: 'warning',
-        confirmButtonText: '开始导入',
-        cancelButtonText: '取消'
-      }
-    )
-
-    importing.value = true
-    const res = await importAnnouncementStagingJson({})
-    const data = res.data || {}
-    lastImportResult.value = data
-
-    const createdCount = data.created_count || 0
-    const duplicateCount = data.duplicate_count || 0
-    const parseWarningCount = data.parse_warning_count ?? data.parse_failed_count ?? 0
-    const errorCount = data.error_count || 0
-
-    if (duplicateCount > 0 || parseWarningCount > 0 || errorCount > 0) {
-      ElMessage.warning(`导入完成：新增 ${createdCount} 个，重复跳过 ${duplicateCount} 个，待人工核验 ${parseWarningCount} 个，异常 ${errorCount} 个`)
-    } else {
-      ElMessage.success(`导入完成：新增 ${createdCount} 个临时批次`)
-    }
-
-    const firstCreatedItem = (data.items || []).find((item) => item.id)
-    await refreshAll({ preferredKey: firstCreatedItem?.id ? `body:${firstCreatedItem.id}` : selectedTreeKey.value, force: true })
-  } catch (error) {
-    if (error === 'cancel' || error === 'close') {
-      return
-    }
-    console.error('导入爬虫 JSON 失败:', error)
-  } finally {
-    importing.value = false
-  }
-}
-
 async function handleConfirmAll() {
   if (bulkConfirming.value || !overview.pending_batch_count) {
     return
@@ -1872,52 +2126,6 @@ async function handleConfirm(row) {
 
 
 
-async function handleDeleteBatch(row) {
-  if (!row?.id || deletingBatchId.value) {
-    return
-  }
-
-  const isConfirmed = row.status === 'confirmed'
-  const targetLabel = getTypeInfo(row).announcement_type === 'flight_inspection' ? '飞行检查正式库' : '抽检正式库'
-  const currentVisibleRows = [...visibleTreeRows.value]
-  const currentIndex = currentVisibleRows.findIndex((item) => Number(item.id) === Number(row.id))
-  const fallbackBatch = currentVisibleRows[currentIndex + 1] || currentVisibleRows[currentIndex - 1] || null
-
-  try {
-    await ElMessageBox.confirm(
-      isConfirmed
-        ? `确认删除“${row.title || '该批次'}”吗？删除后会同时移除当前临时批次以及${targetLabel}中的已导入记录。`
-        : `确认删除“${row.title || '该批次'}”吗？删除后当前临时批次及其解析结果将不可恢复。`,
-      '删除当前通告',
-      {
-        type: 'warning',
-        confirmButtonText: '确认删除',
-        cancelButtonText: '取消'
-      }
-    )
-
-    deletingBatchId.value = row.id
-    await deleteAnnouncementStagingBatch(row.id)
-
-    const nextDetailMap = { ...detailMap.value }
-    delete nextDetailMap[row.id]
-    detailMap.value = nextDetailMap
-
-    ElMessage.success(isConfirmed ? '当前通告已删除，并同步清理正式库记录' : '当前通告已删除')
-    await refreshAll({ preferredKey: fallbackBatch?.id ? `body:${fallbackBatch.id}` : '', force: true })
-  } catch (error) {
-    if (error === 'cancel' || error === 'close') {
-      return
-    }
-    console.error('删除当前通告失败:', error)
-  } finally {
-    if (deletingBatchId.value === row?.id) {
-      deletingBatchId.value = null
-    }
-  }
-}
-
-
 const goPublished = (id) => {
 
   if (!id) return
@@ -1925,13 +2133,14 @@ const goPublished = (id) => {
 }
 
 const applyFilters = () => {
+  filters.announcement_type = reviewAnnouncementType.value || 'sampling'
   loadTreeData({ preferredKey: selectedTreeKey.value })
 }
 
 const resetFilters = () => {
   filters.status = 'pending'
   filters.product_type = ''
-  filters.announcement_type = ''
+  filters.announcement_type = reviewAnnouncementType.value || 'sampling'
   filters.keyword = ''
   loadTreeData({ preferredKey: selectedTreeKey.value })
 }
@@ -1949,7 +2158,7 @@ watch(
 )
 
 watch(
-  [filters, detailFilters, selectedTreeKey, selectedBatchId, selectedProductType, selectedYearKey, activeDetailTab, selectedAttachmentIndex, lastImportResult],
+  [filters, detailFilters, selectedTreeKey, selectedBatchId, selectedProductType, selectedYearKey, activeDetailTab, selectedAttachmentIndex, lastImportResult, activeWorkbenchView],
 
 
   () => {
@@ -1958,9 +2167,42 @@ watch(
   { deep: true }
 )
 
+watch(
+  () => safeQueryValue(route.query.view),
+  (v) => {
+    if (!ALLOWED_WORKBENCH_VIEWS.includes(v)) {
+      return
+    }
+    if (activeWorkbenchView.value !== v) {
+      activeWorkbenchView.value = v
+    }
+  }
+)
+
+watch(
+  () => [safeQueryValue(route.query.focusBatchId), safeQueryValue(route.query.view)],
+  async ([fid, view]) => {
+    if (!workspaceCacheReady.value) {
+      return
+    }
+    if (view !== 'review' || !fid) {
+      return
+    }
+    const id = Number(fid)
+    if (!id || Number(selectedBatchId.value) === id) {
+      return
+    }
+
+    await focusBatchById(id, { skipMerge: true })
+  },
+  { flush: 'post' }
+)
+
 onMounted(async () => {
   const cachePayload = await loadWorkspaceCache()
   applyWorkspacePayload(cachePayload)
+  resolveWorkbenchView(cachePayload)
+  await nextTick()
   test()
   const preferredKey = selectedTreeKey.value || (selectedBatchId.value ? `body:${selectedBatchId.value}` : '')
   await refreshAll({ preferredKey })
@@ -2185,6 +2427,144 @@ onBeforeUnmount(() => {
   grid-template-columns: 1fr 3fr;
   gap: 20px;
   align-items: start;
+}
+
+.workspace-layout-review {
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.filter-sidebar {
+  position: relative;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  min-height: 100px;
+}
+
+.filter-sidebar-section {
+  background: #fff;
+}
+
+.filter-sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  color: #303133;
+}
+
+.filter-sidebar-head:hover {
+  background: #fafafa;
+}
+
+.filter-sidebar-head-icon {
+  font-size: 18px;
+  color: #606266;
+  flex-shrink: 0;
+}
+
+.filter-sidebar-head-title {
+  flex: 1;
+  font-weight: 600;
+}
+
+.filter-sidebar-chevron {
+  font-size: 14px;
+  color: #909399;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.filter-sidebar-chevron.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+.filter-sidebar-divider {
+  height: 1px;
+  background: #ebeef5;
+}
+
+.filter-sidebar-list {
+  padding: 0 10px 14px 14px;
+}
+
+.filter-sidebar-list--year {
+  padding-top: 0;
+}
+
+.filter-sidebar-hint {
+  padding: 0 10px 10px 26px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
+}
+
+.filter-sidebar-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.filter-sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.filter-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #d4d9e1;
+  border-radius: 999px;
+}
+
+.filter-sidebar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px 8px 26px;
+  margin: 2px 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.filter-sidebar-row:hover:not(.disabled) {
+  background: #f5f7fa;
+}
+
+.filter-sidebar-row.active {
+  background: #ecf5ff;
+}
+
+.filter-sidebar-row.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.filter-sidebar-label {
+  font-size: 14px;
+  color: #303133;
+  line-height: 1.4;
+}
+
+.filter-sidebar-count {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #5b9bd5;
+}
+
+.filter-sidebar-row.active .filter-sidebar-count {
+  color: #409eff;
 }
 
 .left-column,
@@ -2514,7 +2894,15 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
+  .workspace-layout-review {
+    grid-template-columns: 1fr;
+  }
+
   .year-stage-scroll {
+    max-height: none;
+  }
+
+  .filter-sidebar-scroll {
     max-height: none;
   }
 }
@@ -2613,6 +3001,119 @@ onBeforeUnmount(() => {
 /* 卡片 header 更紧凑 */
 .directory-panel :deep(.el-card__header) {
   padding: 10px 12px;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.workbench-shell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.stage-nav {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #ebeef5;
+  border-radius: 16px;
+  background: #fbfcff;
+}
+
+.stage-nav-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #606266;
+  margin-bottom: 2px;
+}
+
+.stage-nav-item {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  color: #303133;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.stage-nav-item span,
+.stage-nav-item small {
+  display: block;
+}
+
+.stage-nav-item span {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.stage-nav-item small {
+  margin-top: 4px;
+  color: #909399;
+  line-height: 1.4;
+}
+
+.stage-nav-item:hover,
+.stage-nav-item.active {
+  border-color: #cfe4ff;
+  background: #f6faff;
+}
+
+.stage-nav-item.active span {
+  color: #2367d1;
+}
+
+.workbench-main {
+  min-width: 0;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.quick-guide,
+.review-stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quick-guide span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f5f7fa;
+  color: #606266;
+  font-size: 13px;
+}
+
+.review-type-tabs {
+  min-width: 260px;
+}
+
+@media (max-width: 1100px) {
+  .workbench-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-nav {
+    position: static;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .stage-nav {
+    grid-template-columns: 1fr;
+  }
 }
 
 </style>

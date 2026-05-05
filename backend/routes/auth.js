@@ -3,6 +3,34 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, hashPassword, login, logout, verifyPassword } = require('../utils/auth');
 
+// Demo accounts shown on the login page. Repair legacy rows without overwriting changed pbkdf2 passwords.
+const SEED_ACCOUNTS = [
+  { username: 'admin', password: 'admin', role: 'developer', displayName: '系统管理员' },
+  { username: 'data_admin', password: 'data_admin', role: 'data_admin', displayName: '数据管理员' },
+  { username: 'user', password: 'user', role: 'normal_user', displayName: '普通用户' }
+];
+
+async function reconcileSeedAccounts() {
+  for (const seed of SEED_ACCOUNTS) {
+    const [rows] = await pool.query('SELECT id, password FROM users WHERE username = ? LIMIT 1', [seed.username]);
+    const row = rows[0];
+    if (!row) continue;
+
+    const storedPassword = String(row.password || '');
+    if (verifyPassword(seed.password, storedPassword)) {
+      await pool.query('UPDATE users SET role = ?, status = ? WHERE id = ?', [seed.role, 'active', row.id]);
+      continue;
+    }
+
+    if (storedPassword.startsWith('pbkdf2_sha256$')) continue;
+
+    await pool.query(
+      'UPDATE users SET password = ?, role = ?, status = ?, display_name = COALESCE(NULLIF(display_name, \'\'), ?) WHERE id = ?',
+      [hashPassword(seed.password), seed.role, 'active', seed.displayName, row.id]
+    );
+  }
+}
+
 async function ensureUserSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -42,11 +70,13 @@ async function ensureUserSchema() {
             (?, ?, ?, ?, 'data_admin', 'active'),
             (?, ?, ?, ?, 'normal_user', 'active')`,
     [
-      'admin', 'admin@cosmetics.com', hashPassword('admin'), '开发人员',
+      'admin', 'admin@cosmetics.com', hashPassword('admin'), '系统管理员',
       'data_admin', 'data_admin@cosmetics.com', hashPassword('data_admin'), '数据管理员',
       'user', 'user@cosmetics.com', hashPassword('user'), '普通用户'
     ]
   );
+
+  await reconcileSeedAccounts();
 }
 
 function parseDetails(raw) {

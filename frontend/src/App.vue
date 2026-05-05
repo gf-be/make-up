@@ -7,7 +7,7 @@
           <el-icon :size="28">
             <Document />
           </el-icon>
-          <span class="logo-title">化妆品资讯系统</span>
+          <span class="logo-title">视频、文案管理系统</span>
         </div>
         <div class="nav-scroll">
           <el-menu :default-active="activeMenu" mode="horizontal" router class="nav-menu">
@@ -48,7 +48,6 @@ const menus = [
   { index: '/pivot-analysis', key: 'pivot-analysis', label: '数据矩阵', icon: 'DataAnalysis' },
   { index: '/sampling-search', key: 'sampling-search', label: '数据检索', icon: 'Search' },
   { index: '/announcement-staging', key: 'announcement-staging', label: '导入检查', icon: 'DataAnalysis' },
-  { index: '/announcement-tracebacks', key: 'announcement-tracebacks', label: '倒溯处理', icon: 'Warning' },
   { index: '/announcements', key: 'announcements', label: '抽检通告', icon: 'Bell' },
   { index: '/inspections', key: 'inspections', label: '抽样检查', icon: 'Checked' },
   { index: '/companies', key: 'companies', label: '企业管理', icon: 'OfficeBuilding' },
@@ -62,7 +61,6 @@ const activeMenu = computed(() => {
   if (route.path.startsWith('/home') || route.path.startsWith('/dashboard')) return '/home'
   if (route.path.startsWith('/announcements')) return '/announcements'
   if (route.path.startsWith('/announcement-staging')) return '/announcement-staging'
-  if (route.path.startsWith('/announcement-tracebacks')) return '/announcement-tracebacks'
   if (route.path.startsWith('/pivot-analysis')) return '/pivot-analysis'
   if (route.path.startsWith('/sampling-search')) return '/sampling-search'
 

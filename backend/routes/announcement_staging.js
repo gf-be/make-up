@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const pool = require('../config/database');
 const {
   DEFAULT_STAGING_SOURCE_DIR,
   DEFAULT_WORKSPACE_CACHE_KEY,
   ensureAnnouncementStagingSchema,
   importStagingFromJsonDirectory,
+  importStagingFromUploadedFiles,
   getAnnouncementStagingOverview,
   getAnnouncementStagingDetail,
   publishAnnouncementStagingBatch,
@@ -15,6 +17,7 @@ const {
   updateAnnouncementStagingProductType,
 
   movePublishedAnnouncementStagingBatchToTraceback,
+  movePendingAnnouncementStagingBatchToTraceback,
 
   listAnnouncementStagingTracebacks,
   markAnnouncementStagingTracebackResolved,
@@ -31,6 +34,22 @@ const {
   getAnnouncementTypeLabel
 } = require('../utils/unqualifiedProducts');
 const { ensureInspectionDetailsSchema } = require('../utils/announcementInspectionSync');
+const { authenticate } = require('../utils/auth');
+
+const uploadJsonFiles = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const normalizedName = String(file.originalname || '').toLowerCase();
+    if (normalizedName.endsWith('.json') || file.mimetype === 'application/json') {
+      return cb(null, true);
+    }
+    return cb(new Error('只允许上传 JSON 文件'));
+  },
+  limits: {
+    files: 200,
+    fileSize: 20 * 1024 * 1024
+  }
+});
 
 
 function clampPageSize(limit, defaultValue = 10, maxValue = 100) {
@@ -162,6 +181,72 @@ router.post('/import-json', async (req, res) => {
   }
 });
 
+router.post('/import-json-upload', authenticate, uploadJsonFiles.array('files', 200), async (req, res) => {
+  let connection;
+
+  try {
+    const files = req.files || [];
+    if (!files.length) {
+      return res.status(400).json({ success: false, message: '请选择需要上传的 JSON 文件' });
+    }
+
+    let relativePaths = [];
+    try {
+      relativePaths = JSON.parse(req.body?.relative_paths || '[]');
+    } catch (error) {
+      relativePaths = [];
+    }
+
+    const uploadFiles = files.map((file, index) => ({
+      ...file,
+      relativePath: String(relativePaths[index] || file.originalname || '').replace(/\\/g, '/')
+    }));
+
+    connection = await pool.getConnection();
+    const result = await importStagingFromUploadedFiles(
+      connection,
+      uploadFiles,
+      {
+        product_type: req.body?.product_type || '',
+        announcement_type: req.body?.announcement_type || ''
+      },
+      {
+        user_id: req.user.id,
+        username: req.user.username
+      }
+    );
+    const overview = await getAnnouncementStagingOverview(connection, DEFAULT_STAGING_SOURCE_DIR);
+
+    const parseWarningCount = result.parse_warning_count ?? result.parse_failed_count ?? 0;
+    const messageParts = [
+      `上传 ${result.total_files || 0} 个`,
+      `新增 ${result.created_count || 0} 个`,
+      `重复跳过 ${result.duplicate_count || 0} 个`,
+      `待人工核验 ${parseWarningCount} 个`
+    ];
+
+    if (result.error_count > 0) {
+      messageParts.push(`异常 ${result.error_count} 个`);
+    }
+
+    res.json({
+      success: true,
+      message: `上传导入完成：${messageParts.join('，')}`,
+      data: {
+        ...result,
+        overview
+      }
+    });
+  } catch (error) {
+    console.error('上传 JSON 到临时表失败:', error);
+    res.status(500).json({ success: false, message: error.message || '上传 JSON 到临时表失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
 router.get('/overview', async (req, res) => {
   try {
     const overview = await getAnnouncementStagingOverview(pool, DEFAULT_STAGING_SOURCE_DIR);
@@ -197,6 +282,11 @@ router.get('/tree', async (req, res) => {
           published_announcement_id,
           published_supervision_id,
           source_json_file,
+          source_file_name,
+          source_relative_path,
+          imported_by_username,
+          imported_at,
+          import_source,
           source_detail_url,
           primary_attachment_name,
           confirmed_at,
@@ -260,19 +350,39 @@ router.post('/tracebacks/:id/resolve', async (req, res) => {
 });
 
 router.delete('/tracebacks/:id', async (req, res) => {
+  let connection;
+
   try {
-    const deleted = await deleteAnnouncementStagingTraceback(pool, req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ success: false, message: '倒溯记录不存在或已删除' });
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const result = await deleteAnnouncementStagingTraceback(connection, req.params.id);
+    if (!result.deleted) {
+      await connection.commit();
+      return res.json({
+        success: true,
+        message: '倒溯记录已删除或不存在',
+        data: result
+      });
     }
+
+    await connection.commit();
 
     res.json({
       success: true,
-      message: '倒溯记录已删除'
+      message: '倒溯记录已删除',
+      data: result
     });
   } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
     console.error('删除倒溯记录失败:', error);
     res.status(500).json({ success: false, message: '删除倒溯记录失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 
@@ -434,6 +544,11 @@ router.get('/', async (req, res) => {
           published_announcement_id,
           published_supervision_id,
           source_json_file,
+          source_file_name,
+          source_relative_path,
+          imported_by_username,
+          imported_at,
+          import_source,
           source_detail_url,
           primary_attachment_name,
           confirmed_at,
@@ -604,16 +719,48 @@ router.post('/:id/retreat-to-traceback', async (req, res) => {
   try {
     connection = await pool.getConnection();
     await connection.beginTransaction();
-    const result = await movePublishedAnnouncementStagingBatchToTraceback(
-      connection,
-      req.params.id,
-      req.body?.reason || ''
-    );
+
+    const detail = await getAnnouncementStagingDetail(connection, req.params.id);
+    const batch = detail?.batch || null;
+    const reasonText = typeof req.body?.reason === 'string' ? req.body.reason : '';
+
+    let result;
+
+    if (!batch) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '待确认批次不存在' });
+    }
+
+    if (batch.status === 'confirmed') {
+      result = await movePublishedAnnouncementStagingBatchToTraceback(
+        connection,
+        req.params.id,
+        reasonText
+      );
+    } else if (batch.status === 'pending') {
+      result = await movePendingAnnouncementStagingBatchToTraceback(
+        connection,
+        req.params.id,
+        reasonText
+      );
+    } else {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `当前批次状态为「${batch.status}」，不支持退回倒溯处理`
+      });
+    }
+
     await connection.commit();
+
+    const message =
+      batch.status === 'confirmed'
+        ? '已将正式库通告退回倒溯处理，临时批次恢复为待确认'
+        : '核验打回已记入倒溯处理，并已移出临时区';
 
     res.json({
       success: true,
-      message: '已将正式库通告退回倒溯处理中心，并恢复为待确认批次',
+      message,
       data: result
     });
   } catch (error) {
@@ -627,6 +774,12 @@ router.post('/:id/retreat-to-traceback', async (req, res) => {
     }
 
     if (error.message === '该批次尚未导入正式库，无法退至倒溯处理') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    if (
+      error.message === '仅待确认的批次可通过核验打回进入倒溯处理'
+    ) {
       return res.status(400).json({ success: false, message: error.message });
     }
 

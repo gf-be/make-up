@@ -63,7 +63,9 @@ const DEFAULT_WORKSPACE_CACHE_KEY = 'announcement-staging-workspace';
 const TRACEBACK_TYPE_LABELS = {
   duplicate: '重复导入',
   parse_failed: '附件解析失败',
-  import_failed: '导入异常'
+  import_failed: '导入异常',
+  published_incorrect: '已导入有误',
+  manual_reject: '核验打回'
 };
 
 
@@ -277,6 +279,23 @@ function buildImportFailedTracebackPayload(filePath, reason, fileName = path.bas
         .filter(Boolean)
         .slice(0, 10)
     }
+  };
+}
+
+function buildUploadSourceIdentifier(relativePath, fileName) {
+  const sourceText = normalizeNullableText(relativePath) || normalizeNullableText(fileName) || 'unknown.json';
+  return `upload:${sourceText.replace(/\\/g, '/')}`;
+}
+
+function buildAuditPayload(importOptions = {}) {
+  const auditContext = importOptions.auditContext || {};
+  return {
+    imported_by_user_id: auditContext.user_id || null,
+    imported_by_username: normalizeNullableText(auditContext.username),
+    imported_at: auditContext.imported_at || null,
+    import_source: normalizeNullableText(auditContext.import_source) || 'server_directory',
+    source_file_name: normalizeNullableText(importOptions.sourceFileName),
+    source_relative_path: normalizeNullableText(importOptions.sourceRelativePath)
   };
 }
 
@@ -885,6 +904,12 @@ async function ensureAnnouncementTracebackTables(connection) {
       existing_batch_id INT NULL,
       existing_announcement_id INT NULL,
       existing_supervision_id INT NULL,
+      imported_by_user_id INT NULL,
+      imported_by_username VARCHAR(50) NULL,
+      imported_at DATETIME NULL,
+      import_source VARCHAR(50) NOT NULL DEFAULT 'server_directory',
+      source_file_name VARCHAR(255) NULL,
+      source_relative_path VARCHAR(500) NULL,
       handled_status ENUM('pending', 'resolved') DEFAULT 'pending',
       handled_at DATETIME NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -895,6 +920,13 @@ async function ensureAnnouncementTracebackTables(connection) {
       INDEX idx_tracebacks_source_detail_url (source_detail_url(191))
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  await ensureColumnExists(connection, 'announcement_staging_tracebacks', 'imported_by_user_id', 'INT NULL AFTER existing_supervision_id');
+  await ensureColumnExists(connection, 'announcement_staging_tracebacks', 'imported_by_username', 'VARCHAR(50) NULL AFTER imported_by_user_id');
+  await ensureColumnExists(connection, 'announcement_staging_tracebacks', 'imported_at', 'DATETIME NULL AFTER imported_by_username');
+  await ensureColumnExists(connection, 'announcement_staging_tracebacks', 'import_source', "VARCHAR(50) NOT NULL DEFAULT 'server_directory' AFTER imported_at");
+  await ensureColumnExists(connection, 'announcement_staging_tracebacks', 'source_file_name', 'VARCHAR(255) NULL AFTER import_source');
+  await ensureColumnExists(connection, 'announcement_staging_tracebacks', 'source_relative_path', 'VARCHAR(500) NULL AFTER source_file_name');
 }
 
 async function ensureAnnouncementWorkspaceCacheTable(connection) {
@@ -934,6 +966,12 @@ async function ensureAnnouncementStagingSchema(connection) {
       status ENUM('pending', 'confirmed') DEFAULT 'pending',
       published_announcement_id INT NULL,
       published_supervision_id INT NULL,
+      imported_by_user_id INT NULL,
+      imported_by_username VARCHAR(50) NULL,
+      imported_at DATETIME NULL,
+      import_source VARCHAR(50) NOT NULL DEFAULT 'server_directory',
+      source_file_name VARCHAR(255) NULL,
+      source_relative_path VARCHAR(500) NULL,
       confirmed_at DATETIME NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -948,6 +986,12 @@ async function ensureAnnouncementStagingSchema(connection) {
   await ensureColumnExists(connection, 'announcement_staging_batches', 'product_type', "VARCHAR(50) NOT NULL DEFAULT 'cosmetics' AFTER primary_attachment_path");
   await ensureColumnExists(connection, 'announcement_staging_batches', 'announcement_type', "VARCHAR(50) NOT NULL DEFAULT 'sampling' AFTER product_type");
   await ensureColumnExists(connection, 'announcement_staging_batches', 'published_supervision_id', 'INT NULL AFTER published_announcement_id');
+  await ensureColumnExists(connection, 'announcement_staging_batches', 'imported_by_user_id', 'INT NULL AFTER published_supervision_id');
+  await ensureColumnExists(connection, 'announcement_staging_batches', 'imported_by_username', 'VARCHAR(50) NULL AFTER imported_by_user_id');
+  await ensureColumnExists(connection, 'announcement_staging_batches', 'imported_at', 'DATETIME NULL AFTER imported_by_username');
+  await ensureColumnExists(connection, 'announcement_staging_batches', 'import_source', "VARCHAR(50) NOT NULL DEFAULT 'server_directory' AFTER imported_at");
+  await ensureColumnExists(connection, 'announcement_staging_batches', 'source_file_name', 'VARCHAR(255) NULL AFTER import_source');
+  await ensureColumnExists(connection, 'announcement_staging_batches', 'source_relative_path', 'VARCHAR(500) NULL AFTER source_file_name');
   await ensureIndexExists(connection, 'announcement_staging_batches', 'idx_staging_product_type', 'ALTER TABLE announcement_staging_batches ADD INDEX idx_staging_product_type (product_type)');
   await ensureIndexExists(connection, 'announcement_staging_batches', 'idx_staging_announcement_type', 'ALTER TABLE announcement_staging_batches ADD INDEX idx_staging_announcement_type (announcement_type)');
   await ensureIndexExists(connection, 'announcement_staging_batches', 'idx_staging_published_supervision', 'ALTER TABLE announcement_staging_batches ADD INDEX idx_staging_published_supervision (published_supervision_id)');
@@ -1054,7 +1098,8 @@ async function findExistingStagingBatch(connection, batchPayload = {}) {
     `
       SELECT id, status, title, published_announcement_id, published_supervision_id
       FROM announcement_staging_batches
-      WHERE ${conditions.map((condition) => `(${condition})`).join(' OR ')}
+      WHERE status = 'pending'
+        AND (${conditions.map((condition) => `(${condition})`).join(' OR ')})
       ORDER BY id DESC
       LIMIT 1
     `,
@@ -1175,6 +1220,12 @@ async function upsertAnnouncementTraceback(connection, options = {}) {
   const sourcePage = batchPayload.source_page || null;
   const attachmentSummaryJson = JSON.stringify(buildTracebackAttachmentSummary(batchPayload));
   const rawPayload = batchPayload.raw_payload || null;
+  const importedByUserId = batchPayload.imported_by_user_id || null;
+  const importedByUsername = batchPayload.imported_by_username || null;
+  const importedAt = batchPayload.imported_at || null;
+  const importSource = batchPayload.import_source || 'server_directory';
+  const sourceFileName = batchPayload.source_file_name || null;
+  const sourceRelativePath = batchPayload.source_relative_path || null;
 
   const [existingRows] = await connection.query(
     `
@@ -1198,6 +1249,8 @@ async function upsertAnnouncementTraceback(connection, options = {}) {
         SET title = ?, announcement_no = ?, source_json_file = ?, source_detail_url = ?, source_page = ?,
             product_type = ?, announcement_type = ?, reason = ?, attachment_summary_json = ?, raw_payload = ?,
             existing_batch_id = ?, existing_announcement_id = ?, existing_supervision_id = ?,
+            imported_by_user_id = ?, imported_by_username = ?, imported_at = ?, import_source = ?,
+            source_file_name = ?, source_relative_path = ?,
             handled_status = 'pending', handled_at = NULL
         WHERE id = ?
       `,
@@ -1215,6 +1268,12 @@ async function upsertAnnouncementTraceback(connection, options = {}) {
         existing_batch_id,
         existing_announcement_id,
         existing_supervision_id,
+        importedByUserId,
+        importedByUsername,
+        importedAt,
+        importSource,
+        sourceFileName,
+        sourceRelativePath,
         existingRows[0].id
       ]
     );
@@ -1238,8 +1297,14 @@ async function upsertAnnouncementTraceback(connection, options = {}) {
         existing_batch_id,
         existing_announcement_id,
         existing_supervision_id,
+        imported_by_user_id,
+        imported_by_username,
+        imported_at,
+        import_source,
+        source_file_name,
+        source_relative_path,
         handled_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     `,
     [
       trace_type,
@@ -1255,7 +1320,13 @@ async function upsertAnnouncementTraceback(connection, options = {}) {
       rawPayload,
       existing_batch_id,
       existing_announcement_id,
-      existing_supervision_id
+      existing_supervision_id,
+      importedByUserId,
+      importedByUsername,
+      importedAt,
+      importSource,
+      sourceFileName,
+      sourceRelativePath
     ]
   );
 
@@ -1295,9 +1366,11 @@ async function listAnnouncementStagingTracebacks(connection, filters = {}) {
       title LIKE ? OR
       announcement_no LIKE ? OR
       source_detail_url LIKE ? OR
-      reason LIKE ?
+      reason LIKE ? OR
+      COALESCE(source_json_file, '') LIKE ? OR
+      COALESCE(imported_by_username, '') LIKE ?
     )`);
-    params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
+    params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
   }
 
   const limit = Math.min(Math.max(Number.parseInt(filters.limit, 10) || 50, 1), 200);
@@ -1335,12 +1408,110 @@ async function markAnnouncementStagingTracebackResolved(connection, tracebackId)
 
 async function deleteAnnouncementStagingTraceback(connection, tracebackId) {
   await ensureAnnouncementStagingSchema(connection);
-  const [result] = await connection.query(
-    'DELETE FROM announcement_staging_tracebacks WHERE id = ? LIMIT 1',
+
+  const [tracebackRows] = await connection.query(
+    'SELECT * FROM announcement_staging_tracebacks WHERE id = ? LIMIT 1',
     [tracebackId]
   );
+  const traceback = tracebackRows[0] || null;
+  if (!traceback) {
+    return {
+      deleted: false,
+      deleted_staging_batch_count: 0,
+      deleted_staging_item_count: 0,
+      deleted_traceback_count: 0
+    };
+  }
 
-  return Number(result.affectedRows || 0) > 0;
+  const batchConditions = [];
+  const batchParams = [];
+
+  if (traceback.existing_batch_id) {
+    batchConditions.push('id = ?');
+    batchParams.push(traceback.existing_batch_id);
+  }
+  if (traceback.source_json_file) {
+    batchConditions.push('source_json_file = ?');
+    batchParams.push(traceback.source_json_file);
+  }
+  if (traceback.source_detail_url) {
+    batchConditions.push('source_detail_url = ?');
+    batchParams.push(traceback.source_detail_url);
+  }
+  if (traceback.announcement_no) {
+    batchConditions.push('announcement_no = ?');
+    batchParams.push(traceback.announcement_no);
+  }
+
+  let deletedStagingBatchCount = 0;
+  let deletedStagingItemCount = 0;
+  let stagingBatchIds = [];
+
+  if (batchConditions.length > 0) {
+    const [batchRows] = await connection.query(
+      `
+        SELECT id
+        FROM announcement_staging_batches
+        WHERE status = 'pending'
+          AND published_announcement_id IS NULL
+          AND published_supervision_id IS NULL
+          AND (${batchConditions.map((condition) => `(${condition})`).join(' OR ')})
+      `,
+      batchParams
+    );
+    stagingBatchIds = batchRows.map((row) => Number(row.id)).filter(Boolean);
+  }
+
+  if (stagingBatchIds.length > 0) {
+    const placeholders = stagingBatchIds.map(() => '?').join(', ');
+
+    const [itemDeleteResult] = await connection.query(
+      `DELETE FROM announcement_staging_items WHERE staging_batch_id IN (${placeholders})`,
+      stagingBatchIds
+    );
+    deletedStagingItemCount = Number(itemDeleteResult.affectedRows || 0);
+
+    // Older databases may not have a working cascade, so clear dependent temporary rows explicitly.
+    await connection.query(
+      `DELETE FROM announcement_publish_backups WHERE staging_batch_id IN (${placeholders})`,
+      stagingBatchIds
+    );
+
+    const [batchDeleteResult] = await connection.query(
+      `
+        DELETE FROM announcement_staging_batches
+        WHERE id IN (${placeholders})
+          AND status = 'pending'
+          AND published_announcement_id IS NULL
+          AND published_supervision_id IS NULL
+      `,
+      stagingBatchIds
+    );
+    deletedStagingBatchCount = Number(batchDeleteResult.affectedRows || 0);
+  }
+
+  const tracebackConditions = ['id = ?'];
+  const tracebackParams = [tracebackId];
+
+  if (stagingBatchIds.length > 0) {
+    tracebackConditions.push(`existing_batch_id IN (${stagingBatchIds.map(() => '?').join(', ')})`);
+    tracebackParams.push(...stagingBatchIds);
+  }
+
+  const [tracebackDeleteResult] = await connection.query(
+    `
+      DELETE FROM announcement_staging_tracebacks
+      WHERE ${tracebackConditions.map((condition) => `(${condition})`).join(' OR ')}
+    `,
+    tracebackParams
+  );
+
+  return {
+    deleted: Number(tracebackDeleteResult.affectedRows || 0) > 0,
+    deleted_staging_batch_count: deletedStagingBatchCount,
+    deleted_staging_item_count: deletedStagingItemCount,
+    deleted_traceback_count: Number(tracebackDeleteResult.affectedRows || 0)
+  };
 }
 
 async function getAnnouncementWorkspaceCache(connection, cacheKey = DEFAULT_WORKSPACE_CACHE_KEY) {
@@ -1381,6 +1552,7 @@ function buildStagingBatchPayload(sourceJsonFile, payload = {}, importOptions = 
 
   const mergedPayload = mergeImportMetaIntoPayload(payload, importOptions);
   const typeInfo = resolvePayloadTypeInfo(mergedPayload, importOptions);
+  const auditPayload = buildAuditPayload(importOptions);
 
   const rows = collectBatchRows(mergedPayload, typeInfo.announcement_type);
   const extracted = extractAnnouncementInfo(mergedPayload.content_text || mergedPayload.content || '');
@@ -1417,6 +1589,7 @@ function buildStagingBatchPayload(sourceJsonFile, payload = {}, importOptions = 
     product_type: typeInfo.product_type,
     announcement_type: typeInfo.announcement_type,
     raw_payload: JSON.stringify(mergedPayload),
+    ...auditPayload,
     items: rows,
     attachment_preview: attachmentPreview,
     attachment_validation: attachmentValidation
@@ -1424,11 +1597,8 @@ function buildStagingBatchPayload(sourceJsonFile, payload = {}, importOptions = 
 }
 
 
-async function upsertStagingBatchFromFile(connection, filePath, importOptions = {}) {
-  const absoluteFilePath = path.resolve(filePath);
-  const fileContent = fs.readFileSync(absoluteFilePath, 'utf-8');
-  const payload = JSON.parse(fileContent);
-  const batchPayload = buildStagingBatchPayload(absoluteFilePath, payload, importOptions);
+async function upsertStagingBatchFromJsonPayload(connection, sourceJsonFile, payload = {}, importOptions = {}) {
+  const batchPayload = buildStagingBatchPayload(sourceJsonFile, payload, importOptions);
   const existingBatch = await findExistingStagingBatch(connection, batchPayload);
 
   if (existingBatch) {
@@ -1450,6 +1620,10 @@ async function upsertStagingBatchFromFile(connection, filePath, importOptions = 
       detail_count: batchPayload.items.length,
       counterfeit_count: batchPayload.counterfeit_count,
       source_json_file: batchPayload.source_json_file,
+      source_file_name: batchPayload.source_file_name,
+      source_relative_path: batchPayload.source_relative_path,
+      imported_by_username: batchPayload.imported_by_username,
+      imported_at: batchPayload.imported_at,
       source_detail_url: batchPayload.source_detail_url,
       product_type: batchPayload.product_type,
       announcement_type: batchPayload.announcement_type,
@@ -1484,6 +1658,10 @@ async function upsertStagingBatchFromFile(connection, filePath, importOptions = 
       detail_count: batchPayload.items.length,
       counterfeit_count: batchPayload.counterfeit_count,
       source_json_file: batchPayload.source_json_file,
+      source_file_name: batchPayload.source_file_name,
+      source_relative_path: batchPayload.source_relative_path,
+      imported_by_username: batchPayload.imported_by_username,
+      imported_at: batchPayload.imported_at,
       source_detail_url: batchPayload.source_detail_url,
       product_type: batchPayload.product_type,
       announcement_type: batchPayload.announcement_type,
@@ -1518,8 +1696,14 @@ async function upsertStagingBatchFromFile(connection, filePath, importOptions = 
         product_type,
         announcement_type,
         raw_payload,
+        imported_by_user_id,
+        imported_by_username,
+        imported_at,
+        import_source,
+        source_file_name,
+        source_relative_path,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     `,
     [
       batchPayload.source_sequence,
@@ -1539,7 +1723,13 @@ async function upsertStagingBatchFromFile(connection, filePath, importOptions = 
       batchPayload.primary_attachment_path,
       batchPayload.product_type,
       batchPayload.announcement_type,
-      batchPayload.raw_payload
+      batchPayload.raw_payload,
+      batchPayload.imported_by_user_id,
+      batchPayload.imported_by_username,
+      batchPayload.imported_at,
+      batchPayload.import_source,
+      batchPayload.source_file_name,
+      batchPayload.source_relative_path
     ]
   );
   const stagingBatchId = result.insertId;
@@ -1571,6 +1761,10 @@ async function upsertStagingBatchFromFile(connection, filePath, importOptions = 
     detail_count: batchPayload.items.length,
     counterfeit_count: batchPayload.counterfeit_count,
     source_json_file: batchPayload.source_json_file,
+    source_file_name: batchPayload.source_file_name,
+    source_relative_path: batchPayload.source_relative_path,
+    imported_by_username: batchPayload.imported_by_username,
+    imported_at: batchPayload.imported_at,
     source_detail_url: batchPayload.source_detail_url,
     product_type: batchPayload.product_type,
     announcement_type: batchPayload.announcement_type,
@@ -1581,6 +1775,22 @@ async function upsertStagingBatchFromFile(connection, filePath, importOptions = 
     needs_manual_review: needsManualReview,
     attachment_validation: batchPayload.attachment_validation
   };
+}
+
+async function upsertStagingBatchFromFile(connection, filePath, importOptions = {}) {
+  const absoluteFilePath = path.resolve(filePath);
+  const fileContent = fs.readFileSync(absoluteFilePath, 'utf-8');
+  const payload = JSON.parse(fileContent);
+  return upsertStagingBatchFromJsonPayload(connection, absoluteFilePath, payload, {
+    ...importOptions,
+    sourceFileName: importOptions.sourceFileName || path.basename(absoluteFilePath),
+    sourceRelativePath: importOptions.sourceRelativePath || path.basename(absoluteFilePath),
+    auditContext: {
+      imported_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      import_source: 'server_directory',
+      ...(importOptions.auditContext || {})
+    }
+  });
 }
 
 
@@ -1693,6 +1903,120 @@ async function importStagingFromJsonDirectory(connection, directoryPath = DEFAUL
   };
 }
 
+async function importStagingFromUploadedFiles(connection, files = [], importOptions = {}, auditContext = {}) {
+  await ensureAnnouncementStagingSchema(connection);
+
+  const normalizedFiles = Array.isArray(files) ? files : [];
+  const processedItems = [];
+  const importErrors = [];
+  const importedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+  for (const file of normalizedFiles) {
+    const fileName = normalizeNullableText(file.originalname) || 'unknown.json';
+    const relativePath = normalizeNullableText(file.relativePath) || fileName;
+    const sourceIdentifier = buildUploadSourceIdentifier(relativePath, fileName);
+    const fileOptions = {
+      ...importOptions,
+      sourceFileName: fileName,
+      sourceRelativePath: relativePath,
+      auditContext: {
+        ...auditContext,
+        imported_at: importedAt,
+        import_source: 'upload'
+      }
+    };
+
+    await connection.beginTransaction();
+    try {
+      const payload = JSON.parse(Buffer.isBuffer(file.buffer) ? file.buffer.toString('utf-8') : String(file.content || ''));
+      const result = await upsertStagingBatchFromJsonPayload(connection, sourceIdentifier, payload, fileOptions);
+      await connection.commit();
+
+      processedItems.push({
+        ...result,
+        source_json_name: fileName,
+        source_deleted: false,
+        delete_message: null
+      });
+    } catch (error) {
+      await connection.rollback();
+      const message = `${relativePath} 导入失败：${error.message}`;
+      let tracebackId = null;
+      const tracebackPayload = {
+        ...buildAuditPayload(fileOptions),
+        source_json_file: sourceIdentifier,
+        source_detail_url: null,
+        source_page: null,
+        title: path.basename(fileName, path.extname(fileName)) || fileName,
+        announcement_no: null,
+        product_type: normalizeProductType(importOptions.product_type),
+        announcement_type: normalizeAnnouncementType(importOptions.announcement_type),
+        raw_payload: null,
+        attachment_count: 0,
+        parsed_detail_count: 0
+      };
+
+      try {
+        tracebackId = await upsertAnnouncementTraceback(connection, {
+          trace_type: 'import_failed',
+          batchPayload: tracebackPayload,
+          reason: message
+        });
+      } catch (tracebackError) {
+        console.error('写入上传导入异常倒溯记录失败:', tracebackError);
+      }
+
+      importErrors.push({
+        file_name: fileName,
+        relative_path: relativePath,
+        message,
+        traceback_id: tracebackId
+      });
+      processedItems.push({
+        id: null,
+        action: 'failed',
+        skipped: true,
+        title: tracebackPayload.title,
+        source_json_file: sourceIdentifier,
+        source_json_name: fileName,
+        source_file_name: fileName,
+        source_relative_path: relativePath,
+        source_detail_url: null,
+        product_type: tracebackPayload.product_type,
+        announcement_type: tracebackPayload.announcement_type,
+        warning_message: message,
+        traceback_id: tracebackId,
+        source_deleted: false,
+        delete_message: null
+      });
+    }
+  }
+
+  const createdItems = processedItems.filter((item) => item.action === 'created');
+  const duplicateItems = processedItems.filter((item) => item.action === 'skipped_duplicate');
+  const parseWarningItems = createdItems.filter((item) => item.needs_manual_review);
+
+  return {
+    source_dir: 'browser_upload',
+    total_files: normalizedFiles.length,
+    processed_count: processedItems.length,
+    imported_count: createdItems.length,
+    created_count: createdItems.length,
+    updated_count: 0,
+    duplicate_count: duplicateItems.length,
+    parse_warning_count: parseWarningItems.length,
+    parse_failed_count: parseWarningItems.length,
+    skipped_count: duplicateItems.length,
+    error_count: importErrors.length,
+    deleted_count: 0,
+    delete_failed_count: 0,
+    delete_failures: [],
+    errors: importErrors,
+    remaining_json_count: 0,
+    items: processedItems
+  };
+}
+
 
 
 
@@ -1785,7 +2109,8 @@ async function getAnnouncementStagingOverview(connection, directoryPath = DEFAUL
       SUM(CASE WHEN trace_type = 'duplicate' THEN 1 ELSE 0 END) AS duplicate_traceback_count,
       SUM(CASE WHEN trace_type = 'parse_failed' THEN 1 ELSE 0 END) AS parse_failed_traceback_count,
       SUM(CASE WHEN trace_type = 'import_failed' THEN 1 ELSE 0 END) AS import_failed_traceback_count,
-      SUM(CASE WHEN trace_type = 'published_incorrect' THEN 1 ELSE 0 END) AS published_incorrect_traceback_count
+      SUM(CASE WHEN trace_type = 'published_incorrect' THEN 1 ELSE 0 END) AS published_incorrect_traceback_count,
+      SUM(CASE WHEN trace_type = 'manual_reject' THEN 1 ELSE 0 END) AS manual_reject_traceback_count
     FROM announcement_staging_tracebacks
   `);
 
@@ -1825,6 +2150,8 @@ async function getAnnouncementStagingOverview(connection, directoryPath = DEFAUL
     duplicate_traceback_count: Number(tracebackRow.duplicate_traceback_count || 0),
     parse_failed_traceback_count: Number(tracebackRow.parse_failed_traceback_count || 0),
     import_failed_traceback_count: Number(tracebackRow.import_failed_traceback_count || 0),
+    published_incorrect_traceback_count: Number(tracebackRow.published_incorrect_traceback_count || 0),
+    manual_reject_traceback_count: Number(tracebackRow.manual_reject_traceback_count || 0),
     import_progress_percent: calculateProgressPercent(stagingBatchCount, importTotalCount),
 
     publish_progress_percent: calculateProgressPercent(confirmedBatchCount, stagingBatchCount),
@@ -2859,6 +3186,49 @@ async function movePublishedAnnouncementStagingBatchToTraceback(connection, stag
   };
 }
 
+async function movePendingAnnouncementStagingBatchToTraceback(connection, stagingBatchId, reason = '') {
+  await ensureAnnouncementStagingSchema(connection);
+
+  const detail = await getAnnouncementStagingDetail(connection, stagingBatchId);
+  if (!detail) {
+    throw new Error('待确认批次不存在');
+  }
+
+  const batch = detail.batch || {};
+  if (batch.status !== 'pending') {
+    throw new Error('仅待确认的批次可通过核验打回进入倒溯处理');
+  }
+
+  const typeInfo = getBatchTypeInfo(batch, parseJsonSafely(batch.raw_payload, {}));
+  const normalizedReason = normalizeText(reason) || '人工核验未通过，已退回倒溯处理';
+
+  const tracebackId = await upsertAnnouncementTraceback(connection, {
+    trace_type: 'manual_reject',
+    batchPayload: {
+      ...batch,
+      product_type: typeInfo.product_type,
+      announcement_type: typeInfo.announcement_type,
+      parsed_detail_count: Number(detail.summary?.detail_count || batch.parsed_detail_count || 0),
+      attachment_count: Number(detail.summary?.attachment_count || batch.attachment_count || 0),
+      attachment_preview: detail.attachments || [],
+      attachment_validation: detail.parse_validation || null
+    },
+    reason: normalizedReason,
+    existing_batch_id: Number(batch.id),
+    existing_announcement_id: null,
+    existing_supervision_id: null
+  });
+
+  const deleteResult = await deleteAnnouncementStagingBatch(connection, stagingBatchId);
+
+  return {
+    ...deleteResult,
+    traceback_id: Number(tracebackId),
+    traceback_reason: normalizedReason,
+    traceback_type: 'manual_reject'
+  };
+}
+
 module.exports = {
 
 
@@ -2867,6 +3237,7 @@ module.exports = {
   DEFAULT_WORKSPACE_CACHE_KEY,
   ensureAnnouncementStagingSchema,
   importStagingFromJsonDirectory,
+  importStagingFromUploadedFiles,
   getAnnouncementStagingOverview,
   getAnnouncementStagingDetail,
   publishAnnouncementStagingBatch,
@@ -2876,6 +3247,7 @@ module.exports = {
   updateAnnouncementStagingProductType,
 
   movePublishedAnnouncementStagingBatchToTraceback,
+  movePendingAnnouncementStagingBatchToTraceback,
 
   listAnnouncementStagingTracebacks,
 

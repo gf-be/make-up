@@ -51,9 +51,20 @@ const routes = [
   },
   {
     path: '/announcement-tracebacks',
-    name: 'AnnouncementTracebacks',
-    component: () => import('../views/AnnouncementTracebacks.vue'),
-    meta: { module: 'announcement-tracebacks' }
+    redirect: (to) => {
+      const query = { ...to.query };
+      delete query.path;
+      const legacyId = query.id;
+      delete query.id;
+      query.view = 'traceback';
+      if (legacyId && !query.tracebackId) {
+        query.tracebackId = String(Array.isArray(legacyId) ? legacyId[0] : legacyId);
+      }
+      return {
+        path: '/announcement-staging',
+        query
+      };
+    }
   },
   {
     path: '/announcements/:id',

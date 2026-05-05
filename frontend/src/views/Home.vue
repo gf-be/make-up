@@ -105,7 +105,6 @@ const MODULE_LABELS = {
   'pivot-analysis': '数据矩阵',
   'sampling-search': '数据检索',
   'announcement-staging': '导入检查',
-  'announcement-tracebacks': '倒溯处理',
   announcements: '抽检通告',
   inspections: '抽样检查',
   companies: '企业管理',
