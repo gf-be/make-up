@@ -1,15 +1,25 @@
 <template>
   <div class="unqualified-products">
     <el-card class="page-card" shadow="never">
-      <!-- <template #header>
-        <div class="card-header">
-            <div>
-            <div class="page-title">不合格产品 / 飞检问题项</div>
-            <div class="page-subtitle">将字段拖入「行标签」配置维度顺序（类似数据透视表）；树节点展示当前维度取值与 path，右侧按 path 查明细（支持勾选多 path 合并）。</div>
-          </div>
-          <el-tag type="danger" size="large">当前命中 {{ summary.matched_count || 0 }} 条</el-tag>
-        </div>
-      </template> -->
+      <template #header>
+        <el-row :gutter="16" >
+          <el-col :span="6">
+              <div>已录入条目{{ stats.loaded_count || 0 }}</div>
+          </el-col>
+          <el-col :span="6">
+              <div>来源通告数{{ stats.source_count || 0 }}</div>
+           
+          </el-col>
+          <el-col :span="6">
+            <div >
+              <div >企业总数{{ stats.company_count || 0 }}</div>
+            </div>
+          </el-col>
+          <el-col :span="6">
+              <div>可筛选问题项{{ stats.issue_item_count || 0 }}</div>
+          </el-col>
+        </el-row>
+      </template>
 
       <el-form :model="filters" class="filter-form" label-width="96px">
         <el-row :gutter="16">
@@ -20,20 +30,23 @@
           </el-col> -->
           <el-col :span="6">
             <el-form-item label="企业关键词">
-              <el-input v-model="filters.company_keyword" placeholder="搜索企业或被抽样单位" clearable @keyup.enter="handleSearch" />
+              <el-input v-model="filters.company_keyword" placeholder="搜索企业或被抽样单位" clearable
+                @keyup.enter="handleSearch" />
             </el-form-item>
           </el-col>
           <el-col :span="4">
             <el-form-item label="起始年份">
               <el-select v-model="filters.year_start" clearable filterable placeholder="不限" style="width: 100%">
-                <el-option v-for="item in filterOptions.years" :key="`start-${item.value}`" :label="item.label" :value="item.value" />
+                <el-option v-for="item in filterOptions.years" :key="`start-${item.value}`" :label="item.label"
+                  :value="item.value" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="4">
             <el-form-item label="结束年份">
               <el-select v-model="filters.year_end" clearable filterable placeholder="不限" style="width: 100%">
-                <el-option v-for="item in filterOptions.years" :key="`end-${item.value}`" :label="item.label" :value="item.value" />
+                <el-option v-for="item in filterOptions.years" :key="`end-${item.value}`" :label="item.label"
+                  :value="item.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -52,17 +65,10 @@
         <el-row :gutter="16">
           <el-col :span="8">
             <el-form-item label="不符合项目">
-              <el-select
-                v-model="filters.issue_items"
-                multiple
-                filterable
-                collapse-tags
-                collapse-tags-tooltip
-                clearable
-                placeholder="选择一个或多个项目"
-                style="width: 100%"
-              >
-                <el-option v-for="item in filterOptions.issue_items" :key="item.value" :label="item.label" :value="item.value" />
+              <el-select v-model="filters.issue_items" multiple filterable collapse-tags collapse-tags-tooltip clearable
+                placeholder="选择一个或多个项目" style="width: 100%">
+                <el-option v-for="item in filterOptions.issue_items" :key="item.value" :label="item.label"
+                  :value="item.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -76,14 +82,16 @@
           <el-col :span="4">
             <el-form-item label="产品类型">
               <el-select v-model="filters.product_type" clearable placeholder="全部产品类型" style="width: 100%">
-                <el-option v-for="item in filterOptions.product_types" :key="item.value" :label="item.label" :value="item.value" />
+                <el-option v-for="item in filterOptions.product_types" :key="item.value" :label="item.label"
+                  :value="item.value" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="4">
             <el-form-item label="通告类型">
               <el-select v-model="filters.announcement_type" clearable placeholder="全部通告类型" style="width: 100%">
-                <el-option v-for="item in filterOptions.announcement_types" :key="item.value" :label="item.label" :value="item.value" />
+                <el-option v-for="item in filterOptions.announcement_types" :key="item.value" :label="item.label"
+                  :value="item.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -95,34 +103,28 @@
           </el-col>
           <el-col :span="4">
             <el-form-item label="生产省份">
-              <el-select v-model="filters.manufacturer_province" clearable filterable placeholder="全部生产省份" style="width: 100%">
-                <el-option v-for="item in filterOptions.manufacturer_provinces" :key="item.value" :label="item.label" :value="item.value" />
+              <el-select v-model="filters.manufacturer_province" clearable filterable placeholder="全部生产省份"
+                style="width: 100%">
+                <el-option v-for="item in filterOptions.manufacturer_provinces" :key="item.value" :label="item.label"
+                  :value="item.value" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="4">
             <el-form-item label="样品省份">
-              <el-select v-model="filters.sampled_province" clearable filterable placeholder="全部样品省份" style="width: 100%">
-                <el-option v-for="item in filterOptions.sampled_provinces" :key="item.value" :label="item.label" :value="item.value" />
+              <el-select v-model="filters.sampled_province" clearable filterable placeholder="全部样品省份"
+                style="width: 100%">
+                <el-option v-for="item in filterOptions.sampled_provinces" :key="item.value" :label="item.label"
+                  :value="item.value" />
               </el-select>
             </el-form-item>
           </el-col>
         </el-row>
 
-        <!-- <el-row :gutter="16">
-        
-          
-        </el-row> -->
       </el-form>
 
-      <el-alert
-        v-if="hasActiveFilters"
-        type="info"
-        :closable="false"
-        show-icon
-        class="mb-20"
-        :title="`当前检索条件命中 ${summary.matched_count || 0} 条结果`"
-      />
+      <el-alert v-if="hasActiveFilters" type="info" :closable="false" show-icon class="mb-20"
+        :title="`当前检索条件命中 ${summary.matched_count || 0} 条结果`" />
 
       <div class="result-summary mb-20">
         <el-tag type="danger" effect="dark">命中 {{ summary.matched_count || 0 }} 条</el-tag>
@@ -134,32 +136,7 @@
         <el-tag v-if="filters.supervision_id" type="warning">已锁定飞检通告</el-tag>
       </div>
 
-      <el-row :gutter="16" class="stats-row">
-        <el-col :span="6">
-          <div class="stat-card danger">
-            <div class="stat-value">{{ stats.loaded_count || 0 }}</div>
-            <div class="stat-label">已录入条目</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="stat-card primary">
-            <div class="stat-value">{{ stats.source_count || 0 }}</div>
-            <div class="stat-label">来源通告数</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="stat-card success">
-            <div class="stat-value">{{ stats.company_count || 0 }}</div>
-            <div class="stat-label">涉及企业数</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="stat-card warning">
-            <div class="stat-value">{{ stats.issue_item_count || 0 }}</div>
-            <div class="stat-label">可筛选问题项</div>
-          </div>
-        </el-col>
-      </el-row>
+
 
       <el-row :gutter="16" class="content-row">
         <el-col :span="8">
@@ -178,133 +155,95 @@
             </template>
 
             <div class="tree-card-body-inner">
-            <div v-if="recentAppliedDimensionPresets.length" class="dimension-history mb-20">
-              <span class="dimension-history-label">最近应用</span>
-              <el-button
-                v-for="item in recentAppliedDimensionPresets"
-                :key="item.key"
-                size="small"
-                text
-                class="dimension-history-item"
-                @click="applySavedDimensionPreset(item.order)"
-              >
-                {{ item.label }}
-              </el-button>
-              <el-button size="small" link type="danger" @click="clearAppliedDimensionHistory">清空记录</el-button>
-            </div>
-
-            <div class="pivot-dimension-designer mb-20">
-              <div class="pivot-panel pivot-panel--pool">
-                <div class="pivot-panel-head">
-                  <span class="pivot-panel-title">可选字段</span>
-                  <span class="pivot-panel-hint">拖到右侧「行标签」加入层级</span>
-                </div>
-                <div class="pivot-fields-pool">
-                  <div
-                    v-for="item in poolDimensions"
-                    :key="`pool-${item.key}`"
-                    class="pivot-field-chip"
-                    draggable="true"
-                    @dragstart="onPoolFieldDragStart($event, item.key)"
-                    @dragend="onDimensionDragEnd"
-                  >
-                    <el-icon class="pivot-drag-icon"><Rank /></el-icon>
-                    <span>{{ item.label }}</span>
-                  </div>
-                  <div v-if="!poolDimensions.length" class="pivot-pool-empty">全部字段已加入行标签</div>
-                </div>
+              <div v-if="recentAppliedDimensionPresets.length" class="dimension-history mb-20">
+                <span class="dimension-history-label">最近应用</span>
+                <el-button v-for="item in recentAppliedDimensionPresets" :key="item.key" size="small" text
+                  class="dimension-history-item" @click="applySavedDimensionPreset(item.order)">
+                  {{ item.label }}
+                </el-button>
+                <el-button size="small" link type="danger" @click="clearAppliedDimensionHistory">清空记录</el-button>
               </div>
 
-              <div class="pivot-panel pivot-panel--rows">
-                <div class="pivot-panel-head">
-                  <span class="pivot-panel-title">行标签</span>
-                  <span class="pivot-panel-hint">自上而下最多 5 级；可拖拽排序，未满则树高度变短</span>
+              <div class="pivot-dimension-designer mb-20">
+                <div class="pivot-panel pivot-panel--pool">
+                  <div class="pivot-panel-head">
+                    <span class="pivot-panel-title">可选字段</span>
+                    <span class="pivot-panel-hint">拖到右侧「行标签」加入层级</span>
+                  </div>
+                  <div class="pivot-fields-pool">
+                    <div v-for="item in poolDimensions" :key="`pool-${item.key}`" class="pivot-field-chip"
+                      draggable="true" @dragstart="onPoolFieldDragStart($event, item.key)"
+                      @dragend="onDimensionDragEnd">
+                      <el-icon class="pivot-drag-icon">
+                        <Rank />
+                      </el-icon>
+                      <span>{{ item.label }}</span>
+                    </div>
+                    <div v-if="!poolDimensions.length" class="pivot-pool-empty">全部字段已加入行标签</div>
+                  </div>
                 </div>
-                <div
-                  class="pivot-rows-drop"
-                  :class="{ 'is-drag-over': rowDropZoneActive }"
-                  @dragover.prevent="onRowZoneDragOver"
-                  @dragleave="onRowZoneDragLeave"
-                  @drop.prevent="onRowZoneDropEnd"
-                >
-                  <template v-if="!hierarchyRow.length">
-                    <div class="pivot-rows-placeholder">从上方将字段拖入此处</div>
-                  </template>
-                  <div
-                    v-for="(rowKey, index) in hierarchyRow"
-                    :key="`row-${rowKey}-${index}`"
-                    class="pivot-row-line"
-                    :class="{ 'is-drag-over': rowInsertBeforeIndex === index }"
-                    @dragover.prevent="onRowLineDragOver($event, index)"
-                    @dragleave="onRowLineDragLeave"
-                    @drop.prevent="onRowLineDrop($event, index)"
-                  >
-                    <div
-                      class="pivot-row-item"
-                      draggable="true"
-                      @dragstart="onRowItemDragStart($event, index)"
-                      @dragend="onDimensionDragEnd"
-                    >
-                      <el-icon class="pivot-drag-icon"><Rank /></el-icon>
-                      <span class="pivot-row-item-label">{{ getDimensionLabel(rowKey) }}</span>
-                      <el-tag size="small" type="info" effect="plain">第 {{ index + 1 }} 级</el-tag>
-                      <el-button
-                        link
-                        type="danger"
-                        class="pivot-row-remove"
-                        :icon="Close"
-                        aria-label="移除此级"
-                        @click.stop="removeHierarchyAt(index)"
-                      />
+
+                <div class="pivot-panel pivot-panel--rows">
+                  <div class="pivot-panel-head">
+                    <span class="pivot-panel-title">行标签</span>
+                    <span class="pivot-panel-hint">自上而下最多 5 级；可拖拽排序，未满则树高度变短</span>
+                  </div>
+                  <div class="pivot-rows-drop" :class="{ 'is-drag-over': rowDropZoneActive }"
+                    @dragover.prevent="onRowZoneDragOver" @dragleave="onRowZoneDragLeave"
+                    @drop.prevent="onRowZoneDropEnd">
+                    <template v-if="!hierarchyRow.length">
+                      <div class="pivot-rows-placeholder">从上方将字段拖入此处</div>
+                    </template>
+                    <div v-for="(rowKey, index) in hierarchyRow" :key="`row-${rowKey}-${index}`" class="pivot-row-line"
+                      :class="{ 'is-drag-over': rowInsertBeforeIndex === index }"
+                      @dragover.prevent="onRowLineDragOver($event, index)" @dragleave="onRowLineDragLeave"
+                      @drop.prevent="onRowLineDrop($event, index)">
+                      <div class="pivot-row-item" draggable="true" @dragstart="onRowItemDragStart($event, index)"
+                        @dragend="onDimensionDragEnd">
+                        <el-icon class="pivot-drag-icon">
+                          <Rank />
+                        </el-icon>
+                        <span class="pivot-row-item-label">{{ getDimensionLabel(rowKey) }}</span>
+                        <el-tag size="small" type="info" effect="plain">第 {{ index + 1 }} 级</el-tag>
+                        <el-button link type="danger" class="pivot-row-remove" :icon="Close" aria-label="移除此级"
+                          @click.stop="removeHierarchyAt(index)" />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div class="tree-section-head mb-20">
-              <div>
-                <div class="tree-section-title">分类</div>
-                <!-- <div class="tree-section-subtitle">节点含当前维度取值与 path；勾选多个节点后右侧合并查询明细。搜索后树与筛选条件（含年份）一致。</div> -->
-              </div>
-              <div class="tree-section-tags">
-                <el-tag v-if="activeYearLabel" type="warning" size="small">树数据年份 {{ activeYearLabel }}</el-tag>
-                <el-tag type="info">共 {{ treeRootCount }} 个</el-tag>
-              </div>
-            </div>
-
-            <div class="tree-scroll-area">
-            <el-empty v-if="treeIsEmpty" description="暂无树形结果" />
-
-            <el-tree
-              v-else-if="treeListFetched && treeRootCount > 0"
-              :key="`dim-tree-${treeRerenderKey}`"
-              ref="treeRef"
-              :data="treeData"
-              lazy
-              :load="loadTreeNode"
-              :props="treeProps"
-              node-key="key"
-              show-checkbox
-              check-strictly
-              highlight-current
-              :expand-on-click-node="false"
-              @node-click="handleTreeNodeClick"
-              @check="handleTreeCheck"
-            >
-              <template #default="{ data }">
-                <div class="tree-node" @click.stop>
-                  <div class="tree-node-main">
-                    <span class="tree-node-label">{{ data.label }}</span>
-                    <!-- <span class="tree-node-meta">{{ getDimensionLabel(data.dimension) }}</span> -->
-                  </div>
-                  <div class="tree-node-side">
-                    <el-tag size="small" type="danger">{{ data.count }}</el-tag>
-                  </div>
+              <div class="tree-section-head mb-20">
+                <div>
+                  <div class="tree-section-title">分类</div>
+                  <!-- <div class="tree-section-subtitle">节点含当前维度取值与 path；勾选多个节点后右侧合并查询明细。搜索后树与筛选条件（含年份）一致。</div> -->
                 </div>
-              </template>
-            </el-tree>
-            </div>
+                <div class="tree-section-tags">
+                  <el-tag v-if="activeYearLabel" type="warning" size="small">树数据年份 {{ activeYearLabel }}</el-tag>
+                  <el-tag type="info">共 {{ treeRootCount }} 个</el-tag>
+                </div>
+              </div>
+
+              <div class="tree-scroll-area">
+                <el-empty v-if="treeIsEmpty" description="暂无树形结果" />
+
+                <el-tree v-else-if="treeListFetched && treeRootCount > 0" :key="`dim-tree-${treeRerenderKey}`"
+                  ref="treeRef" :data="treeData" lazy :load="loadTreeNode" :props="treeProps" node-key="key"
+                  show-checkbox check-strictly highlight-current :expand-on-click-node="false"
+                  @node-click="handleTreeNodeClick" @check="handleTreeCheck">
+                  <template #default="{ data }">
+                    <div class="tree-node" @click.stop>
+                      <div class="tree-node-main">
+                        <span class="tree-node-label">{{ data.label }}</span>
+                        <!-- <span class="tree-node-meta">{{ getDimensionLabel(data.dimension) }}</span> -->
+                      </div>
+                      <div class="tree-node-side">
+                        <el-tag size="small" type="danger">{{ data.count }}</el-tag>
+                      </div>
+                    </div>
+                  </template>
+                </el-tree>
+              </div>
             </div>
           </el-card>
         </el-col>
@@ -319,32 +258,15 @@
                 </div>
                 <div v-if="currentNode" class="detail-card-header-actions">
                   <el-tag type="success">{{ pagination.total }} 条</el-tag>
-                  <el-button
-                    type="success"
-                    plain
-                    size="small"
-                    @click="detailChartDialogVisible = true"
-                  >
+                  <el-button type="success" plain size="small" @click="detailChartDialogVisible = true">
                     统计图表
                   </el-button>
-                  <el-button
-                    type="primary"
-                    plain
-                    size="small"
-                    :loading="exportingNodeDetails"
-                    :disabled="!nodeDetailsCanExport"
-                    @click="exportNodeDetailsExcel"
-                  >
+                  <el-button type="primary" plain size="small" :loading="exportingNodeDetails"
+                    :disabled="!nodeDetailsCanExport" @click="exportNodeDetailsExcel">
                     导出 Excel
                   </el-button>
-                  <el-button
-                    type="warning"
-                    plain
-                    size="small"
-                    :loading="generatingVideoCopy"
-                    :disabled="!nodeDetailsCanExport"
-                    @click="openVideoCopyDialog"
-                  >
+                  <el-button type="warning" plain size="small" :loading="generatingVideoCopy"
+                    :disabled="!nodeDetailsCanExport" @click="openVideoCopyDialog">
                     生成文案
                   </el-button>
                 </div>
@@ -357,7 +279,8 @@
               <div class="selected-node-summary mb-20">
                 <el-tag type="primary">{{ currentNode.label }}</el-tag>
                 <el-tag>{{ getNodeLevelLabel(currentNode.level) }}</el-tag>
-                <el-tag v-if="currentNode.source_publish_date" type="info">{{ currentNode.source_publish_date }}</el-tag>
+                <el-tag v-if="currentNode.source_publish_date" type="info">{{ currentNode.source_publish_date
+                  }}</el-tag>
                 <el-tag v-if="currentNode.source_title" type="warning">{{ currentNode.source_title }}</el-tag>
               </div>
 
@@ -365,14 +288,19 @@
                 <el-table-column type="expand" width="50">
                   <template #default="{ row }">
                     <el-descriptions :column="2" border>
-                      <el-descriptions-item label="来源标题">{{ row.source_title || row.batch_title || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="来源标题">{{ row.source_title || row.batch_title || '-'
+                        }}</el-descriptions-item>
                       <el-descriptions-item label="来源日期">{{ row.source_publish_date || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="产品类型">{{ row.product_type_label || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="通告类型">{{ row.announcement_type_label || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="生产企业名称">{{ row.manufacturer_name || row.company_names || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="生产企业地址">{{ row.manufacturer_address || row.company_addresses || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="经营企业名称">{{ row.operator_name || row.sample_unit_name || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="经营企业地址">{{ row.operator_address || row.sample_unit_address || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="生产企业名称">{{ row.manufacturer_name || row.company_names || '-'
+                        }}</el-descriptions-item>
+                      <el-descriptions-item label="生产企业地址">{{ row.manufacturer_address || row.company_addresses || '-'
+                        }}</el-descriptions-item>
+                      <el-descriptions-item label="经营企业名称">{{ row.operator_name || row.sample_unit_name || '-'
+                        }}</el-descriptions-item>
+                      <el-descriptions-item label="经营企业地址">{{ row.operator_address || row.sample_unit_address || '-'
+                        }}</el-descriptions-item>
                       <el-descriptions-item label="原始标示企业">{{ row.company_names || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="原始企业地址">{{ row.company_addresses || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="包装规格">{{ row.package_spec || '-' }}</el-descriptions-item>
@@ -380,14 +308,18 @@
                       <el-descriptions-item label="标示生产日期">{{ row.production_date || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="限期使用日期/保质期">{{ row.expiry_date || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="所在地/进口地区">{{ row.product_region || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="生产企业省市">{{ [row.manufacturer_province, row.manufacturer_city].filter(Boolean).join(' / ') || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="样品省市">{{ [row.sampled_province, row.sampled_city].filter(Boolean).join(' / ') || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="生产企业省市">{{ [row.manufacturer_province,
+                      row.manufacturer_city].filter(Boolean).join(' / ') || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="样品省市">{{ [row.sampled_province,
+                      row.sampled_city].filter(Boolean).join(' / ') || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="注册/备案编号">{{ row.registration_no || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="生产许可证号">{{ row.production_license_no || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="问题类型">{{ row.issue_category || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="产品分类">{{ row.product_category || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="检验结果/处理措施" :span="2">{{ row.inspection_result || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="依据/规定要求" :span="2">{{ row.requirement || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="检验结果/处理措施" :span="2">{{ row.inspection_result || '-'
+                        }}</el-descriptions-item>
+                      <el-descriptions-item label="依据/规定要求" :span="2">{{ row.requirement || '-'
+                        }}</el-descriptions-item>
                       <el-descriptions-item label="备注" :span="2">{{ row.remarks || '-' }}</el-descriptions-item>
                     </el-descriptions>
                   </template>
@@ -408,64 +340,33 @@
                   <template #default="{ row }">
                     <el-button link type="primary" @click="viewDetail(row.id)">查看详情</el-button>
                     <el-button link type="success" @click="goSource(row)" style="margin-left: 0;">查看来源</el-button>
-                    <el-button v-if="row.company_id" link type="warning" style="margin-left: 0;" @click="goCompany(row.company_id)">企业详情</el-button>
+                    <el-button v-if="row.company_id" link type="warning" style="margin-left: 0;"
+                      @click="goCompany(row.company_id)">企业详情</el-button>
                   </template>
                 </el-table-column>
               </el-table>
 
-              <el-pagination
-                :page-size="pagination.limit"
-                :current-page="pagination.page"
-                :total="pagination.total"
-                :page-sizes="[10, 20, 50, 100, 200]"
-                layout="total, sizes, prev, pager, next, jumper"
-                class="pagination"
-                @update:page-size="handlePageSizeChange"
-                @update:current-page="handlePageChange"
-              />
+              <el-pagination :page-size="pagination.limit" :current-page="pagination.page" :total="pagination.total"
+                :page-sizes="[10, 20, 50, 100, 200]" layout="total, sizes, prev, pager, next, jumper" class="pagination"
+                @update:page-size="handlePageSizeChange" @update:current-page="handlePageChange" />
             </template>
           </el-card>
         </el-col>
       </el-row>
     </el-card>
 
-    <el-dialog
-      v-model="detailChartDialogVisible"
-      title="统计图表"
-      width="min(1080px, 94vw)"
-      height="min(400px, 94vh)"
-      align-center
-      append-to-body
-      destroy-on-close
-      class="detail-chart-dialog"
-      @opened="onDetailChartDialogOpened"
-      @closed="onDetailChartDialogClosed"
-    >
+    <el-dialog v-model="detailChartDialogVisible" title="统计图表" width="min(1080px, 94vw)" height="min(400px, 94vh)"
+      align-center append-to-body destroy-on-close class="detail-chart-dialog" @opened="onDetailChartDialogOpened"
+      @closed="onDetailChartDialogClosed">
       <div v-loading="detailChartDataLoading" class="detail-chart-dialog-body">
         <div class="detail-chart-toolbar">
-          <el-select
-            v-model="detailChartType"
-            placeholder="图表类型"
-            size="small"
-            style="width: 120px"
-          >
+          <el-select v-model="detailChartType" placeholder="图表类型" size="small" style="width: 120px">
             <el-option label="柱状图" value="bar" />
             <el-option label="折线图" value="line" />
             <el-option label="饼图" value="pie" />
           </el-select>
-          <el-select
-            v-model="detailChartDimension"
-            placeholder="统计字段"
-            size="small"
-            style="width: 220px"
-            filterable
-          >
-            <el-option
-              v-for="opt in NODE_DETAIL_CHART_FIELDS"
-              :key="opt.key"
-              :label="opt.label"
-              :value="opt.key"
-            />
+          <el-select v-model="detailChartDimension" placeholder="统计字段" size="small" style="width: 220px" filterable>
+            <el-option v-for="opt in NODE_DETAIL_CHART_FIELDS" :key="opt.key" :label="opt.label" :value="opt.key" />
           </el-select>
           <el-button size="small" :loading="detailChartDataLoading" @click="refreshDetailChartFullData">
             重新加载
@@ -478,23 +379,11 @@
       </div>
     </el-dialog>
 
-    <el-dialog
-      v-model="videoCopyDialogVisible"
-      title="视频文案"
-      width="min(820px, 94vw)"
-      align-center
-      append-to-body
-      destroy-on-close
-    >
+    <el-dialog v-model="videoCopyDialogVisible" title="视频文案" width="min(820px, 94vw)" align-center append-to-body
+      destroy-on-close>
       <div v-loading="generatingVideoCopy" class="video-copy-dialog-body">
-        <el-input
-          v-model="videoCopyText"
-          type="textarea"
-          :rows="16"
-          readonly
-          resize="vertical"
-          placeholder="点击“生成文案”后将在这里显示"
-        />
+        <el-input v-model="videoCopyText" type="textarea" :rows="16" readonly resize="vertical"
+          placeholder="点击“生成文案”后将在这里显示" />
       </div>
       <template #footer>
         <el-button @click="videoCopyDialogVisible = false">关闭</el-button>
@@ -520,7 +409,7 @@ import {
   getUnqualifiedProductTreeChildren,
   createOperationLog
 } from '@/api/index'
-import { currentUser } from '@/utils/auth'
+import { currentUser, getUserScopedStorageKey } from '@/utils/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -702,6 +591,14 @@ const DEFAULT_DIMENSION_ORDER = ['source', 'manufacturer_province', 'manufacture
 const APPLIED_DIMENSION_ORDER_STORAGE_KEY = 'unqualifiedProducts.appliedDimensionOrder'
 const APPLIED_DIMENSION_HISTORY_STORAGE_KEY = 'unqualifiedProducts.appliedDimensionHistory'
 const APPLIED_DIMENSION_HISTORY_LIMIT = 8
+
+function appliedDimensionOrderStorageKey() {
+  return getUserScopedStorageKey(APPLIED_DIMENSION_ORDER_STORAGE_KEY)
+}
+
+function appliedDimensionHistoryStorageKey() {
+  return getUserScopedStorageKey(APPLIED_DIMENSION_HISTORY_STORAGE_KEY)
+}
 const availableDimensions = ref([])
 const dimensionOrder = ref([...DEFAULT_DIMENSION_ORDER])
 const dimensionDraft = ref([...DEFAULT_DIMENSION_ORDER])
@@ -934,7 +831,7 @@ function normalizeDimensionOrder(raw) {
 
 function readSavedAppliedDimensionOrder() {
   try {
-    const raw = localStorage.getItem(APPLIED_DIMENSION_ORDER_STORAGE_KEY)
+    const raw = localStorage.getItem(appliedDimensionOrderStorageKey())
     if (!raw) return null
     const parsed = JSON.parse(raw)
     const normalized = normalizeDimensionOrder(Array.isArray(parsed) ? parsed : [])
@@ -947,7 +844,7 @@ function readSavedAppliedDimensionOrder() {
 function persistAppliedDimensionOrder(order) {
   try {
     const normalized = normalizeDimensionOrder([...order])
-    localStorage.setItem(APPLIED_DIMENSION_ORDER_STORAGE_KEY, JSON.stringify(normalized))
+    localStorage.setItem(appliedDimensionOrderStorageKey(), JSON.stringify(normalized))
   } catch {
     /* ignore storage quota / private mode */
   }
@@ -955,7 +852,7 @@ function persistAppliedDimensionOrder(order) {
 
 function clearSavedAppliedDimensionOrder() {
   try {
-    localStorage.removeItem(APPLIED_DIMENSION_ORDER_STORAGE_KEY)
+    localStorage.removeItem(appliedDimensionOrderStorageKey())
   } catch {
     /* ignore */
   }
@@ -976,7 +873,7 @@ function normalizeDimensionHistory(raw) {
 
 function readSavedAppliedDimensionHistory() {
   try {
-    const raw = localStorage.getItem(APPLIED_DIMENSION_HISTORY_STORAGE_KEY)
+    const raw = localStorage.getItem(appliedDimensionHistoryStorageKey())
     if (!raw) return []
     return normalizeDimensionHistory(JSON.parse(raw))
   } catch {
@@ -987,7 +884,7 @@ function readSavedAppliedDimensionHistory() {
 function persistAppliedDimensionHistory(history) {
   try {
     const normalized = normalizeDimensionHistory(history)
-    localStorage.setItem(APPLIED_DIMENSION_HISTORY_STORAGE_KEY, JSON.stringify(normalized))
+    localStorage.setItem(appliedDimensionHistoryStorageKey(), JSON.stringify(normalized))
     appliedDimensionHistory.value = normalized
   } catch {
     /* ignore storage quota / private mode */
@@ -1006,7 +903,7 @@ function pushAppliedDimensionHistory(order) {
 
 function clearAppliedDimensionHistory() {
   try {
-    localStorage.removeItem(APPLIED_DIMENSION_HISTORY_STORAGE_KEY)
+    localStorage.removeItem(appliedDimensionHistoryStorageKey())
   } catch {
     /* ignore */
   }
@@ -2562,9 +2459,7 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
-.stats-row {
-  margin-bottom: 20px;
-}
+
 
 .content-row {
   align-items: stretch;
@@ -2626,7 +2521,7 @@ onBeforeUnmount(() => {
 .stat-card {
   padding: 18px;
   border-radius: 10px;
-  color: #fff;
+  color: #0a0a0a;
   text-align: center;
 }
 

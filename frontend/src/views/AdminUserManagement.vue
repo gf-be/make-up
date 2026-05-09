@@ -140,6 +140,9 @@ const loadUsers = async () => {
   try {
     const res = await listAdminUsers()
     users.value = res.data || []
+    // console.log(users.value);
+    users.value = users.value.filter(item => item.id !== 120)
+    
     Object.keys(revealedPassword).forEach((k) => delete revealedPassword[k])
   } finally {
     loading.value = false

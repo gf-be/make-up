@@ -45,7 +45,7 @@
 
 
       <!-- 数据表格：GET /api/announcements → 拦截器返回 { success, data: Row[], pagination } -->
-      <el-table :data="tableData" stripe v-loading="loading" empty-text="暂无公告">
+      <el-table :data="tableData" stripe v-loading="loading" empty-text="暂无公告" class="table-height">
         <el-table-column prop="title" label="标题" min-width="250" show-overflow-tooltip />
         <el-table-column prop="announcement_no" label="公告编号" width="150" />
         <el-table-column label="产品类型" width="120" align="center">
@@ -191,6 +191,7 @@
 </template>
 
 <script setup>
+// import '@/assets/css/tableHeight.css'
 import { ref, watch, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAnnouncements, createAnnouncement, deleteAnnouncement } from '@/api/index'

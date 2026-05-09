@@ -123,7 +123,6 @@
              
 
                 <el-form :model="filters" inline class="filter-form-batch">
-                
                   <el-form-item label="年份">
                     <el-select v-model="filters.year" clearable placeholder="全部" style="width: 120px"
                       @change="applyFilters">
@@ -144,14 +143,12 @@
                       <el-option label="已导入" value="confirmed" />
                     </el-select>
                   </el-form-item>
-                  <!-- <el-form-item label="关键词">
-                    <el-input v-model="filters.keyword" clearable placeholder="标题 / 编号 / 单位 / 网址" style="width: 200px"
-                      @keyup.enter="applyFilters" />
-                  </el-form-item> -->
-                  <el-form-item>
+               
+                  <el-form-item style="margin-bottom: 0px;">
                     <el-button type="primary" @click="applyFilters">检索</el-button>
                     <el-button @click="resetFilters">重置</el-button>
                     <el-button type="success" plain :disabled="!overview.pending_batch_count" :loading="bulkConfirming"
+                    style="margin: 12px 0px !important;"
                       @click="handleConfirmAll">
                       一键入库全部待确认（{{ overview.pending_batch_count || 0 }}）
                     </el-button>
@@ -159,9 +156,9 @@
                 </el-form>
 
                 <el-table class="batch-table" :data="batchListRows" row-key="id" :max-height="batchReviewTableMaxHeight"
-                  size="small" stripe
+                  size="small" stripe 
                   :row-class-name="batchRowClassName" @row-click="handleBatchRowClick">
-                  <el-table-column label="通告标题" min-width="260" show-overflow-tooltip>
+                  <el-table-column label="通告标题" min-width="210" show-overflow-tooltip>
                     <template #default="{ row }">{{ row.title || '（无标题）' }}</template>
                   </el-table-column>
                   <!-- <el-table-column prop="announcement_type_label" label="年号" width="90" align="center" /> -->
@@ -237,7 +234,7 @@
                         </div>
                       </div>
 
-                      <div v-if="currentBatchBodyText" class="content-scroll-panel">
+                      <div v-if="currentBatchBodyText" class="content-scroll-panel ">
                         <el-descriptions :column="2" border>
                           <el-descriptions-item label="列表期号展示">{{ getBatchPeriodLabel(currentBatch) || '-'
                           }}</el-descriptions-item>
@@ -2389,7 +2386,9 @@ onBeforeUnmount(() => {
   max-width: 1760px;
   margin: 0 auto;
 }
-
+.el-card__body{
+    padding: 16px!important;
+  }
 .page-card,
 .tree-panel,
 .traceback-panel,
@@ -2637,7 +2636,7 @@ onBeforeUnmount(() => {
 }
 
 .filter-form-batch {
-  margin-bottom: 12px;
+  /* margin-bottom: 12px; */
   padding: 10px 12px;
   background: #f7f9fc;
   border-radius: 12px;

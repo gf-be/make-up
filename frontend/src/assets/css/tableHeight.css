@@ -1,0 +1,24 @@
+/* 全局表格样式。勿在普通 .css 中使用 :deep() — 仅 Vue SFC 的 <style scoped> 会编译它，否则整条规则会被浏览器忽略。 */
+.table-height {
+  border: 1px solid #bdd0fb !important;
+  /* 外框蓝色实线 */
+}
+
+/* 表头：蓝色背景 + 白色文字 */
+.table-height .el-table__header th {
+  background-color: #9cb9f7 !important;
+  color: #ffffff !important;
+  border: 1px solid #c7d5f3 !important;
+  font-weight: 600 !important;
+}
+
+/* 单元格：白色背景 + 蓝色实线网格 */
+.table-height .el-table__body td {
+  border: 1px solid #dce6fc !important;
+  background-color: #ffffff !important;
+}
+
+/* 悬浮行（stripe 行背景用 .el-table__cell，需直接命中 td） */
+.table-height .el-table__body tr:hover > td {
+  background-color: #e6f0ff !important;
+}

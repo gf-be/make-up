@@ -41,7 +41,7 @@
       </el-form>
 
       
-      <el-table :data="tableData" stripe v-loading="loading">
+      <el-table :data="tableData" stripe v-loading="loading" class="table-height">
         <el-table-column prop="name" label="企业名称" min-width="200" show-overflow-tooltip />
         <!-- <el-table-column prop="brand" label="品牌" width="120" /> -->
         <el-table-column prop="sampled_count" label="抽查次数" width="100" align="center" />
@@ -183,7 +183,31 @@ onMounted(() => {
   max-width: 1400px;
   margin: 0 auto;
 }
+/* 全局表格最高优先级样式 */
+.table-height {
+    border: 1px solid #bdd0fb !important; /* 外框蓝色实线 */
+  }
+  
+  /* 表头：蓝色背景 + 白色文字 */
+  .table-height :deep(.el-table__header th) {
+    background-color: #9cb9f7 !important;
+    color: #ffffff !important;
+    border: 1px solid #c7d5f3 !important; /* 表头边框同色 */
+    font-weight: 600 !important;
+  }
+  
+  /* 单元格：白色背景 + 蓝色实线网格 */
+  .table-height :deep(.el-table__body td) {
+    border: 1px solid #dce6fc !important; /* 蓝色实线网格 */
+    background-color: #ffffff !important;
+  }
+  
+  /* 悬浮行效果 */
+  .table-height :deep(.el-table__row:hover td) {
+    background-color: #E6F0FF !important; /* 浅蓝悬浮背景 */
+  }
 
+ 
 .card-header {
   display: flex;
   justify-content: space-between;

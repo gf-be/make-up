@@ -18,10 +18,48 @@ export const MODULE_PERMISSIONS = {
 const AUTH_STORAGE_KEY = 'cosmetics_current_user'
 const TOKEN_STORAGE_KEY = 'cosmetics_auth_token'
 
-function readStoredUser() {
+/** 登录态用 sessionStorage：同站点下每个浏览器标签页独立会话，可多账号同时在线且互不影响。 */
+function authStorage() {
   try {
-    return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
-  } catch (error) {
+    return typeof sessionStorage !== 'undefined' ? sessionStorage : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 历史版本将 token 存在 localStorage（全标签页共享）。首次加载时若当前标签 session 为空则迁入并清空 localStorage，避免旧行为与多标签多用户冲突。
+ */
+function migrateLegacyAuthFromLocalStorage() {
+  try {
+    const ls = localStorage
+    const ss = authStorage()
+    if (!ss) return
+    const existingToken = ss.getItem(TOKEN_STORAGE_KEY)
+    const existingUser = ss.getItem(AUTH_STORAGE_KEY)
+    if (existingToken != null || existingUser != null) return
+
+    const token = ls.getItem(TOKEN_STORAGE_KEY)
+    const userJson = ls.getItem(AUTH_STORAGE_KEY)
+    if (token == null && userJson == null) return
+
+    if (token != null) ss.setItem(TOKEN_STORAGE_KEY, token)
+    if (userJson != null) ss.setItem(AUTH_STORAGE_KEY, userJson)
+    ls.removeItem(TOKEN_STORAGE_KEY)
+    ls.removeItem(AUTH_STORAGE_KEY)
+  } catch {
+    /* 隐私模式 / 禁用存储 */
+  }
+}
+
+migrateLegacyAuthFromLocalStorage()
+
+function readStoredUser() {
+  const ss = authStorage()
+  try {
+    if (!ss) return null
+    return JSON.parse(ss.getItem(AUTH_STORAGE_KEY) || 'null')
+  } catch {
     return null
   }
 }
@@ -29,19 +67,54 @@ function readStoredUser() {
 export const currentUser = ref(readStoredUser())
 
 export function getAuthToken() {
-  return localStorage.getItem(TOKEN_STORAGE_KEY) || ''
+  try {
+    return authStorage()?.getItem(TOKEN_STORAGE_KEY) || ''
+  } catch {
+    return ''
+  }
 }
 
 export function setAuthSession(token, user) {
-  localStorage.setItem(TOKEN_STORAGE_KEY, token || '')
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user || null))
+  const ss = authStorage()
+  try {
+    if (ss) {
+      ss.setItem(TOKEN_STORAGE_KEY, token || '')
+      ss.setItem(AUTH_STORAGE_KEY, JSON.stringify(user || null))
+    }
+  } catch {
+    /* ignore */
+  }
   currentUser.value = user || null
 }
 
 export function clearAuthSession() {
-  localStorage.removeItem(TOKEN_STORAGE_KEY)
-  localStorage.removeItem(AUTH_STORAGE_KEY)
+  try {
+    const ss = authStorage()
+    if (ss) {
+      ss.removeItem(TOKEN_STORAGE_KEY)
+      ss.removeItem(AUTH_STORAGE_KEY)
+    }
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
   currentUser.value = null
+}
+
+/**
+ * localStorage 中的业务偏好按用户隔离（同一浏览器先后登录不同账号时不串读）。
+ * @param {string} baseKey
+ * @param {object | null | undefined} user 默认当前登录用户
+ */
+export function getUserScopedStorageKey(baseKey, user = currentUser.value) {
+  if (user?.id != null && user.id !== '') {
+    return `${baseKey}::id:${user.id}`
+  }
+  if (user?.username) {
+    return `${baseKey}::u:${String(user.username)}`
+  }
+  return `${baseKey}::__guest__`
 }
 
 export function hasModuleAccess(moduleKey, user = currentUser.value) {

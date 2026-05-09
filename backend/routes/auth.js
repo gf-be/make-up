@@ -204,6 +204,22 @@ router.put('/me', authenticate, async (req, res) => {
     const fields = [];
 
     const values = [];
+    if (Object.prototype.hasOwnProperty.call(body, 'username')) {
+      const normalizedUsername = String(body.username || '').trim();
+      if (!/^[a-zA-Z0-9_]{3,30}$/.test(normalizedUsername)) {
+        return res.status(400).json({ success: false, message: '账号需为 3-30 位字母、数字或下划线' });
+      }
+      const [dupName] = await pool.query(
+        'SELECT id FROM users WHERE username = ? AND id <> ? LIMIT 1',
+        [normalizedUsername, req.user.id]
+      );
+      if (dupName[0]) {
+        return res.status(409).json({ success: false, message: '该账号已被使用' });
+      }
+      fields.push('username = ?');
+      values.push(normalizedUsername);
+    }
+
     if (Object.prototype.hasOwnProperty.call(body, 'display_name')) {
       fields.push('display_name = ?');
       const v = body.display_name == null ? null : String(body.display_name).trim().slice(0, 100) || null;
@@ -236,7 +252,7 @@ router.put('/me', authenticate, async (req, res) => {
 
 
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ success: false, message: '邮箱已被其他账号使用' });
+      return res.status(409).json({ success: false, message: '账号或邮箱与其他用户冲突' });
     }
 
 

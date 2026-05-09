@@ -8,7 +8,7 @@
       </template>
 
       <!-- 统计卡片 -->
-      <el-row :gutter="20" class="stats-row">
+      <!-- <el-row :gutter="20" class="stats-row">
         <el-col :span="6">
           <div class="stat-item">
             <div class="stat-value">{{ stats.total || 0 }}</div>
@@ -33,10 +33,10 @@
             <div class="stat-label">市级</div>
           </div>
         </el-col>
-      </el-row>
+      </el-row> -->
 
       <!-- 筛选栏 -->
-      <el-form :model="filters" inline class="filter-form">
+      <el-form :model="filters" inline class="filter-form ">
         <el-form-item label="级别">
           <el-select v-model="filters.level" style="width: 240px" placeholder="选择级别" clearable @change="loadData">
             <el-option label="国家级" value="national" />
@@ -60,7 +60,7 @@
       </el-form>
 
       <!-- 数据表格 -->
-      <el-table :data="tableData" stripe v-loading="loading">
+      <el-table :data="tableData" stripe v-loading="loading" class="table-height">
         <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
         <el-table-column prop="batch_number" label="批次号" width="140" />
         <el-table-column prop="level" label="级别" width="80">

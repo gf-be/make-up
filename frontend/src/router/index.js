@@ -154,7 +154,8 @@ const router = createRouter({
 router.beforeEach((to) => {
   if (to.meta.public) return true
   if (!currentUser.value) {
-    return { path: '/login', query: { redirect: to.fullPath } }
+    // 不携带 redirect：避免共用设备/换账号登录后仍跳回他人书签或地址栏中的深链
+    return { path: '/login' }
   }
   const mod = to.meta.module
   if (mod && !hasModuleAccess(mod)) {

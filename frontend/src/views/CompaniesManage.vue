@@ -18,6 +18,7 @@
                 clearable
                 style="width: 130px"
                 @keyup.enter="loadList"
+                
               />
             </el-form-item>
             <el-form-item label="信用代码">
@@ -47,11 +48,11 @@
             empty-text="暂无企业"
             @row-click="handleRowClick"
           >
-            <el-table-column prop="name" label="企业名称" min-width="110"  />
+            <el-table-column prop="name" label="企业名称" min-width="110" show-overflow-tooltip />
             <el-table-column prop="credit_code" label="信用代码" min-width="110" show-overflow-tooltip>
               <template #default="{ row }">{{ row.credit_code || '—' }}</template>
             </el-table-column>
-            <el-table-column prop="province" label="省" width="64" />
+            <el-table-column prop="province" label="省" width="64" show-overflow-tooltip/>
             <el-table-column prop="sampled_count" label="抽查" width="48" align="center" />
           </el-table>
           <el-pagination

@@ -45,12 +45,11 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { login, registerNormalUser } from '@/api'
-import { setAuthSession, currentUser, hasModuleAccess, getRoleDefaultPath } from '@/utils/auth'
+import { setAuthSession, currentUser, getRoleDefaultPath } from '@/utils/auth'
 
-const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const registering = ref(false)
@@ -79,19 +78,7 @@ const handleLogin = async () => {
     setAuthSession(payload.token, payload.user)
     ElMessage.success('登录成功')
 
-    const redirectRaw = typeof route.query.redirect === 'string' ? route.query.redirect.trim() : ''
-    const defaultPath = getRoleDefaultPath(currentUser.value?.role)
-    let path = redirectRaw || defaultPath
-
-    if (redirectRaw) {
-      const resolved = router.resolve(redirectRaw)
-      const restrictMod = resolved.matched.map((record) => record.meta?.module).find(Boolean)
-      if (restrictMod && !hasModuleAccess(restrictMod)) {
-        path = defaultPath
-      }
-    }
-
-    router.replace(path)
+    router.replace(getRoleDefaultPath(currentUser.value?.role))
   } catch (error) {
     console.error('登录失败:', error)
   } finally {

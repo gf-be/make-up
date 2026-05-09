@@ -19,7 +19,7 @@
         </div>
       </template>
 
-      <el-table :data="listRows" stripe size="small" row-key="id" empty-text="暂无数据">
+      <el-table :data="listRows" stripe size="small" row-key="id" empty-text="暂无数据" class="table-height">
         <el-table-column prop="id" label="ID" width="72" align="center" />
         <el-table-column prop="sequence_no" label="序号" width="56" align="center" />
         <el-table-column prop="batch_title" label="批次标题" min-width="140" show-overflow-tooltip />
@@ -30,7 +30,7 @@
         <el-table-column label="通告ID" width="88" align="center">
           <template #default="{ row }">{{ row.announcement_id ?? '—' }}</template>
         </el-table-column>
-        <el-table-column v-if="!row.announcement_id" label="飞检ID" width="80" align="center">
+        <el-table-column label="飞检ID" width="80" align="center">
           <template #default="{ row }">{{ row.supervision_id ?? '—' }}</template>
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
@@ -219,7 +219,7 @@
             </el-form>
           </el-tab-pane>
 
-          <el-tab-pane label="来源与关联" name="source">
+          <!-- <el-tab-pane label="来源与关联" name="source">
             <el-form label-width="140px" class="dense-form">
               <el-row :gutter="12">
                 <el-col :span="12">
@@ -297,7 +297,7 @@
                 <el-input v-model="form.province_display" maxlength="100" />
               </el-form-item>
             </el-form>
-          </el-tab-pane>
+          </el-tab-pane> -->
         </el-tabs>
       </div>
       <template #footer>

@@ -12,7 +12,7 @@
       </template>
 
 
-      <el-row :gutter="20" class="stats-row">
+      <!-- <el-row :gutter="20" class="stats-row">
         <el-col :span="6">
           <div class="stat-item total">
             <div class="stat-value">{{ stats.total || 0 }}</div>
@@ -37,7 +37,7 @@
             <div class="stat-label">市级</div>
           </div>
         </el-col>
-      </el-row>
+      </el-row> -->
 
       <el-form :model="filters" inline class="filter-form">
         <el-form-item label="级别">

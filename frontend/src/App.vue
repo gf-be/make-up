@@ -34,6 +34,7 @@
 </template>
 
 <script setup>
+
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { logout } from '@/api'
@@ -216,4 +217,5 @@ const handleLogout = async () => {
     padding: 20px;
   }
 }
+
 </style>

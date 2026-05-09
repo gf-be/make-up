@@ -7,12 +7,10 @@
             <span class="card-title">个人资料</span>
           </template>
           <el-form :model="profileForm" label-width="88px" class="profile-form">
-            <el-form-item label="账号">
-              <el-input :model-value="currentUser?.username" disabled />
+            <el-form-item label="账号" required>
+              <el-input v-model="profileForm.username" placeholder="登录账号，3-30 位字母、数字或下划线" maxlength="30" />
             </el-form-item>
-            <el-form-item label="角色">
-              <el-tag>{{ currentUser?.role_label || getRoleLabel(currentUser?.role) }}</el-tag>
-            </el-form-item>
+           
             <el-form-item label="昵称">
               <el-input v-model="profileForm.display_name" placeholder="展示名称" maxlength="100" />
             </el-form-item>
@@ -21,18 +19,12 @@
             </el-form-item>
             <el-form-item>
               <el-button type="primary" :loading="savingProfile" @click="handleSaveProfile">保存资料</el-button>
+              <el-button type="primary" plain @click="passwordDialogVisible = true">更改登录密码</el-button>
             </el-form-item>
           </el-form>
         </el-card>
       </el-col>
-      <el-col :xs="24" :md="10">
-        <el-card shadow="never">
-          <template #header>
-            <span class="card-title">修改密码</span>
-          </template>
-          <el-button type="primary" plain @click="passwordDialogVisible = true">更改登录密码</el-button>
-        </el-card>
-      </el-col>
+  
     </el-row>
 
     <el-dialog v-model="passwordDialogVisible" title="修改密码" width="420px" :close-on-click-modal="false">
@@ -65,7 +57,10 @@ const savingProfile = ref(false)
 const savingPassword = ref(false)
 const passwordDialogVisible = ref(false)
 
+const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,30}$/
+
 const profileForm = reactive({
+  username: '',
   display_name: '',
   email: ''
 })
@@ -77,6 +72,7 @@ const passwordForm = reactive({
 })
 
 function syncProfileForm() {
+  profileForm.username = currentUser.value?.username || ''
   profileForm.display_name = currentUser.value?.display_name || ''
   profileForm.email = currentUser.value?.email || ''
 }
@@ -89,9 +85,15 @@ watch(
 )
 
 const handleSaveProfile = async () => {
+  const username = String(profileForm.username || '').trim()
+  if (!USERNAME_PATTERN.test(username)) {
+    ElMessage.warning('账号需为 3-30 位字母、数字或下划线')
+    return
+  }
   savingProfile.value = true
   try {
     const res = await updateCurrentUserProfile({
+      username,
       display_name: profileForm.display_name,
       email: profileForm.email
     })
@@ -136,5 +138,12 @@ const handleUpdatePassword = async () => {
 
 .profile-form {
   max-width: 520px;
+}
+
+.field-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.4;
 }
 </style>
