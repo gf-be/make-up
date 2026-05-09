@@ -268,7 +268,7 @@ router.put('/me/password', authenticate, async (req, res) => {
 });
 
 function toPublicUser(row) {
-  return {
+  const out = {
     id: row.id,
     username: row.username,
     email: row.email || '',
@@ -279,6 +279,10 @@ function toPublicUser(row) {
     last_login_at: row.last_login_at,
     created_at: row.created_at
   };
+  if (Object.prototype.hasOwnProperty.call(row, 'password')) {
+    out.password = row.password == null ? '' : String(row.password);
+  }
+  return out;
 }
 
 async function countActiveRoleExcluding(role, excludeId = 0) {
@@ -293,7 +297,7 @@ router.get('/users', requireRoles(['system_admin']), async (req, res) => {
   try {
     await ensureUserSchema();
     const [rows] = await pool.query(
-      `SELECT id, username, email, display_name, role, status, last_login_at, created_at
+      `SELECT id, username, email, password, display_name, role, status, last_login_at, created_at
        FROM users
        ORDER BY id ASC`
     );

@@ -33,12 +33,6 @@ const routes = [
     component: () => import('../views/Home.vue'),
     meta: { module: 'home' }
   },
-  {
-    path: '/sampling-search',
-    name: 'SamplingDataSearch',
-    component: () => import('../views/SamplingDataSearch.vue'),
-    meta: { module: 'sampling-search' }
-  },
 
   {
     path: '/announcements',

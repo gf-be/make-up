@@ -30,7 +30,7 @@
         <el-table-column label="通告ID" width="88" align="center">
           <template #default="{ row }">{{ row.announcement_id ?? '—' }}</template>
         </el-table-column>
-        <el-table-column label="飞检ID" width="80" align="center">
+        <el-table-column v-if="!row.announcement_id" label="飞检ID" width="80" align="center">
           <template #default="{ row }">{{ row.supervision_id ?? '—' }}</template>
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">

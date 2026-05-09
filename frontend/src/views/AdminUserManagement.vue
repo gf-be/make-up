@@ -16,6 +16,18 @@
         <el-table-column prop="username" label="账号" min-width="120" />
         <el-table-column prop="display_name" label="昵称" min-width="120" />
         <el-table-column prop="email" label="邮箱" min-width="160" show-overflow-tooltip />
+        <el-table-column label="密码" min-width="220">
+          <template #default="{ row }">
+            <div class="password-col">
+              <span class="password-text" :title="revealedPassword[row.id] ? row.password : ''">
+                {{ revealedPassword[row.id] ? (row.password || '—') : '••••••••' }}
+              </span>
+              <el-button link type="primary" @click="togglePasswordReveal(row.id)">
+                {{ revealedPassword[row.id] ? '隐藏' : '查看' }}
+              </el-button>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="role_label" label="角色" width="120" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
@@ -89,6 +101,7 @@ import { currentUser } from '@/utils/auth'
 const loading = ref(false)
 const saving = ref(false)
 const users = ref([])
+const revealedPassword = reactive({})
 const dialogVisible = ref(false)
 const isCreate = ref(true)
 const editingId = ref(null)
@@ -127,9 +140,14 @@ const loadUsers = async () => {
   try {
     const res = await listAdminUsers()
     users.value = res.data || []
+    Object.keys(revealedPassword).forEach((k) => delete revealedPassword[k])
   } finally {
     loading.value = false
   }
+}
+
+const togglePasswordReveal = (id) => {
+  revealedPassword[id] = !revealedPassword[id]
 }
 
 onMounted(loadUsers)
@@ -237,5 +255,22 @@ const handleDelete = async (row = {}) => {
 
 .card-title {
   font-weight: 600;
+}
+
+.password-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.password-text {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
