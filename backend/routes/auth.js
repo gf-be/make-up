@@ -1,11 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { authenticate, hashPassword, login, logout, verifyPassword } = require('../utils/auth');
+const {
+  authenticate,
+  hashPassword,
+  login,
+  logout,
+  verifyPassword,
+  requireRoles,
+  ROLE_LABELS,
+  refreshSessionUser
+} = require('../utils/auth');
 
 // Demo accounts shown on the login page. Repair legacy rows without overwriting changed pbkdf2 passwords.
+const ALLOWED_MANAGE_ROLES = ['system_admin', 'developer', 'data_admin', 'normal_user'];
+
 const SEED_ACCOUNTS = [
-  { username: 'admin', password: 'admin', role: 'developer', displayName: '系统管理员' },
+  { username: 'admin', password: 'admin', role: 'system_admin', displayName: '系统管理员' },
+  { username: 'developer', password: 'developer', role: 'developer', displayName: '开发管理员' },
   { username: 'data_admin', password: 'data_admin', role: 'data_admin', displayName: '数据管理员' },
   { username: 'user', password: 'user', role: 'normal_user', displayName: '普通用户' }
 ];
@@ -39,7 +51,7 @@ async function ensureUserSchema() {
       email VARCHAR(100) UNIQUE,
       password VARCHAR(255) NOT NULL,
       display_name VARCHAR(100),
-      role ENUM('developer', 'data_admin', 'normal_user') DEFAULT 'normal_user',
+      role ENUM('system_admin', 'developer', 'data_admin', 'normal_user') DEFAULT 'normal_user',
       status ENUM('active', 'disabled') DEFAULT 'active',
       last_login_at TIMESTAMP NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -59,18 +71,38 @@ async function ensureUserSchema() {
   await addColumn("ALTER TABLE users ADD COLUMN status ENUM('active', 'disabled') DEFAULT 'active' AFTER role");
   await addColumn('ALTER TABLE users ADD COLUMN last_login_at TIMESTAMP NULL AFTER status');
   await pool.query('ALTER TABLE users MODIFY email VARCHAR(100) NULL');
-  await pool.query("ALTER TABLE users MODIFY role ENUM('admin', 'editor', 'viewer', 'developer', 'data_admin', 'normal_user') DEFAULT 'normal_user'");
-  await pool.query("UPDATE users SET role = 'developer' WHERE role = 'admin'");
-  await pool.query("UPDATE users SET role = 'data_admin' WHERE role = 'editor'");
-  await pool.query("UPDATE users SET role = 'normal_user' WHERE role = 'viewer'");
-  await pool.query("ALTER TABLE users MODIFY role ENUM('developer', 'data_admin', 'normal_user') DEFAULT 'normal_user'");
+
+  try {
+    await pool.query(
+      "ALTER TABLE users MODIFY role ENUM('system_admin', 'developer', 'data_admin', 'normal_user') DEFAULT 'normal_user'"
+    );
+  } catch (error) {
+    try {
+      await pool.query(
+        "ALTER TABLE users MODIFY role ENUM('admin', 'editor', 'viewer', 'developer', 'data_admin', 'normal_user', 'system_admin') DEFAULT 'normal_user'"
+      );
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      await pool.query("UPDATE users SET role = 'developer' WHERE role IN ('admin', 'editor', 'viewer')");
+    } catch (_) {
+      /* ignore */
+    }
+    await pool.query(
+      "ALTER TABLE users MODIFY role ENUM('system_admin', 'developer', 'data_admin', 'normal_user') DEFAULT 'normal_user'"
+    );
+  }
+
   await pool.query(
     `INSERT IGNORE INTO users (username, email, password, display_name, role, status)
-     VALUES (?, ?, ?, ?, 'developer', 'active'),
+     VALUES (?, ?, ?, ?, 'system_admin', 'active'),
+            (?, ?, ?, ?, 'developer', 'active'),
             (?, ?, ?, ?, 'data_admin', 'active'),
             (?, ?, ?, ?, 'normal_user', 'active')`,
     [
       'admin', 'admin@cosmetics.com', hashPassword('admin'), '系统管理员',
+      'developer', 'developer@local', hashPassword('developer'), '开发管理员',
       'data_admin', 'data_admin@cosmetics.com', hashPassword('data_admin'), '数据管理员',
       'user', 'user@cosmetics.com', hashPassword('user'), '普通用户'
     ]
@@ -165,6 +197,54 @@ router.get('/me', authenticate, (req, res) => {
   res.json({ success: true, data: req.user });
 });
 
+router.put('/me', authenticate, async (req, res) => {
+  try {
+    await ensureUserSchema();
+    const body = req.body || {};
+    const fields = [];
+
+    const values = [];
+    if (Object.prototype.hasOwnProperty.call(body, 'display_name')) {
+      fields.push('display_name = ?');
+      const v = body.display_name == null ? null : String(body.display_name).trim().slice(0, 100) || null;
+      values.push(v);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'email')) {
+      fields.push('email = ?');
+      const v = body.email == null || body.email === '' ? null : String(body.email).trim().slice(0, 100) || null;
+      values.push(v);
+    }
+
+
+    if (!fields.length) {
+      return res.status(400).json({ success: false, message: '没有可更新的字段' });
+    }
+
+    values.push(req.user.id);
+    await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
+
+    const header = req.headers.authorization || '';
+
+    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+
+    const nextUser = token ? await refreshSessionUser(pool, token) : null;
+
+
+    res.json({ success: true, message: '资料已更新', data: nextUser || req.user });
+  } catch (error) {
+
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ success: false, message: '邮箱已被其他账号使用' });
+    }
+
+
+    console.error('更新个人资料失败:', error);
+    res.status(500).json({ success: false, message: '更新个人资料失败' });
+  }
+});
+
 router.put('/me/password', authenticate, async (req, res) => {
   try {
     await ensureUserSchema();
@@ -185,6 +265,280 @@ router.put('/me/password', authenticate, async (req, res) => {
     console.error('修改密码失败:', error);
     res.status(500).json({ success: false, message: '修改密码失败' });
   }
+});
+
+function toPublicUser(row) {
+  return {
+    id: row.id,
+    username: row.username,
+    email: row.email || '',
+    display_name: row.display_name || '',
+    role: row.role,
+    role_label: ROLE_LABELS[row.role] || row.role,
+    status: row.status || 'active',
+    last_login_at: row.last_login_at,
+    created_at: row.created_at
+  };
+}
+
+async function countActiveRoleExcluding(role, excludeId = 0) {
+  const [rows] = await pool.query(
+    'SELECT COUNT(*) AS c FROM users WHERE role = ? AND status = ? AND id <> ?',
+    [role, 'active', excludeId]
+  );
+  return Number(rows[0]?.c || 0);
+}
+
+router.get('/users', requireRoles(['system_admin']), async (req, res) => {
+  try {
+    await ensureUserSchema();
+    const [rows] = await pool.query(
+      `SELECT id, username, email, display_name, role, status, last_login_at, created_at
+       FROM users
+       ORDER BY id ASC`
+    );
+    res.json({ success: true, data: rows.map(toPublicUser) });
+  } catch (error) {
+    console.error('获取用户列表失败:', error);
+    res.status(500).json({ success: false, message: '获取用户列表失败' });
+  }
+});
+
+router.post('/users', requireRoles(['system_admin']), async (req, res) => {
+  try {
+    await ensureUserSchema();
+    const { username, password, display_name, email, role } = req.body || {};
+    const normalizedUsername = String(username || '').trim();
+    const normalizedPassword = String(password || '');
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(normalizedUsername)) {
+      return res.status(400).json({ success: false, message: '账号需为 3-30 位字母、数字或下划线' });
+    }
+    if (normalizedPassword.length < 6) {
+      return res.status(400).json({ success: false, message: '密码至少 6 位' });
+    }
+    const nextRole = String(role || '').trim();
+    if (!ALLOWED_MANAGE_ROLES.includes(nextRole)) {
+      return res.status(400).json({ success: false, message: '无效的角色' });
+    }
+
+    await pool.query(
+      `INSERT INTO users (username, email, password, display_name, role, status)
+       VALUES (?, ?, ?, ?, ?, 'active')`,
+      [
+        normalizedUsername,
+        String(email || '').trim() || null,
+        hashPassword(normalizedPassword),
+        String(display_name || '').trim() || normalizedUsername,
+        nextRole
+      ]
+    );
+
+    const [rows] = await pool.query(
+      'SELECT id, username, email, display_name, role, status, last_login_at, created_at FROM users WHERE username = ? LIMIT 1',
+      [normalizedUsername]
+    );
+    res.json({ success: true, message: '用户已创建', data: toPublicUser(rows[0]) });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ success: false, message: '账号或邮箱已存在' });
+    }
+    console.error('创建用户失败:', error);
+    res.status(500).json({ success: false, message: '创建用户失败' });
+  }
+});
+
+router.patch('/users/:id', requireRoles(['system_admin']), async (req, res) => {
+  try {
+    await ensureUserSchema();
+    const id = Number.parseInt(req.params.id, 10);
+    if (!id) {
+      return res.status(400).json({ success: false, message: '无效的用户 id' });
+    }
+
+    const [targetRows] = await pool.query(
+      'SELECT id, username, role, status FROM users WHERE id = ? LIMIT 1',
+      [id]
+    );
+    const target = targetRows[0];
+    if (!target) {
+      return res.status(404).json({ success: false, message: '用户不存在' });
+    }
+
+
+    const body = req.body || {};
+    let nextRole = target.role;
+
+
+    let nextStatus = target.status;
+
+
+    if (typeof body.role === 'string' && body.role.trim()) {
+
+
+      nextRole = body.role.trim();
+      if (!ALLOWED_MANAGE_ROLES.includes(nextRole)) {
+
+
+        return res.status(400).json({ success: false, message: '无效的角色' });
+
+
+      }
+
+
+    }
+
+
+    if (typeof body.status === 'string' && ['active', 'disabled'].includes(body.status)) {
+      nextStatus = body.status;
+    }
+
+    const demotingSysAdmin =
+      target.role === 'system_admin'
+      && (nextRole !== 'system_admin' || nextStatus === 'disabled');
+
+    if (demotingSysAdmin && (await countActiveRoleExcluding('system_admin', id)) < 1) {
+      return res.status(400).json({ success: false, message: '至少需要保留一名在职的系统管理员' });
+    }
+
+
+    const sets = [];
+    const vals = [];
+
+    if (typeof body.username === 'string') {
+      const normalizedUsername = String(body.username).trim();
+      if (normalizedUsername !== target.username) {
+        if (!/^[a-zA-Z0-9_]{3,30}$/.test(normalizedUsername)) {
+          return res.status(400).json({ success: false, message: '账号需为 3-30 位字母、数字或下划线' });
+        }
+        sets.push('username = ?');
+        vals.push(normalizedUsername);
+      }
+    }
+
+    if (typeof body.display_name === 'string') {
+      sets.push('display_name = ?');
+      vals.push(String(body.display_name).trim().slice(0, 100) || target.username);
+
+
+    }
+
+
+    if (typeof body.email === 'string') {
+      sets.push('email = ?');
+      vals.push(String(body.email).trim().slice(0, 100) || null);
+    }
+
+
+    if (typeof body.role === 'string' && body.role.trim()) {
+
+
+      sets.push('role = ?');
+      vals.push(nextRole);
+    }
+
+
+    if (typeof body.status === 'string' && ['active', 'disabled'].includes(body.status)) {
+      sets.push('status = ?');
+      vals.push(nextStatus);
+
+
+    }
+
+
+    const np = typeof body.new_password === 'string' ? body.new_password : '';
+
+
+    if (np) {
+      if (np.length < 6) {
+        return res.status(400).json({ success: false, message: '新密码至少 6 位' });
+      }
+
+
+      sets.push('password = ?');
+      vals.push(hashPassword(np));
+    }
+
+
+    if (!sets.length) {
+      return res.status(400).json({ success: false, message: '没有可更新的字段' });
+
+
+    }
+
+
+    vals.push(id);
+
+
+    await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, vals);
+
+    const [rows] = await pool.query(
+      'SELECT id, username, email, display_name, role, status, last_login_at, created_at FROM users WHERE id = ? LIMIT 1',
+      [id]
+    );
+    res.json({ success: true, message: '用户已更新', data: toPublicUser(rows[0]) });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ success: false, message: '账号或邮箱已被其他用户使用' });
+    }
+    console.error('更新用户失败:', error);
+
+
+    res.status(500).json({ success: false, message: '更新用户失败' });
+  }
+
+
+});
+
+router.delete('/users/:id', requireRoles(['system_admin']), async (req, res) => {
+  try {
+    await ensureUserSchema();
+
+
+    const id = Number.parseInt(req.params.id, 10);
+
+
+    if (!id) {
+      return res.status(400).json({ success: false, message: '无效的用户 id' });
+    }
+
+
+    if (Number(req.user.id) === id) {
+
+
+      return res.status(400).json({ success: false, message: '不能删除当前登录账号' });
+    }
+
+
+    const [targetRows] = await pool.query('SELECT id, role FROM users WHERE id = ? LIMIT 1', [id]);
+    const target = targetRows[0];
+    if (!target) {
+      return res.status(404).json({ success: false, message: '用户不存在' });
+    }
+
+    if (target.role === 'system_admin' && (await countActiveRoleExcluding('system_admin', id)) < 1) {
+      return res.status(400).json({ success: false, message: '至少需要保留一名系统管理员账号' });
+
+
+    }
+
+
+    await pool.query('DELETE FROM operation_logs WHERE user_id = ?', [id]);
+
+
+    await pool.query('DELETE FROM users WHERE id = ?', [id]);
+
+
+    res.json({ success: true, message: '用户已删除' });
+  } catch (error) {
+    console.error('删除用户失败:', error);
+
+
+    res.status(500).json({ success: false, message: '删除用户失败' });
+
+
+  }
+
+
 });
 
 router.get('/operation-logs', authenticate, async (req, res) => {

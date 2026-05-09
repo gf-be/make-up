@@ -1,10 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { currentUser, hasModuleAccess } from '@/utils/auth'
+import { currentUser, getRoleDefaultPath, hasModuleAccess } from '@/utils/auth'
 
 const routes = [
   {
     path: '/',
-    redirect: '/home'
+    redirect: () => {
+      if (!currentUser.value) return '/login'
+      return getRoleDefaultPath(currentUser.value.role)
+    }
   },
   {
     path: '/login',
@@ -13,22 +16,22 @@ const routes = [
     meta: { public: true }
   },
   {
+    path: '/profile',
+    name: 'ProfileCenter',
+    component: () => import('../views/ProfileCenter.vue'),
+    meta: { module: 'profile' }
+  },
+  {
+    path: '/admin/users',
+    name: 'AdminUserManagement',
+    component: () => import('../views/AdminUserManagement.vue'),
+    meta: { module: 'admin-users' }
+  },
+  {
     path: '/home',
     name: 'Home',
     component: () => import('../views/Home.vue'),
     meta: { module: 'home' }
-  },
-  {
-    path: '/dashboard',
-    name: 'Dashboard',
-    component: () => import('../views/Dashboard.vue'),
-    meta: { module: 'home' }
-  },
-  {
-    path: '/pivot-analysis',
-    name: 'PivotAnalysis',
-    component: () => import('../views/PivotAnalysis.vue'),
-    meta: { module: 'pivot-analysis' }
   },
   {
     path: '/sampling-search',
@@ -93,6 +96,18 @@ const routes = [
     meta: { module: 'companies' }
   },
   {
+    path: '/companies-manage',
+    name: 'CompaniesManage',
+    component: () => import('../views/CompaniesManage.vue'),
+    meta: { module: 'companies-manage' }
+  },
+  {
+    path: '/products-manage',
+    name: 'ProductsManage',
+    component: () => import('../views/ProductsManage.vue'),
+    meta: { module: 'products-manage' }
+  },
+  {
     path: '/unqualified-products',
     name: 'UnqualifiedProducts',
     component: () => import('../views/UnqualifiedProducts.vue'),
@@ -147,8 +162,9 @@ router.beforeEach((to) => {
   if (!currentUser.value) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
-  if (!hasModuleAccess(to.meta.module)) {
-    return '/home'
+  const mod = to.meta.module
+  if (mod && !hasModuleAccess(mod)) {
+    return getRoleDefaultPath(currentUser.value.role)
   }
   return true
 })

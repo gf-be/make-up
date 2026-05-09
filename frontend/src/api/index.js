@@ -20,6 +20,26 @@ export const updateCurrentUserPassword = (data) => {
   return request.put('/auth/me/password', data)
 }
 
+export const updateCurrentUserProfile = (data) => {
+  return request.put('/auth/me', data)
+}
+
+export const listAdminUsers = () => {
+  return request.get('/auth/users')
+}
+
+export const createAdminUser = (data) => {
+  return request.post('/auth/users', data)
+}
+
+export const updateAdminUser = (id, data = {}) => {
+  return request.patch(`/auth/users/${id}`, data)
+}
+
+export const deleteAdminUser = (id) => {
+  return request.delete(`/auth/users/${id}`)
+}
+
 export const getOperationLogs = (params) => {
   return request.get('/auth/operation-logs', { params })
 }
@@ -28,35 +48,7 @@ export const createOperationLog = (data) => {
   return request.post('/auth/operation-logs', data)
 }
 
-// 仪表板
-export const getDashboardStats = () => {
-  return request.get('/dashboard/stats')
-}
 
-export const getDashboardTrends = () => {
-  return request.get('/dashboard/trends')
-}
-
-export const getPivotAnalysis = (params) => {
-  return request.get('/analytics/pivot', { params })
-}
-
-// 组合式数据检索（抽检多维检索 / 导出）
-export const getSamplingSearchFieldSchema = () => {
-  return request.get('/sampling-search/field-schema')
-}
-
-export const getSamplingSearchOptions = (params) => {
-  return request.get('/sampling-search/options', { params })
-}
-
-export const postSamplingSearchQuery = (data) => {
-  return request.post('/sampling-search/query', data)
-}
-
-export const postSamplingSearchExport = (data) => {
-  return request.post('/sampling-search/export', data, { responseType: 'blob' })
-}
 
 // 公告（抽样检查公告）
 export const getAnnouncements = (params) => {
@@ -129,8 +121,24 @@ export const getAnnouncementStagingTree = (params) => {
   return request.get('/announcement-staging/tree', { params })
 }
 
+export const getAnnouncementStagingFilterYears = (params) => {
+  return request.get('/announcement-staging/filter-years', { params })
+}
+
 export const getAnnouncementStagingDetail = (id) => {
   return request.get(`/announcement-staging/${id}`)
+}
+
+export const createAnnouncementStagingItem = (id, data = {}) => {
+  return request.post(`/announcement-staging/${id}/items`, data)
+}
+
+export const updateAnnouncementStagingItem = (id, data = {}) => {
+  return request.put(`/announcement-staging/${id}/items`, data)
+}
+
+export const deleteAnnouncementStagingItem = (id, data = {}) => {
+  return request.delete(`/announcement-staging/${id}/items`, { data })
 }
 
 export const getAnnouncementStagingTracebacks = (params) => {
@@ -173,6 +181,10 @@ export const confirmAnnouncementStaging = (id) => {
 
 export const updateAnnouncementStagingBody = (id, data = {}) => {
   return request.put(`/announcement-staging/${id}/body`, data)
+}
+
+export const updateAnnouncementStagingInfo = (id, data = {}) => {
+  return request.put(`/announcement-staging/${id}/info`, data)
 }
 
 export const updateAnnouncementStagingProductType = (id, data = {}) => {
@@ -220,8 +232,8 @@ export const getCompanies = (params) => {
   return request.get('/companies', { params })
 }
 
-export const getCompanyDetail = (id) => {
-  return request.get(`/companies/${id}`)
+export const getCompanyDetail = (id, params = {}) => {
+  return request.get(`/companies/${id}`, { params })
 }
 
 export const getCompanyStats = () => {
@@ -264,6 +276,27 @@ export const getUnqualifiedProductDetail = (id) => {
   return request.get(`/unqualified-products/${id}`)
 }
 
+/** 数据/开发管理员：管理页专用详情（含拆分表） */
+export const getManageUnqualifiedProductDetail = (id) => {
+  return request.get(`/unqualified-products/manage/record/${id}`)
+}
+
+export const listManageUnqualifiedProducts = (params) => {
+  return request.get('/unqualified-products/manage/list', { params })
+}
+
+export const createManageUnqualifiedProduct = (data) => {
+  return request.post('/unqualified-products/manage', data)
+}
+
+export const updateManageUnqualifiedProduct = (id, data) => {
+  return request.put(`/unqualified-products/manage/${id}`, data)
+}
+
+export const deleteManageUnqualifiedProduct = (id) => {
+  return request.delete(`/unqualified-products/manage/${id}`)
+}
+
 export const getUnqualifiedProductStats = () => {
   return request.get('/unqualified-products/stats/overview')
 }
@@ -297,6 +330,10 @@ export const createCompany = (data) => {
 
 export const updateCompany = (id, data) => {
   return request.put(`/companies/${id}`, data)
+}
+
+export const bulkImportCompanyCreditCodes = (data) => {
+  return request.post('/companies/bulk-credit-codes', data)
 }
 
 export const deleteCompany = (id) => {

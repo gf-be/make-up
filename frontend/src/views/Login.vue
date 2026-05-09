@@ -5,7 +5,7 @@
       <div class="login-subtitle">请选择账号角色登录</div>
       <el-form :model="form" label-width="72px" @keyup.enter="handleLogin">
         <el-form-item label="账号">
-          <el-input v-model="form.username" placeholder="admin / data_admin / user" />
+          <el-input v-model="form.username" placeholder="请输入账号" />
         </el-form-item>
         <el-form-item label="密码">
           <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
@@ -48,7 +48,7 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { login, registerNormalUser } from '@/api'
-import { setAuthSession } from '@/utils/auth'
+import { setAuthSession, currentUser, hasModuleAccess, getRoleDefaultPath } from '@/utils/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -56,8 +56,8 @@ const loading = ref(false)
 const registering = ref(false)
 const registerDialogVisible = ref(false)
 const form = reactive({
-  username: 'user',
-  password: 'user'
+  username: '',
+  password: ''
 })
 const registerForm = reactive({
   username: '',
@@ -75,9 +75,23 @@ const handleLogin = async () => {
   loading.value = true
   try {
     const res = await login(form)
-    setAuthSession(res.data?.token, res.data?.user)
+    const payload = res.data || {}
+    setAuthSession(payload.token, payload.user)
     ElMessage.success('登录成功')
-    router.replace(route.query.redirect || '/home')
+
+    const redirectRaw = typeof route.query.redirect === 'string' ? route.query.redirect.trim() : ''
+    const defaultPath = getRoleDefaultPath(currentUser.value?.role)
+    let path = redirectRaw || defaultPath
+
+    if (redirectRaw) {
+      const resolved = router.resolve(redirectRaw)
+      const restrictMod = resolved.matched.map((record) => record.meta?.module).find(Boolean)
+      if (restrictMod && !hasModuleAccess(restrictMod)) {
+        path = defaultPath
+      }
+    }
+
+    router.replace(path)
   } catch (error) {
     console.error('登录失败:', error)
   } finally {

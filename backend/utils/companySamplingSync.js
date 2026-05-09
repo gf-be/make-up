@@ -79,6 +79,14 @@ async function ensureCompaniesSamplingSchema(connection) {
   }
   await ensureIndexExists(connection, 'companies', 'idx_companies_product_category', 'INDEX idx_companies_product_category (product_category)');
 
+  await ensureColumnExists(connection, 'companies', 'credit_code', "VARCHAR(18) NULL COMMENT '统一社会信用代码' AFTER brand");
+  await ensureIndexExists(
+    connection,
+    'companies',
+    'uk_companies_credit_code',
+    'UNIQUE INDEX uk_companies_credit_code (credit_code)'
+  );
+
 
   await connection.query(`
     CREATE TABLE IF NOT EXISTS company_sampling_records (
@@ -171,6 +179,36 @@ async function ensureCompaniesSamplingSchema(connection) {
       'FOREIGN KEY (supervision_detail_id) REFERENCES flight_inspection_detail(id) ON DELETE SET NULL'
     );
   }
+
+  /** 大批量企业 / 抽样明细下，company_id + 筛选条件可走索引 */
+  if (await tableExists(connection, 'inspection_details')) {
+    await ensureIndexExists(
+      connection,
+      'inspection_details',
+      'idx_inspection_details_company_id',
+      'INDEX idx_inspection_details_company_id (company_id)'
+    );
+    await ensureIndexExists(
+      connection,
+      'inspection_details',
+      'idx_inspection_details_company_result',
+      'INDEX idx_inspection_details_company_result (company_id, inspection_result)'
+    );
+  }
+
+  await ensureIndexExists(
+    connection,
+    'companies',
+    'idx_companies_province_sampled',
+    'INDEX idx_companies_province_sampled (province, sampled_count)'
+  );
+
+  await ensureIndexExists(
+    connection,
+    'companies',
+    'idx_companies_sampled_updated',
+    'INDEX idx_companies_sampled_updated (sampled_count, updated_at)'
+  );
 }
 
 

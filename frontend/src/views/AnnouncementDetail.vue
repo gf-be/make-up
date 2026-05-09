@@ -19,167 +19,179 @@
 
         <el-divider />
 
-        <div class="content">
-          <h3>关键信息</h3>
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="产品类型">
-              <el-space wrap>
-                <span>{{ announcementProductTypeLabel }}</span>
-                <el-button link type="primary" size="small" :loading="savingProductType" @click="openProductTypeDialog">修改产品类型</el-button>
-              </el-space>
-            </el-descriptions-item>
+        <el-tabs v-model="detailTab" type="border-card" class="detail-main-tabs">
+          <el-tab-pane label="公告详情" name="overview">
+            <div class="content">
+              <h3>关键信息</h3>
+              <el-descriptions :column="2" border>
+                <el-descriptions-item label="产品类型">
+                  <el-space wrap>
+                    <span>{{ announcementProductTypeLabel }}</span>
+                    <el-button link type="primary" size="small" :loading="savingProductType" @click="openProductTypeDialog">修改产品类型</el-button>
+                  </el-space>
+                </el-descriptions-item>
 
-            <el-descriptions-item label="检验单位">
-              {{ announcement.inspection_unit || '暂无' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="批次数量">
-              {{ announcement.inspection_count || 0 }} 批次
-            </el-descriptions-item>
-            <el-descriptions-item label="检验时间">
-              {{ announcement.inspection_start_date && announcement.inspection_end_date
-                ? `${formatDate(announcement.inspection_start_date)} 至 ${formatDate(announcement.inspection_end_date)}`
-                : '暂无' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="发布日期">
-              {{ formatDate(announcement.publish_date) }}
-            </el-descriptions-item>
-          </el-descriptions>
+                <el-descriptions-item label="检验单位">
+                  {{ announcement.inspection_unit || '暂无' }}
+                </el-descriptions-item>
+                <el-descriptions-item label="批次数量">
+                  {{ announcement.inspection_count || 0 }} 批次
+                </el-descriptions-item>
+                <el-descriptions-item label="检验时间">
+                  {{ announcement.inspection_start_date && announcement.inspection_end_date
+                    ? `${formatDate(announcement.inspection_start_date)} 至 ${formatDate(announcement.inspection_end_date)}`
+                    : '暂无' }}
+                </el-descriptions-item>
+                <el-descriptions-item label="发布日期">
+                  {{ formatDate(announcement.publish_date) }}
+                </el-descriptions-item>
+              </el-descriptions>
 
-          <div class="section-header">
-            <h3>公告内容</h3>
-            <!-- <el-button type="primary" plain size="small" :loading="savingContent" @click="openContentDialog">编辑正文</el-button> -->
-          </div>
-          <div class="announcement-content">{{ announcement.content || '暂无内容' }}</div>
+              <div class="section-header">
+                <h3>公告内容</h3>
+                <!-- <el-button type="primary" plain size="small" :loading="savingContent" @click="openContentDialog">编辑正文</el-button> -->
+              </div>
+              <div class="announcement-content">{{ announcement.content || '暂无内容' }}</div>
 
-          <div v-if="announcement.attachment_path" class="attachment">
-            <h3>附件下载</h3>
-            <el-button type="primary" :icon="Download" @click="downloadAttachment">
-              下载附件（{{ announcement.attachment_name || '附件' }}）
-            </el-button>
-          </div>
+              <div v-if="announcement.attachment_path" class="attachment">
+                <h3>附件下载</h3>
+                <el-button type="primary" :icon="Download" @click="downloadAttachment">
+                  下载附件（{{ announcement.attachment_name || '附件' }}）
+                </el-button>
+              </div>
 
-          <div class="product-details">
-            <div class="section-header">
-              <h3>{{ announcementProductTypeLabel }}问题产品详细信息</h3>
+              <!-- <el-divider /> -->
 
-              <div class="section-tags">
-                <el-tag type="info">总计 {{ productDetailsSummary.total || 0 }} 批次</el-tag>
-                <el-tag v-if="productDetailsSummary.has_filters" type="success">
-                  当前筛选 {{ productDetailsSummary.filtered_total || 0 }} 批次
-                </el-tag>
-                <el-tag v-if="activeCounterfeitCount" type="danger">
-                  涉嫌假冒 {{ activeCounterfeitCount }} 批次
-                </el-tag>
+              <!-- <div class="related-inspections" v-if="relatedInspections.length > 0">
+                <h3>相关检查记录</h3>
+                <el-table :data="relatedInspections" stripe>
+                  <el-table-column prop="product_name" label="产品名称" min-width="200" />
+                  <el-table-column prop="manufacturer" label="生产企业" min-width="200" />
+                  <el-table-column prop="inspection_result" label="检查结果" width="100">
+                    <template #default="{ row }">
+                      <el-tag :type="row.inspection_result === 'unqualified' ? 'danger' : 'success'" size="small">
+                        {{ row.inspection_result === 'unqualified' ? '不合格' : '合格' }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="unqualified_items" label="不合格项目" min-width="200" show-overflow-tooltip />
+                  <el-table-column label="操作" width="100">
+                    <template #default="{ row }">
+                      <el-button type="primary" size="small" link @click="viewDetail(row.inspection_id || row.id)">
+                        查看详情
+                      </el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div> -->
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="问题产品明细" name="products">
+            <div class="product-details">
+              <div class="section-header">
+                <h3>{{ announcementProductTypeLabel }}问题产品详细信息</h3>
+
+                <div class="section-tags">
+                  <el-tag type="info">总计 {{ productDetailsSummary.total || 0 }} 批次</el-tag>
+                  <el-tag v-if="productDetailsSummary.has_filters" type="success">
+                    当前筛选 {{ productDetailsSummary.filtered_total || 0 }} 批次
+                  </el-tag>
+                  <el-tag v-if="activeCounterfeitCount" type="danger">
+                    涉嫌假冒 {{ activeCounterfeitCount }} 批次
+                  </el-tag>
+                </div>
+              </div>
+
+              <el-form :model="productDetailFilters" inline class="detail-filter-form">
+                <el-form-item label="不符合规定项目">
+                  <el-input
+                    v-model="productDetailFilters.unqualified_item"
+                    placeholder="输入项目关键字"
+                    clearable
+                    @keyup.enter="handleProductDetailSearch"
+                  />
+                </el-form-item>
+                <el-form-item label="企业名称">
+                  <el-input
+                    v-model="productDetailFilters.company_keyword"
+                    placeholder="输入注册人/备案人/企业名称"
+                    clearable
+                    @keyup.enter="handleProductDetailSearch"
+                  />
+                </el-form-item>
+                <el-form-item label="被抽样单位">
+                  <el-input
+                    v-model="productDetailFilters.sample_unit_keyword"
+                    placeholder="输入被抽样单位"
+                    clearable
+                    @keyup.enter="handleProductDetailSearch"
+                  />
+                </el-form-item>
+                <el-form-item label="是否涉嫌假冒">
+                  <el-select v-model="productDetailFilters.is_counterfeit" style="width: 100px" clearable placeholder="全部">
+                    <el-option label="全部" value="" />
+                    <el-option label="涉嫌假冒" value="1" />
+                    <el-option label="非假冒" value="0" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" @click="handleProductDetailSearch">筛选</el-button>
+                  <el-button @click="resetProductDetailFilters">重置</el-button>
+                </el-form-item>
+              </el-form>
+
+              <div v-loading="productDetailsLoading" class="product-detail-table-wrap">
+                <template v-if="productDetailPager.total > 0">
+                  <el-table :data="productDetails" stripe>
+                    <el-table-column type="expand" width="50">
+                      <template #default="{ row }">
+                        <el-descriptions :column="2" border size="small" class="detail-expanded">
+                          <el-descriptions-item label="注册人/备案人等名称">{{ row.company_names || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="注册人/备案人等地址">{{ row.company_addresses || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="被抽样单位名称">{{ row.sample_unit_name || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="被抽样单位地址">{{ row.sample_unit_address || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="生产日期">{{ row.production_date || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="限期使用日期/保质期">{{ row.expiry_date || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="所在地/进口地区">{{ row.product_region || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="注册/备案编号">{{ row.registration_no || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="生产许可证号">{{ row.production_license_no || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="检验结果">{{ row.inspection_result || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="规定要求">{{ row.requirement || '暂无' }}</el-descriptions-item>
+                          <el-descriptions-item label="备注" :span="2">{{ row.remarks || '暂无' }}</el-descriptions-item>
+                        </el-descriptions>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="sequence_no" label="序号" width="70" align="center" />
+                    <el-table-column prop="product_name" label="产品名称" min-width="220" show-overflow-tooltip />
+                    <el-table-column prop="company_names" label="注册人/备案人等名称" min-width="240" show-overflow-tooltip />
+                    <el-table-column prop="sample_unit_name" label="被抽样单位" min-width="220" show-overflow-tooltip />
+                    <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="220" show-overflow-tooltip />
+                    <el-table-column v-if="canManageProductDetails" label="操作" width="140" fixed="right" align="center">
+                      <template #default="{ row }">
+                        <el-button link type="primary" @click="openEditProductDetail(row)">编辑</el-button>
+                        <el-button link type="danger" @click="handleDeleteProductDetail(row)">删除</el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                  <div class="product-detail-pagination">
+                    <el-pagination
+                      :current-page="productDetailPager.page"
+                      :page-size="productDetailPager.limit"
+                      layout="total, sizes, prev, pager, next, jumper"
+                      :total="productDetailPager.total"
+                      :page-sizes="[10, 20, 50, 100, 200]"
+                      background
+                      @current-change="handleProductDetailPageChange"
+                      @size-change="handleProductDetailPageSizeChange"
+                    />
+                  </div>
+                </template>
+                <el-empty v-else-if="!productDetailsLoading" description="当前条件下暂无可展示的批次明细" />
               </div>
             </div>
-
-            <el-form :model="productDetailFilters" inline class="detail-filter-form">
-              <el-form-item label="不符合规定项目">
-                <el-input
-                  v-model="productDetailFilters. unqualified_item"
-                  placeholder="输入项目关键字"
-                  clearable
-                  @keyup.enter="handleProductDetailSearch"
-                />
-              </el-form-item>
-              <el-form-item label="企业名称">
-                <el-input
-                  v-model="productDetailFilters.company_keyword"
-                  placeholder="输入注册人/备案人/企业名称"
-                  clearable
-                  @keyup.enter="handleProductDetailSearch"
-                />
-              </el-form-item>
-              <el-form-item label="被抽样单位">
-                <el-input
-                  v-model="productDetailFilters.sample_unit_keyword"
-                  placeholder="输入被抽样单位"
-                  clearable
-                  @keyup.enter="handleProductDetailSearch"
-                />
-              </el-form-item>
-              <el-form-item label="是否涉嫌假冒">
-                <el-select v-model="productDetailFilters.is_counterfeit" style="width: 100px" clearable placeholder="全部">
-                  <el-option label="全部" value="" />
-                  <el-option label="涉嫌假冒" value="1" />
-                  <el-option label="非假冒" value="0" />
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="handleProductDetailSearch">筛选</el-button>
-                <el-button @click="resetProductDetailFilters">重置</el-button>
-              </el-form-item>
-            </el-form>
-
-            <el-table v-if="productDetails.length > 0" :data="productDetails" stripe v-loading="productDetailsLoading">
-              <el-table-column type="expand" width="50">
-                <template #default="{ row }">
-                  <el-descriptions :column="2" border size="small" class="detail-expanded">
-                    <el-descriptions-item label="注册人/备案人等名称">{{ row.company_names || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="注册人/备案人等地址">{{ row.company_addresses || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="被抽样单位名称">{{ row.sample_unit_name || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="被抽样单位地址">{{ row.sample_unit_address || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="生产日期">{{ row.production_date || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="限期使用日期/保质期">{{ row.expiry_date || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="所在地/进口地区">{{ row.product_region || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="注册/备案编号">{{ row.registration_no || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="生产许可证号">{{ row.production_license_no || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="检验结果">{{ row.inspection_result || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="规定要求">{{ row.requirement || '暂无' }}</el-descriptions-item>
-                    <el-descriptions-item label="备注" :span="2">{{ row.remarks || '暂无' }}</el-descriptions-item>
-                  </el-descriptions>
-                </template>
-              </el-table-column>
-              <el-table-column prop="sequence_no" label="序号" width="70" align="center" />
-              <el-table-column prop="product_name" label="产品名称" min-width="220" show-overflow-tooltip />
-              <el-table-column prop="company_names" label="注册人/备案人等名称" min-width="240" show-overflow-tooltip />
-              <el-table-column prop="sample_unit_name" label="被抽样单位" min-width="220" show-overflow-tooltip />
-              <!-- <el-table-column prop="package_spec" label="包装规格" width="120" show-overflow-tooltip /> -->
-              <!-- <el-table-column prop="batch_no" label="标示批号" width="140" show-overflow-tooltip /> -->
-              <!-- <el-table-column prop="inspection_institution" label="检验机构" min-width="180" show-overflow-tooltip /> -->
-              <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="220" show-overflow-tooltip />
-              <!-- <el-table-column label="备注" width="120" align="center">
-                <template #default="{ row }">
-                  <el-tag v-if="row.is_counterfeit" type="danger" size="small">涉嫌假冒</el-tag>
-                  <span v-else class="remark-text">{{ row.remarks && row.remarks !== '/' ? '有备注' : '无' }}</span>
-                </template>
-              </el-table-column> -->
-              <el-table-column v-if="canManageProductDetails" label="操作" width="140" fixed="right" align="center">
-                <template #default="{ row }">
-                  <el-button link type="primary" @click="openEditProductDetail(row)">编辑</el-button>
-                  <el-button link type="danger" @click="handleDeleteProductDetail(row)">删除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-            <el-empty v-else-if="!productDetailsLoading" description="当前条件下暂无可展示的批次明细" />
-          </div>
-        </div>
-
-        <el-divider />
-
-        <div class="related-inspections" v-if="relatedInspections.length > 0">
-          <h3>相关检查记录</h3>
-          <el-table :data="relatedInspections" stripe>
-            <el-table-column prop="product_name" label="产品名称" min-width="200" />
-            <!-- <el-table-column prop="brand" label="品牌" width="120" /> -->
-            <el-table-column prop="manufacturer" label="生产企业" min-width="200" />
-            <el-table-column prop="inspection_result" label="检查结果" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.inspection_result === 'unqualified' ? 'danger' : 'success'" size="small">
-                  {{ row.inspection_result === 'unqualified' ? '不合格' : '合格' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="unqualified_items" label="不合格项目" min-width="200" show-overflow-tooltip />
-            <el-table-column label="操作" width="100">
-              <template #default="{ row }">
-                <el-button type="primary" size="small" link @click="viewDetail(row.inspection_id || row.id)">
-                  查看详情
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
+          </el-tab-pane>
+        </el-tabs>
       </template>
     </el-card>
 
@@ -381,6 +393,7 @@ const productTypeOptions = Object.entries(PRODUCT_TYPE_LABELS).map(([value, labe
 const route = useRoute()
 
 const router = useRouter()
+const detailTab = ref('overview')
 const loading = ref(false)
 const productDetailsLoading = ref(false)
 const savingProductDetail = ref(false)
@@ -402,6 +415,11 @@ const productDetailFilters = ref({
   is_counterfeit: ''
 })
 const productDetailsSummary = ref(createEmptySummary())
+const productDetailPager = reactive({
+  page: 1,
+  limit: 20,
+  total: 0
+})
 const productTypeForm = reactive({
   product_type: 'unknown'
 })
@@ -576,20 +594,58 @@ const fetchRelatedInspections = async (announcementId) => {
   }
 }
 
-const fetchProductDetails = async (announcementId) => {
+const fetchProductDetails = async (announcementId, opts = {}) => {
+  if (opts.resetPage) {
+    productDetailPager.page = 1
+  }
+
   productDetailsLoading.value = true
   try {
-    const res = await getAnnouncementProductDetails(announcementId, {
-      ...productDetailFilters.value
-    })
+    const loadOnce = () =>
+      getAnnouncementProductDetails(announcementId, {
+        ...productDetailFilters.value,
+        page: productDetailPager.page,
+        limit: productDetailPager.limit
+      })
+
+    let res = await loadOnce()
     productDetails.value = res.data || []
     productDetailsSummary.value = res.summary || createEmptySummary()
+    productDetailPager.total = res.pagination ? Number(res.pagination.total || 0) : productDetails.value.length
+
+    const limit = Math.max(1, productDetailPager.limit)
+    const lastPage = Math.max(1, Math.ceil(productDetailPager.total / limit) || 1)
+    if (productDetailPager.page > lastPage) {
+      productDetailPager.page = lastPage
+      res = await loadOnce()
+      productDetails.value = res.data || []
+      productDetailsSummary.value = res.summary || createEmptySummary()
+      if (res.pagination) {
+        productDetailPager.total = Number(res.pagination.total || 0)
+      }
+    }
   } catch (error) {
     console.error('获取公告批次明细失败:', error)
     productDetails.value = []
     productDetailsSummary.value = createEmptySummary()
+    productDetailPager.total = 0
   } finally {
     productDetailsLoading.value = false
+  }
+}
+
+const handleProductDetailPageChange = (page) => {
+  productDetailPager.page = page
+  if (currentAnnouncementId.value) {
+    fetchProductDetails(currentAnnouncementId.value)
+  }
+}
+
+const handleProductDetailPageSizeChange = (size) => {
+  productDetailPager.limit = size
+  productDetailPager.page = 1
+  if (currentAnnouncementId.value) {
+    fetchProductDetails(currentAnnouncementId.value)
   }
 }
 
@@ -600,6 +656,9 @@ const fetchAnnouncement = async () => {
     goBack()
     return
   }
+
+  productDetailPager.page = 1
+  productDetailPager.total = 0
 
   loading.value = true
   try {
@@ -653,10 +712,8 @@ const handleSaveProductType = async () => {
 }
 
 const handleProductDetailSearch = () => {
-
-  if (currentAnnouncementId.value) {
-    fetchProductDetails(currentAnnouncementId.value)
-  }
+  if (!currentAnnouncementId.value) return
+  fetchProductDetails(currentAnnouncementId.value, { resetPage: true })
 }
 
 const resetProductDetailFilters = () => {
@@ -775,6 +832,18 @@ onMounted(() => {
   margin-top: 20px;
 }
 
+.detail-main-tabs :deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
+
+.detail-main-tabs :deep(.el-tabs__content) {
+  padding: 16px 18px;
+}
+
+.detail-main-tabs .product-details {
+  margin-top: 0;
+}
+
 .header {
   margin-bottom: 20px;
 }
@@ -850,6 +919,18 @@ onMounted(() => {
 
 .detail-expanded {
   padding: 12px;
+}
+
+.product-detail-table-wrap {
+  min-height: 160px;
+}
+
+.product-detail-pagination {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .remark-text {

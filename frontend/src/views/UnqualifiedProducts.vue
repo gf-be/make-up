@@ -264,12 +264,12 @@
 
             <div class="tree-section-head mb-20">
               <div>
-                <div class="tree-section-title">维度树</div>
-                <div class="tree-section-subtitle">节点含当前维度取值与 path；勾选多个节点后右侧合并查询明细。搜索后树与筛选条件（含年份）一致。</div>
+                <div class="tree-section-title">分类</div>
+                <!-- <div class="tree-section-subtitle">节点含当前维度取值与 path；勾选多个节点后右侧合并查询明细。搜索后树与筛选条件（含年份）一致。</div> -->
               </div>
               <div class="tree-section-tags">
                 <el-tag v-if="activeYearLabel" type="warning" size="small">树数据年份 {{ activeYearLabel }}</el-tag>
-                <el-tag type="info">根 {{ treeRootCount }} 个</el-tag>
+                <el-tag type="info">共 {{ treeRootCount }} 个</el-tag>
               </div>
             </div>
 

@@ -1,7 +1,8 @@
 const crypto = require('crypto');
 
 const ROLE_LABELS = {
-  developer: '开发人员',
+  system_admin: '系统管理员',
+  developer: '开发管理员',
   data_admin: '数据管理员',
   normal_user: '普通用户'
 };
@@ -13,6 +14,7 @@ function sanitizeUser(user) {
   return {
     id: user.id,
     username: user.username,
+    email: user.email || '',
     role: user.role,
     role_label: ROLE_LABELS[user.role] || user.role,
     display_name: user.display_name || user.username
@@ -44,7 +46,7 @@ function createSession(user) {
 
 async function login(pool, username, password) {
   const [rows] = await pool.query(
-    'SELECT id, username, password, role, display_name, status FROM users WHERE username = ? LIMIT 1',
+    'SELECT id, username, password, role, display_name, email, status FROM users WHERE username = ? LIMIT 1',
     [username]
   );
   const user = rows[0];
@@ -97,6 +99,33 @@ function logout(req) {
   if (token) sessions.delete(token);
 }
 
+async function refreshSessionUser(pool, token) {
+  const existing = sessions.get(token);
+  if (!existing?.id) {
+    return null;
+  }
+
+  const [rows] = await pool.query(
+    'SELECT id, username, password, role, display_name, email, status FROM users WHERE id = ? LIMIT 1',
+    [existing.id]
+  );
+  const user = rows[0];
+  if (!user || user.status === 'disabled') {
+    sessions.delete(token);
+    return null;
+  }
+
+  const safeUser = sanitizeUser(user);
+  const nextSession = {
+    token,
+    login_at: existing.login_at,
+    ...safeUser
+  };
+
+  sessions.set(token, nextSession);
+  return nextSession;
+}
+
 module.exports = {
   ROLE_LABELS,
   authenticate,
@@ -107,5 +136,6 @@ module.exports = {
   logout,
   requireRoles,
   sanitizeUser,
-  verifyPassword
+  verifyPassword,
+  refreshSessionUser
 };

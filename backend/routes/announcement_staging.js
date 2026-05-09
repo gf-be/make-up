@@ -10,10 +10,14 @@ const {
   importStagingFromUploadedFiles,
   getAnnouncementStagingOverview,
   getAnnouncementStagingDetail,
+  createAnnouncementStagingItem,
+  updateAnnouncementStagingItem,
+  deleteAnnouncementStagingItem,
   publishAnnouncementStagingBatch,
   deleteAnnouncementStagingBatch,
   deletePublishedAnnouncementStagingBatch,
   updatePublishedAnnouncementStagingBody,
+  updateAnnouncementStagingInfo,
   updateAnnouncementStagingProductType,
 
   movePublishedAnnouncementStagingBatchToTraceback,
@@ -72,12 +76,19 @@ function buildTypeInfo(productType, announcementType) {
   };
 }
 
-function buildStagingQueryConfig(query = {}) {
+function parseStagingCalendarYear(yearRaw) {
+  const yearParsed = Number.parseInt(String(yearRaw ?? '').trim(), 10);
+  return Number.isFinite(yearParsed) && yearParsed >= 1990 && yearParsed <= 2100 ? yearParsed : null;
+}
+
+function buildStagingQueryConfig(query = {}, options = {}) {
+  const skipYearFilter = Boolean(options.skipYearFilter);
   const {
     status = '',
     keyword = '',
     product_type = '',
-    announcement_type = ''
+    announcement_type = '',
+    year: yearQuery = ''
   } = query;
 
   const conditions = ['1=1'];
@@ -114,6 +125,29 @@ function buildStagingQueryConfig(query = {}) {
     );
   }
 
+  if (!skipYearFilter) {
+    const yearParsed = parseStagingCalendarYear(yearQuery);
+    if (yearParsed !== null) {
+      const ys = String(yearParsed);
+      conditions.push(`(
+        (publish_date IS NOT NULL AND YEAR(publish_date) = ?)
+        OR (
+          (publish_date IS NULL OR CAST(publish_date AS CHAR) = '')
+          AND (
+            announcement_no LIKE ? OR announcement_no LIKE ? OR title LIKE ? OR title LIKE ?
+          )
+        )
+      )`);
+      params.push(
+        yearParsed,
+        `%${ys}年%`,
+        `%${ys}-%`,
+        `%${ys}年%`,
+        `%${ys}年第%`
+      );
+    }
+  }
+
   return {
     whereClause: conditions.join(' AND '),
     params
@@ -148,7 +182,7 @@ router.post('/import-json', async (req, res) => {
     const parseWarningCount = result.parse_warning_count ?? result.parse_failed_count ?? 0;
     const messageParts = [
       `新增 ${result.created_count || 0} 个`,
-      `重复跳过 ${result.duplicate_count || 0} 个`,
+      `重复跳过 ${result.duplicate_count || 0} 个（不入倒溯）`,
       `待人工核验 ${parseWarningCount} 个`
     ];
 
@@ -221,7 +255,7 @@ router.post('/import-json-upload', authenticate, uploadJsonFiles.array('files', 
     const messageParts = [
       `上传 ${result.total_files || 0} 个`,
       `新增 ${result.created_count || 0} 个`,
-      `重复跳过 ${result.duplicate_count || 0} 个`,
+      `重复跳过 ${result.duplicate_count || 0} 个（不入倒溯）`,
       `待人工核验 ${parseWarningCount} 个`
     ];
 
@@ -311,6 +345,48 @@ router.get('/tree', async (req, res) => {
   } catch (error) {
     console.error('获取临时批次树形列表失败:', error);
     res.status(500).json({ success: false, message: '获取临时批次树形列表失败' });
+  }
+});
+
+function deriveStagingBatchDisplayYear(batch = {}) {
+  const pd = batch.publish_date;
+  if (pd) {
+    const y = Number.parseInt(String(pd).slice(0, 4), 10);
+    if (Number.isFinite(y) && y >= 1990 && y <= 2100) {
+      return y;
+    }
+  }
+  const sourceText = `${pd || ''} ${batch.announcement_no || ''} ${batch.title || ''}`.replace(/\s+/g, '');
+  const match = sourceText.match(/(20\d{2})年|^(20\d{2})-/);
+  const fromText = Number.parseInt(match?.[1] || match?.[2] || '', 10);
+  if (Number.isFinite(fromText) && fromText >= 1990 && fromText <= 2100) {
+    return fromText;
+  }
+  return null;
+}
+
+router.get('/filter-years', async (req, res) => {
+  try {
+    await ensureAnnouncementStagingSchema(pool);
+    const { whereClause, params } = buildStagingQueryConfig(req.query, { skipYearFilter: true });
+    const [rows] = await pool.query(
+      `
+        SELECT publish_date, announcement_no, title
+        FROM announcement_staging_batches
+        WHERE ${whereClause}
+      `,
+      params
+    );
+    const yearSet = new Set();
+    rows.forEach((row) => {
+      const y = deriveStagingBatchDisplayYear(row);
+      if (y !== null) yearSet.add(y);
+    });
+    const years = [...yearSet].sort((a, b) => b - a);
+    res.json({ success: true, data: { years } });
+  } catch (error) {
+    console.error('获取通告导入年份筛选列表失败:', error);
+    res.status(500).json({ success: false, message: '获取通告导入年份筛选列表失败' });
   }
 });
 
@@ -604,6 +680,69 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+router.post('/:id/items', async (req, res) => {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const detail = await createAnnouncementStagingItem(connection, req.params.id, req.body || {});
+    await connection.commit();
+    res.json({
+      success: true,
+      message: '产品明细已新增',
+      data: detail
+    });
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error('新增临时批次产品明细失败:', error);
+    res.status(500).json({ success: false, message: error.message || '新增产品明细失败' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+router.put('/:id/items', async (req, res) => {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const detail = await updateAnnouncementStagingItem(connection, req.params.id, req.body?.locator || {}, req.body?.item || {});
+    await connection.commit();
+    res.json({
+      success: true,
+      message: '产品明细已更新',
+      data: detail
+    });
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error('更新临时批次产品明细失败:', error);
+    res.status(500).json({ success: false, message: error.message || '更新产品明细失败' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+router.delete('/:id/items', async (req, res) => {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const detail = await deleteAnnouncementStagingItem(connection, req.params.id, req.body?.locator || req.body || {});
+    await connection.commit();
+    res.json({
+      success: true,
+      message: '产品明细已删除',
+      data: detail
+    });
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error('删除临时批次产品明细失败:', error);
+    res.status(500).json({ success: false, message: error.message || '删除产品明细失败' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
 router.post('/:id/confirm', async (req, res) => {
   let connection;
 
@@ -673,18 +812,60 @@ router.put('/:id/body', async (req, res) => {
   }
 });
 
+router.put('/:id/info', async (req, res) => {
+  let connection;
+
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const result = await updateAnnouncementStagingInfo(connection, req.params.id, req.body || {});
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: result.updated_published_id
+        ? '通告基础信息已同步更新到临时批次和正式库'
+        : '通告基础信息已更新到临时批次',
+      data: result
+    });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('更新临时批次基础信息失败:', error);
+
+    if (error.message === '待确认批次不存在') {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+
+    if (String(error.message || '').includes('不能切换「抽检 / 飞检」类型')) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    res.status(500).json({ success: false, message: error.message || '更新临时批次基础信息失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
 router.patch('/:id/product-type', async (req, res) => {
   let connection;
 
   try {
-    const productType = String(req.body?.product_type || '').trim();
-    if (!productType) {
-      return res.status(400).json({ success: false, message: '产品类型不能为空' });
+    const hasProductType = Object.prototype.hasOwnProperty.call(req.body || {}, 'product_type');
+    const hasAnnouncementType = Object.prototype.hasOwnProperty.call(req.body || {}, 'announcement_type');
+    if (!hasProductType && !hasAnnouncementType) {
+      return res.status(400).json({ success: false, message: '请至少提供 product_type 或 announcement_type' });
     }
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
-    const result = await updateAnnouncementStagingProductType(connection, req.params.id, productType);
+    const result = await updateAnnouncementStagingProductType(connection, req.params.id, {
+      ...(hasProductType ? { product_type: req.body.product_type } : {}),
+      ...(hasAnnouncementType ? { announcement_type: req.body.announcement_type } : {})
+    });
     await connection.commit();
 
     res.json({
@@ -702,6 +883,10 @@ router.patch('/:id/product-type', async (req, res) => {
 
     if (error.message === '待确认批次不存在') {
       return res.status(404).json({ success: false, message: error.message });
+    }
+
+    if (String(error.message || '').includes('不能切换「抽检 / 飞检」类型')) {
+      return res.status(400).json({ success: false, message: error.message });
     }
 
     res.status(500).json({ success: false, message: error.message || '更新临时批次产品类型失败' });

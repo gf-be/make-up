@@ -657,6 +657,11 @@ router.get('/:announcementId/product-details', async (req, res) => {
       is_counterfeit = ''
     } = req.query;
 
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limitRaw = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isNaN(limitRaw) || limitRaw <= 0 ? 50 : Math.min(limitRaw, 200);
+    const offset = (page - 1) * limit;
+
     await ensureAnnouncementProductDetailsTable(pool);
 
     let [existingRows] = await pool.query(
@@ -721,32 +726,55 @@ router.get('/:announcementId/product-details', async (req, res) => {
       params.push(Number(is_counterfeit));
     }
 
-    const [rows] = await pool.query(
+    const whereClause = conditions.join(' AND ');
+
+    const [countRows] = await pool.query(
       `
-        SELECT *
+        SELECT
+          COUNT(*) AS cnt,
+          SUM(CASE WHEN is_counterfeit = 1 THEN 1 ELSE 0 END) AS filtered_counterfeit_sum
         FROM announcement_product_details
-        WHERE ${conditions.join(' AND ')}
-        ORDER BY sequence_no ASC, id ASC
+        WHERE ${whereClause}
       `,
       params
     );
 
+    const filteredTotal = Number(countRows[0]?.cnt || 0);
+    const filteredCounterfeitCount = Number(countRows[0]?.filtered_counterfeit_sum || 0);
+
+    const [rows] = await pool.query(
+      `
+        SELECT *
+        FROM announcement_product_details
+        WHERE ${whereClause}
+        ORDER BY sequence_no ASC, id ASC
+        LIMIT ? OFFSET ?
+      `,
+      [...params, limit, offset]
+    );
+
     const summary = await getAnnouncementProductDetailSummary(pool, announcementId);
-    const filteredCounterfeitCount = rows.reduce((count, row) => count + (row.is_counterfeit ? 1 : 0), 0);
+    const hasFilters = Boolean(
+      normalizedUnqualifiedItem ||
+      normalizedCompanyKeyword ||
+      normalizedSampleUnitKeyword ||
+      hasCounterfeitFilter
+    );
 
     res.json({
       success: true,
       data: rows,
       summary: {
         ...summary,
-        filtered_total: rows.length,
+        filtered_total: filteredTotal,
         filtered_counterfeit_count: filteredCounterfeitCount,
-        has_filters: Boolean(
-          normalizedUnqualifiedItem ||
-          normalizedCompanyKeyword ||
-          normalizedSampleUnitKeyword ||
-          hasCounterfeitFilter
-        )
+        has_filters: hasFilters
+      },
+      pagination: {
+        total: filteredTotal,
+        page,
+        limit,
+        pages: limit > 0 ? Math.ceil(filteredTotal / limit) : 0
       }
     });
   } catch (error) {
@@ -1093,7 +1121,9 @@ router.patch('/:id/product-type', async (req, res) => {
     let resultPayload;
 
     if (stagingBatchId) {
-      resultPayload = await updateAnnouncementStagingProductType(connection, stagingBatchId, normalizedProductType);
+      resultPayload = await updateAnnouncementStagingProductType(connection, stagingBatchId, {
+        product_type: normalizedProductType
+      });
     } else {
       await connection.query('UPDATE announcements SET product_type = ? WHERE id = ?', [normalizedProductType, id]);
       const syncResult = await syncAnnouncementDerivedData(connection, id);

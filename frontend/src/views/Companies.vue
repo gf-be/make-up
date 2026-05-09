@@ -40,37 +40,7 @@
         </el-form-item>
       </el-form>
 
-      <el-row :gutter="20" class="stats-row">
-        <el-col :span="6">
-          <div class="stat-item">
-            <div class="stat-value">{{ companyStats.total_companies || 0 }}</div>
-            <div class="stat-label">企业总数</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="stat-item inspected">
-            <div class="stat-value">{{ companyStats.inspected_companies || 0 }}</div>
-            <div class="stat-label">已检查企业</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="stat-item unqualified">
-            <div class="stat-value">{{ companyStats.unqualified_companies || 0 }}</div>
-            <div class="stat-label">不合格企业</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="stat-item rate">
-            <div class="stat-value">
-              {{ companyStats.inspected_companies
-                ? ((companyStats.inspected_companies - companyStats.unqualified_companies) / companyStats.inspected_companies * 100).toFixed(1)
-                : 0 }}%
-            </div>
-            <div class="stat-label">合格率</div>
-          </div>
-        </el-col>
-      </el-row>
-
+      
       <el-table :data="tableData" stripe v-loading="loading">
         <el-table-column prop="name" label="企业名称" min-width="200" show-overflow-tooltip />
         <!-- <el-table-column prop="brand" label="品牌" width="120" /> -->

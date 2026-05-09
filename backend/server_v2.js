@@ -57,11 +57,9 @@ app.use('/api/announcements', require('./routes/announcements_v2'));
 app.use('/api/announcement-staging', require('./routes/announcement_staging'));
 app.use('/api/inspections', require('./routes/inspections_v2'));
 app.use('/api/companies', require('./routes/companies'));
+// app.use('/api/companies-manage', require('./routes/companies_manage'));
 app.use('/api/unqualified-products', require('./routes/unqualified_products'));
 app.use('/api/supervisions', require('./routes/supervisions'));
-app.use('/api/dashboard', require('./routes/dashboard_v2'));
-app.use('/api/analytics', require('./routes/analytics'));
-app.use('/api/sampling-search', require('./routes/sampling_search'));
 app.use('/api/food-inspections', require('./routes/food_inspections'));
 
 
@@ -83,10 +81,9 @@ app.get('/', (req, res) => {
       announcementStaging: '/api/announcement-staging',
       inspections: '/api/inspections',
       companies: '/api/companies',
+      companiesManage: '/api/companies-manage',
       unqualifiedProducts: '/api/unqualified-products',
       supervisions: '/api/supervisions',
-      dashboard: '/api/dashboard',
-      samplingSearch: '/api/sampling-search',
       foodInspections: '/api/food-inspections'
     }
 

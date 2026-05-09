@@ -100,10 +100,11 @@ const passwordForm = reactive({
 })
 
 const MODULE_LABELS = {
+  profile: '个人中心',
+  'admin-users': '用户管理',
+
   home: '首页',
   'unqualified-products': '不合格产品',
-  'pivot-analysis': '数据矩阵',
-  'sampling-search': '数据检索',
   'announcement-staging': '导入检查',
   announcements: '抽检通告',
   inspections: '抽样检查',

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const { requireRoles } = require('../utils/auth');
 const {
   ensureUnqualifiedProductsTable,
   getUnqualifiedProductCategoryOptions,
@@ -12,6 +13,886 @@ const {
   normalizeProductType,
   normalizeAnnouncementType
 } = require('../utils/unqualifiedProducts');
+
+/** 企业管理页同款：开发与数据管理员可操作 unqualified_products 主档（含无主档来源的记录） */
+const requireUnqualifiedProductManagers = () => requireRoles(['developer', 'data_admin']);
+
+const MANAGE_WRITABLE_COLUMNS = [
+  'batch_title',
+  'total_batches',
+  'sequence_no',
+  'product_name',
+  'company_names',
+  'company_addresses',
+  'manufacturer_name',
+  'manufacturer_address',
+  'operator_name',
+  'operator_address',
+  'sample_unit_name',
+  'sample_unit_address',
+  'package_spec',
+  'batch_no',
+  'production_date',
+  'expiry_date',
+  'product_region',
+  'registration_no',
+  'production_license_no',
+  'inspection_institution',
+  'unqualified_items',
+  'inspection_result',
+  'requirement',
+  'remarks',
+  'product_category',
+  'manufacturer_province',
+  'manufacturer_city',
+  'sampled_province',
+  'sampled_city',
+  'issue_category',
+  'product_type',
+  'announcement_type',
+  'source_key',
+  'source_no',
+  'source_title',
+  'source_publish_date',
+  'source_year',
+  'province_display',
+  'company_id',
+  'announcement_id',
+  'announcement_detail_id',
+  'supervision_id',
+  'supervision_detail_id',
+  'is_counterfeit'
+];
+
+function truncateDateTimeForMysql(value) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return null;
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    return null;
+  }
+  return d.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function sanitizeLongText(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const s = String(value);
+  return s.length ? s : null;
+}
+
+function normalizeNullableInt(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  const n = Number.parseInt(value, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeRequiredInt(value, fieldLabel) {
+  const n = Number.parseInt(value, 10);
+  if (!Number.isFinite(n)) {
+    const err = new Error(`${fieldLabel}须为整数`);
+    err.statusCode = 400;
+    throw err;
+  }
+  return n;
+}
+
+function normalizeIssueAndCategoryArrays(body) {
+  const toArr = (v) => {
+    if (Array.isArray(v)) {
+      return v.map((x) => String(x || '').trim()).filter(Boolean);
+    }
+    if (v === undefined || v === null || v === '') {
+      return [];
+    }
+    return String(v)
+      .split(/[\n,，;；|｜]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  };
+  return {
+    issue_items: [...new Set(toArr(body.issue_items))],
+    product_categories: [...new Set(toArr(body.product_categories))]
+  };
+}
+
+async function verifyManageForeignKeys(connection, row) {
+
+  const tasks = [];
+
+  if (row.announcement_id != null) {
+
+    tasks.push(
+      connection
+        .query('SELECT id FROM announcements WHERE id = ? LIMIT 1', [row.announcement_id])
+        .then(([r]) => {
+          if (!r[0]) {
+            const e = new Error('announcement_id 在库中不存在');
+            e.statusCode = 400;
+            throw e;
+          }
+        })
+    );
+
+  }
+
+
+  if (row.announcement_detail_id != null) {
+
+    tasks.push(
+      connection
+        .query('SELECT id FROM announcement_product_details WHERE id = ? LIMIT 1', [row.announcement_detail_id])
+        .then(([r]) => {
+          if (!r[0]) {
+            const e = new Error('announcement_detail_id 在库中不存在');
+            e.statusCode = 400;
+            throw e;
+          }
+        })
+    );
+
+  }
+
+
+  if (row.supervision_id != null) {
+
+    tasks.push(
+      connection
+        .query('SELECT id FROM supervisions WHERE id = ? LIMIT 1', [row.supervision_id])
+        .then(([r]) => {
+          if (!r[0]) {
+            const e = new Error('supervision_id 在库中不存在');
+            e.statusCode = 400;
+            throw e;
+          }
+        })
+    );
+
+  }
+
+
+  if (row.supervision_detail_id != null) {
+
+    tasks.push(
+      connection
+        .query('SELECT id FROM flight_inspection_detail WHERE id = ? LIMIT 1', [row.supervision_detail_id])
+        .then(([r]) => {
+          if (!r[0]) {
+            const e = new Error('supervision_detail_id 在库中不存在');
+            e.statusCode = 400;
+            throw e;
+          }
+        })
+    );
+
+  }
+
+
+  if (row.company_id != null) {
+
+    tasks.push(
+      connection
+        .query('SELECT id FROM companies WHERE id = ? LIMIT 1', [row.company_id])
+        .then(([r]) => {
+          if (!r[0]) {
+            const e = new Error('company_id 在库中不存在');
+            e.statusCode = 400;
+            throw e;
+          }
+        })
+    );
+
+  }
+
+
+
+  await Promise.all(tasks);
+}
+
+async function syncIssueCategoryJunction(connection, productId, { issue_items, product_categories }, row) {
+
+
+  await connection.query('DELETE FROM unqualified_product_issue_items WHERE unqualified_product_id = ?', [productId]);
+
+
+  const annId = row.announcement_id ?? null;
+
+
+  const detId = row.announcement_detail_id ?? null;
+
+
+  for (const issue_item of issue_items) {
+
+
+    await connection.query(
+      'INSERT INTO unqualified_product_issue_items (unqualified_product_id, announcement_id, announcement_detail_id, issue_item) VALUES (?, ?, ?, ?)',
+      [productId, annId, detId, issue_item]
+    );
+
+
+  }
+
+
+  await connection.query('DELETE FROM unqualified_product_category_items WHERE unqualified_product_id = ?', [productId]);
+
+
+  for (const product_category of product_categories) {
+
+
+    await connection.query(
+      'INSERT INTO unqualified_product_category_items (unqualified_product_id, announcement_id, announcement_detail_id, product_category) VALUES (?, ?, ?, ?)',
+      [productId, annId, detId, product_category]
+    );
+
+
+  }
+
+
+
+}
+
+/** 合并请求体为可写入行；create 时对缺失列给默认值 */
+
+
+function assembleManageRowFromBody(body, { forCreate }) {
+
+
+  const batchTitle = sanitizeLongText(body.batch_title);
+
+
+  const productName = sanitizeLongText(body.product_name);
+
+
+  if (forCreate) {
+
+
+    if (!batchTitle) {
+
+
+      const e = new Error('batch_title（批次标题）不能为空');
+
+
+      e.statusCode = 400;
+
+
+      throw e;
+
+
+    }
+
+
+    if (!productName) {
+
+
+      const e = new Error('product_name（产品名称）不能为空');
+
+
+      e.statusCode = 400;
+
+
+      throw e;
+
+
+    }
+
+
+  }
+
+
+
+  let sequenceNo;
+
+
+  if (forCreate || body.sequence_no !== undefined) {
+
+
+    sequenceNo = normalizeRequiredInt(body.sequence_no, 'sequence_no（批次内序号）');
+
+
+  }
+
+
+
+  const row = {};
+
+
+  if (batchTitle !== undefined || forCreate) row.batch_title = batchTitle || '';
+
+  if (body.total_batches !== undefined || forCreate) {
+
+    row.total_batches = normalizeNullableInt(body.total_batches) ?? 0;
+
+  }
+
+
+  if (sequenceNo !== undefined) row.sequence_no = sequenceNo;
+
+  if (productName !== undefined || forCreate) row.product_name = productName || '';
+
+
+  const textFields = [
+
+    'company_names',
+
+    'company_addresses',
+
+    'manufacturer_name',
+
+    'manufacturer_address',
+
+    'operator_name',
+
+    'operator_address',
+
+    'sample_unit_name',
+
+    'sample_unit_address',
+
+    'package_spec',
+
+    'batch_no',
+
+    'production_date',
+
+    'expiry_date',
+
+    'product_region',
+
+    'registration_no',
+
+    'production_license_no',
+
+    'inspection_institution',
+
+    'product_category',
+
+    'manufacturer_province',
+
+    'manufacturer_city',
+
+    'sampled_province',
+
+    'sampled_city',
+
+    'issue_category',
+
+    'source_key',
+
+    'source_no',
+
+    'source_title',
+
+    'province_display'
+
+  ];
+
+
+  for (const f of textFields) {
+
+
+    if (Object.prototype.hasOwnProperty.call(body, f) || forCreate) {
+
+
+      row[f] = sanitizeLongText(body[f]);
+
+    }
+
+
+  }
+
+
+
+  const longFields = ['unqualified_items', 'inspection_result', 'requirement', 'remarks'];
+
+
+  for (const f of longFields) {
+
+
+    if (Object.prototype.hasOwnProperty.call(body, f) || forCreate) {
+
+
+      row[f] = sanitizeLongText(body[f]);
+
+    }
+
+
+  }
+
+
+
+  if (Object.prototype.hasOwnProperty.call(body, 'product_type') || forCreate) {
+
+
+    const pt = body.product_type;
+
+
+    row.product_type = pt ? normalizeProductType(String(pt)) : 'cosmetics';
+
+  }
+
+
+  if (Object.prototype.hasOwnProperty.call(body, 'announcement_type') || forCreate) {
+
+
+    const at = body.announcement_type;
+
+
+    row.announcement_type = at ? normalizeAnnouncementType(String(at)) : 'sampling';
+
+  }
+
+
+
+  if (Object.prototype.hasOwnProperty.call(body, 'source_publish_date') || forCreate) {
+
+
+    row.source_publish_date = truncateDateTimeForMysql(body.source_publish_date);
+
+  }
+
+
+  if (Object.prototype.hasOwnProperty.call(body, 'source_year') || forCreate) {
+
+
+    row.source_year = normalizeNullableInt(body.source_year);
+
+  }
+
+
+
+  const idFields = [
+    'announcement_id',
+    'announcement_detail_id',
+    'supervision_id',
+    'supervision_detail_id',
+    'company_id'
+
+  ];
+
+  for (const f of idFields) {
+
+
+    if (Object.prototype.hasOwnProperty.call(body, f) || forCreate) {
+
+
+      row[f] = normalizeNullableInt(body[f]);
+
+    }
+
+
+  }
+
+
+
+  if (Object.prototype.hasOwnProperty.call(body, 'is_counterfeit') || forCreate) {
+
+
+    const v = body.is_counterfeit;
+
+
+    row.is_counterfeit = v === true || v === 1 || v === '1' || v === 'true' ? 1 : 0;
+
+  }
+
+
+
+  return row;
+
+}
+
+router.get('/manage/list', requireUnqualifiedProductManagers(), async (req, res) => {
+
+
+  try {
+
+
+    await ensureUnqualifiedProductsReady();
+
+
+    const {
+
+
+      keyword = '',
+
+      page = 1,
+
+      limit = 20
+
+    
+
+    } = req.query;
+
+
+    const currentPage = Math.max(Number.parseInt(page, 10) || 1, 1);
+
+
+    const pageSize = clampPageSize(limit, 20, 200);
+
+
+    const offset = (currentPage - 1) * pageSize;
+
+
+    const kw = normalizeOptionalText(keyword);
+
+
+    const params = [];
+
+    let whereClause = '1 = 1';
+
+    if (kw) {
+
+
+      whereClause +=
+        ` AND (
+        up.product_name LIKE ? OR
+        up.batch_title LIKE ? OR
+        up.manufacturer_name LIKE ? OR
+        up.sample_unit_name LIKE ? OR
+        CAST(up.id AS CHAR) LIKE ?
+      )`;
+
+      const like = `%${kw}%`;
+
+
+      params.push(like, like, like, like, like);
+
+    }
+
+
+    const [countRows] = await pool.query(
+      `
+      SELECT COUNT(*) AS total FROM unqualified_products up WHERE ${whereClause}
+    `,
+      params
+    );
+
+
+    const total = Number(countRows[0]?.total || 0);
+
+
+    const [rows] = await pool.query(
+      `
+      SELECT ${getProductSelectSql('up')}
+      FROM unqualified_products up
+      WHERE ${whereClause}
+      ORDER BY up.id DESC
+      LIMIT ? OFFSET ?
+    `,
+      [...params, pageSize, offset]
+    );
+
+
+    res.json({
+
+
+      success: true,
+
+      data: rows.map((r) => ({
+        ...r,
+
+        product_type_label: getProductTypeLabel(r.product_type),
+
+        announcement_type_label: getAnnouncementTypeLabel(r.announcement_type)
+
+      })),
+
+      pagination: {
+
+        total,
+
+        page: currentPage,
+
+        limit: pageSize,
+
+        pages: Math.ceil(total / pageSize) || 0
+
+      }
+
+    });
+
+  } catch (error) {
+
+    console.error('管理端产品列表失败:', error);
+
+
+    const status = error.statusCode || 500;
+
+
+    res.status(status).json({ success: false, message: error.message || '管理端产品列表失败' });
+
+  }
+
+
+
+});
+
+router.post('/manage', requireUnqualifiedProductManagers(), async (req, res) => {
+
+
+  const connection = await pool.getConnection();
+
+  try {
+
+    await ensureUnqualifiedProductsReady();
+
+
+    await connection.beginTransaction();
+
+
+    const row = assembleManageRowFromBody(req.body || {}, { forCreate: true });
+
+
+    await verifyManageForeignKeys(connection, row);
+
+
+    const { issue_items, product_categories } = normalizeIssueAndCategoryArrays(req.body || {});
+
+
+    const cols = [...MANAGE_WRITABLE_COLUMNS];
+
+
+    const placeholders = cols.map(() => '?').join(', ');
+
+
+    const values = cols.map((c) => row[c]);
+
+
+    const [ins] = await connection.query(`INSERT INTO unqualified_products (${cols.join(', ')}) VALUES (${placeholders})`, values);
+
+
+    const productId = ins.insertId;
+
+
+    await syncIssueCategoryJunction(connection, productId, { issue_items, product_categories }, row);
+
+
+    await connection.commit();
+
+
+    res.json({ success: true, data: { id: productId } });
+
+  } catch (error) {
+
+    await connection.rollback();
+
+
+    console.error('创建不合格产品记录失败:', error);
+
+
+    const status = error.statusCode || (error.code === 'ER_DUP_ENTRY' ? 409 : 500);
+
+
+    let message = error.message || '创建不合格产品记录失败';
+
+
+    if (error.code === 'ER_DUP_ENTRY') {
+
+
+      message = '同一 batch_title + sequence_no 已存在，请更换序号';
+
+
+    }
+
+
+    res.status(status).json({ success: false, message });
+
+  } finally {
+
+
+    connection.release();
+
+
+  }
+
+
+
+});
+
+router.put('/manage/:id', requireUnqualifiedProductManagers(), async (req, res) => {
+
+
+  const connection = await pool.getConnection();
+
+
+  const id = normalizeRequiredInt(req.params.id, 'id');
+
+
+  try {
+
+
+    await ensureUnqualifiedProductsReady();
+
+
+    await connection.beginTransaction();
+
+
+    const [existingRows] = await connection.query(
+      'SELECT id FROM unqualified_products WHERE id = ? LIMIT 1',
+
+      [id]
+
+    );
+
+
+    if (!existingRows[0]) {
+
+
+      await connection.rollback();
+
+
+      return res.status(404).json({ success: false, message: '记录不存在' });
+
+    }
+
+
+
+    const row = assembleManageRowFromBody(req.body || {}, { forCreate: true });
+
+
+    delete row.updated_at;
+
+
+    await verifyManageForeignKeys(connection, row);
+
+
+    const { issue_items, product_categories } = normalizeIssueAndCategoryArrays(req.body || {});
+
+
+    const sets = MANAGE_WRITABLE_COLUMNS.map((c) => `${c} = ?`).join(', ');
+
+
+    const values = [...MANAGE_WRITABLE_COLUMNS.map((c) => row[c]), id];
+
+
+    await connection.query(`UPDATE unqualified_products SET ${sets} WHERE id = ? LIMIT 1`, values);
+
+
+    await syncIssueCategoryJunction(connection, id, { issue_items, product_categories }, row);
+
+
+    await connection.commit();
+
+
+    res.json({ success: true });
+
+
+  } catch (error) {
+
+
+    await connection.rollback();
+
+
+    console.error('更新不合格产品记录失败:', error);
+
+
+    const status = error.statusCode || (error.code === 'ER_DUP_ENTRY' ? 409 : 500);
+
+
+    let message = error.message || '更新不合格产品记录失败';
+
+
+    if (error.code === 'ER_DUP_ENTRY') {
+
+
+      message = '同一 batch_title + sequence_no 已存在';
+
+
+    }
+
+
+    res.status(status).json({ success: false, message });
+
+  } finally {
+
+
+    connection.release();
+
+
+  }
+
+
+
+});
+
+router.delete('/manage/:id', requireUnqualifiedProductManagers(), async (req, res) => {
+  try {
+    await ensureUnqualifiedProductsReady();
+    const id = normalizeRequiredInt(req.params.id, 'id');
+    const [r] = await pool.query('DELETE FROM unqualified_products WHERE id = ? LIMIT 1', [id]);
+    const affected = r.affectedRows || 0;
+    if (!affected) {
+      return res.status(404).json({ success: false, message: '记录不存在' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('删除不合格产品失败:', error);
+    res.status(500).json({ success: false, message: error.message || '删除不合格产品失败' });
+  }
+});
+
+/** 管理端详情（含 issue_items / product_categories），供无「产品」浏览权限的数据管理员编辑 */
+router.get('/manage/record/:id', requireUnqualifiedProductManagers(), async (req, res) => {
+  try {
+    await ensureUnqualifiedProductsReady();
+    const id = normalizeRequiredInt(req.params.id, 'id');
+    const [rows] = await pool.query(
+      `
+        SELECT
+          ${getProductSelectSql('up')},
+          a.announcement_no,
+          s.supervision_unit,
+          s.level AS supervision_level
+        FROM unqualified_products up
+        LEFT JOIN announcements a ON up.announcement_id = a.id
+        LEFT JOIN supervisions s ON up.supervision_id = s.id
+        WHERE up.id = ?
+        LIMIT 1
+      `,
+      [id]
+    );
+    const detail = rows[0] || null;
+    if (!detail) {
+      return res.status(404).json({ success: false, message: '问题产品不存在' });
+    }
+    const [[issueRows], [categoryRows]] = await Promise.all([
+      pool.query(
+        `
+          SELECT issue_item
+          FROM unqualified_product_issue_items
+          WHERE unqualified_product_id = ?
+          ORDER BY issue_item ASC
+        `,
+        [id]
+      ),
+      pool.query(
+        `
+          SELECT product_category
+          FROM unqualified_product_category_items
+          WHERE unqualified_product_id = ?
+          ORDER BY product_category ASC
+        `,
+        [id]
+      )
+    ]);
+    res.json({
+      success: true,
+      data: {
+        ...detail,
+        product_type_label: getProductTypeLabel(detail.product_type),
+        announcement_type_label: getAnnouncementTypeLabel(detail.announcement_type),
+        issue_items: (issueRows || []).map((row) => row.issue_item).filter(Boolean),
+        product_categories: (categoryRows || []).map((row) => row.product_category).filter(Boolean)
+      }
+    });
+  } catch (error) {
+    console.error('管理端获取不合格产品详情失败:', error);
+    res.status(500).json({ success: false, message: '获取详情失败' });
+  }
+});
 
 function parseListParam(value) {
   if (Array.isArray(value)) {

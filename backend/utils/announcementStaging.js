@@ -526,8 +526,12 @@ function buildAttachmentPreview(rawPayload = {}, typeInfo = resolveTypeInfo()) {
   if (typeInfo.announcement_type === 'flight_inspection') {
     const flightAttachments = attachments.map((attachment, attachmentIndex) => {
       const rawRows = Array.isArray(attachment?.parse_result?.rows) ? attachment.parse_result.rows : [];
-      const rows = rawRows
-        .map((row, rowIndex) => normalizeFlightInspectionRow(row, rowIndex, attachment, attachmentIndex))
+    const rows = rawRows
+        .map((row, rowIndex) => ({
+          ...normalizeFlightInspectionRow(row, rowIndex, attachment, attachmentIndex),
+          __attachment_index: attachmentIndex + 1,
+          __row_index: rowIndex
+        }))
         .filter((row) => row.company_name || row.title || row.defects_and_problems);
 
       return {
@@ -570,7 +574,11 @@ function buildAttachmentPreview(rawPayload = {}, typeInfo = resolveTypeInfo()) {
   return attachments.map((attachment, attachmentIndex) => {
     const rawRows = Array.isArray(attachment?.parse_result?.rows) ? attachment.parse_result.rows : [];
     const rows = rawRows
-      .map((row, rowIndex) => normalizeDetailRow(row, rowIndex))
+      .map((row, rowIndex) => ({
+        ...normalizeDetailRow(row, rowIndex),
+        __attachment_index: attachmentIndex + 1,
+        __row_index: rowIndex
+      }))
       .filter((row) => row.product_name);
 
     return {
@@ -1602,15 +1610,8 @@ async function upsertStagingBatchFromJsonPayload(connection, sourceJsonFile, pay
   const existingBatch = await findExistingStagingBatch(connection, batchPayload);
 
   if (existingBatch) {
-    const warningMessage = `重复导入：临时区已存在“${existingBatch.title || batchPayload.title}”，本次已跳过`;
-    const tracebackId = await upsertAnnouncementTraceback(connection, {
-      trace_type: 'duplicate',
-      batchPayload,
-      reason: warningMessage,
-      existing_batch_id: existingBatch.id,
-      existing_announcement_id: existingBatch.published_announcement_id || null,
-      existing_supervision_id: existingBatch.published_supervision_id || null
-    });
+    const warningMessage = `重复导入：临时区已存在“${existingBatch.title || batchPayload.title}”，本次已跳过（不产生倒溯）`;
+    await clearAnnouncementTracebacksBySource(connection, batchPayload, ['duplicate']);
 
     return {
       id: Number(existingBatch.id),
@@ -1630,7 +1631,7 @@ async function upsertStagingBatchFromJsonPayload(connection, sourceJsonFile, pay
       product_type_label: getProductTypeLabel(batchPayload.product_type),
       announcement_type_label: getAnnouncementTypeLabel(batchPayload.announcement_type),
       warning_message: warningMessage,
-      traceback_id: tracebackId,
+      traceback_id: null,
       existing_batch_id: Number(existingBatch.id)
     };
   }
@@ -1640,15 +1641,9 @@ async function upsertStagingBatchFromJsonPayload(connection, sourceJsonFile, pay
     const existingAnnouncementId = existingPublished.announcement_id || null;
     const existingSupervisionId = existingPublished.supervision_id || null;
     const warningMessage = existingPublished.target_table === 'supervisions'
-      ? `重复导入：飞检正式库已存在“${existingPublished.title || batchPayload.title}”，本次已跳过`
-      : `重复导入：抽检正式库已存在“${existingPublished.title || batchPayload.title}”，本次已跳过`;
-    const tracebackId = await upsertAnnouncementTraceback(connection, {
-      trace_type: 'duplicate',
-      batchPayload,
-      reason: warningMessage,
-      existing_announcement_id: existingAnnouncementId,
-      existing_supervision_id: existingSupervisionId
-    });
+      ? `重复导入：飞检正式库已存在“${existingPublished.title || batchPayload.title}”，本次已跳过（不产生倒溯）`
+      : `重复导入：抽检正式库已存在“${existingPublished.title || batchPayload.title}”，本次已跳过（不产生倒溯）`;
+    await clearAnnouncementTracebacksBySource(connection, batchPayload, ['duplicate']);
 
     return {
       id: null,
@@ -1668,7 +1663,7 @@ async function upsertStagingBatchFromJsonPayload(connection, sourceJsonFile, pay
       product_type_label: getProductTypeLabel(batchPayload.product_type),
       announcement_type_label: getAnnouncementTypeLabel(batchPayload.announcement_type),
       warning_message: warningMessage,
-      traceback_id: tracebackId,
+      traceback_id: null,
       existing_announcement_id: existingAnnouncementId,
       existing_supervision_id: existingSupervisionId
     };
@@ -1818,7 +1813,7 @@ async function importStagingFromJsonDirectory(connection, directoryPath = DEFAUL
       await connection.commit();
 
       let deleteResult = { deleted: false, message: null };
-      if (result.action === 'created') {
+      if (result.action === 'created' || result.action === 'skipped_duplicate') {
         deleteResult = removeImportedJsonFile(filePath);
         if (!deleteResult.deleted) {
           deleteFailures.push({
@@ -1832,8 +1827,10 @@ async function importStagingFromJsonDirectory(connection, directoryPath = DEFAUL
       processedItems.push({
         ...result,
         source_json_name: fileName,
-        source_deleted: result.action === 'created' ? deleteResult.deleted : false,
-        delete_message: result.action === 'created' && !deleteResult.deleted ? deleteResult.message : null
+        source_deleted: deleteResult.deleted,
+        delete_message: (result.action === 'created' || result.action === 'skipped_duplicate') && !deleteResult.deleted
+          ? deleteResult.message
+          : null
       });
     } catch (error) {
       await connection.rollback();
@@ -1894,7 +1891,7 @@ async function importStagingFromJsonDirectory(connection, directoryPath = DEFAUL
     parse_failed_count: parseWarningItems.length,
     skipped_count: duplicateItems.length,
     error_count: importErrors.length,
-    deleted_count: createdItems.filter((item) => item.source_deleted).length,
+    deleted_count: processedItems.filter((item) => item.source_deleted).length,
     delete_failed_count: deleteFailures.length,
     delete_failures: deleteFailures,
     errors: importErrors,
@@ -2074,6 +2071,179 @@ async function getAnnouncementStagingDetail(connection, stagingBatchId) {
       failed_attachment_count: Number(parseValidation.failed_attachment_count || 0)
     }
   };
+}
+
+function normalizeEditableStagingDetailItem(input = {}, index = 0) {
+  const normalized = normalizeDetailRow(input, index);
+  if (!normalized.product_name) {
+    throw new Error('产品名称不能为空');
+  }
+  return normalized;
+}
+
+function getEditableSamplingPayload(batch = {}) {
+  const typeInfo = getBatchTypeInfo(batch, parseJsonSafely(batch.raw_payload, {}));
+  if (typeInfo.announcement_type === 'flight_inspection') {
+    throw new Error('飞行检查批次暂不支持在此编辑产品明细');
+  }
+
+  const rawPayload = parseJsonSafely(batch.raw_payload, {});
+  if (!Array.isArray(rawPayload.attachments)) {
+    rawPayload.attachments = [];
+  }
+
+  if (!rawPayload.attachments.length) {
+    rawPayload.attachments.push({
+      attachment_name: batch.primary_attachment_name || '人工维护产品明细',
+      parse_result: {
+        supported: true,
+        attachment_type: 'manual',
+        message: '人工维护产品明细',
+        rows: []
+      }
+    });
+  }
+
+  rawPayload.attachments.forEach((attachment, index) => {
+    if (!attachment || typeof attachment !== 'object') {
+      rawPayload.attachments[index] = {};
+    }
+    const target = rawPayload.attachments[index];
+    if (!target.parse_result || typeof target.parse_result !== 'object') {
+      target.parse_result = {
+        supported: true,
+        attachment_type: 'manual',
+        message: '人工维护产品明细',
+        rows: []
+      };
+    }
+    if (!Array.isArray(target.parse_result.rows)) {
+      target.parse_result.rows = [];
+    }
+  });
+
+  return { rawPayload, typeInfo };
+}
+
+async function getStagingBatchForItemEdit(connection, stagingBatchId) {
+  await ensureAnnouncementStagingSchema(connection);
+  const [rows] = await connection.query(
+    'SELECT * FROM announcement_staging_batches WHERE id = ? LIMIT 1',
+    [stagingBatchId]
+  );
+  const batch = rows[0] || null;
+  if (!batch) {
+    throw new Error('待确认批次不存在');
+  }
+  return batch;
+}
+
+function resolveEditableAttachment(rawPayload = {}, attachmentIndexRaw = 1) {
+  const requestedIndex = Math.max(Number.parseInt(attachmentIndexRaw, 10) || 1, 1) - 1;
+  const index = Math.min(requestedIndex, rawPayload.attachments.length - 1);
+  const attachment = rawPayload.attachments[index];
+  return { attachment, attachmentIndex: index };
+}
+
+function resolveEditableRowIndex(rows = [], locator = {}) {
+  const rowIndex = Number.parseInt(locator.row_index, 10);
+  if (Number.isInteger(rowIndex) && rowIndex >= 0 && rowIndex < rows.length) {
+    return rowIndex;
+  }
+
+  const sequenceNo = Number.parseInt(locator.sequence_no, 10);
+  if (Number.isInteger(sequenceNo)) {
+    const matchedIndex = rows.findIndex((row, index) => {
+      const normalized = normalizeDetailRow(row, index);
+      return Number(normalized.sequence_no) === sequenceNo;
+    });
+    if (matchedIndex >= 0) {
+      return matchedIndex;
+    }
+  }
+
+  return -1;
+}
+
+async function persistStagingDetailPayload(connection, stagingBatchId, rawPayload = {}) {
+  const typeInfo = getBatchTypeInfo({ announcement_type: 'sampling' }, rawPayload);
+  const items = collectBatchRows(rawPayload, typeInfo.announcement_type);
+  const attachments = buildAttachmentPreview(rawPayload, typeInfo);
+  const validation = buildAttachmentValidation(rawPayload, items, attachments);
+  const rawPayloadJson = JSON.stringify(rawPayload);
+
+  await connection.query(
+    `
+      UPDATE announcement_staging_batches
+      SET raw_payload = ?,
+          inspection_count = ?,
+          parsed_detail_count = ?,
+          counterfeit_count = ?,
+          attachment_count = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    [
+      rawPayloadJson,
+      items.length,
+      items.length,
+      items.filter((item) => item.is_counterfeit).length,
+      attachments.length,
+      stagingBatchId
+    ]
+  );
+
+  await replaceStagingItems(connection, stagingBatchId, items, typeInfo.announcement_type);
+
+  if (!validation.blocking) {
+    await clearAnnouncementTracebacksBySource(connection, {
+      source_json_file: rawPayload.source_json_file,
+      source_detail_url: rawPayload.source_detail_url || rawPayload.detail_url
+    }, ['parse_failed']);
+  }
+
+  return getAnnouncementStagingDetail(connection, stagingBatchId);
+}
+
+async function createAnnouncementStagingItem(connection, stagingBatchId, payload = {}) {
+  const batch = await getStagingBatchForItemEdit(connection, stagingBatchId);
+  const { rawPayload } = getEditableSamplingPayload(batch);
+  const { attachment } = resolveEditableAttachment(rawPayload, payload.attachment_index || 1);
+  const rows = attachment.parse_result.rows;
+  const item = normalizeEditableStagingDetailItem(payload.item || payload, rows.length);
+  rows.push(item);
+  return persistStagingDetailPayload(connection, stagingBatchId, rawPayload);
+}
+
+async function updateAnnouncementStagingItem(connection, stagingBatchId, locator = {}, payload = {}) {
+  const batch = await getStagingBatchForItemEdit(connection, stagingBatchId);
+  const { rawPayload } = getEditableSamplingPayload(batch);
+  const { attachment } = resolveEditableAttachment(rawPayload, locator.attachment_index || payload.attachment_index || 1);
+  const rows = attachment.parse_result.rows;
+  const rowIndex = resolveEditableRowIndex(rows, locator);
+  if (rowIndex < 0) {
+    throw new Error('产品明细不存在');
+  }
+
+  rows[rowIndex] = normalizeEditableStagingDetailItem({
+    ...rows[rowIndex],
+    ...(payload.item || payload)
+  }, rowIndex);
+  return persistStagingDetailPayload(connection, stagingBatchId, rawPayload);
+}
+
+async function deleteAnnouncementStagingItem(connection, stagingBatchId, locator = {}) {
+  const batch = await getStagingBatchForItemEdit(connection, stagingBatchId);
+  const { rawPayload } = getEditableSamplingPayload(batch);
+  const { attachment } = resolveEditableAttachment(rawPayload, locator.attachment_index || 1);
+  const rows = attachment.parse_result.rows;
+  const rowIndex = resolveEditableRowIndex(rows, locator);
+  if (rowIndex < 0) {
+    throw new Error('产品明细不存在');
+  }
+
+  rows.splice(rowIndex, 1);
+  return persistStagingDetailPayload(connection, stagingBatchId, rawPayload);
 }
 
 
@@ -3019,41 +3189,19 @@ async function updatePublishedAnnouncementStagingBody(connection, stagingBatchId
   };
 }
 
-async function updateAnnouncementStagingProductType(connection, stagingBatchId, productType) {
-  await ensureAnnouncementStagingSchema(connection);
-
-  const [rows] = await connection.query(
-    'SELECT * FROM announcement_staging_batches WHERE id = ? LIMIT 1',
-    [stagingBatchId]
-  );
-  const batch = rows[0] || null;
-  if (!batch) {
-    throw new Error('待确认批次不存在');
-  }
-
-  const rawPayload = parseJsonSafely(batch.raw_payload, {});
-  const currentTypeInfo = getBatchTypeInfo(batch, rawPayload);
-  const nextTypeInfo = resolveTypeInfo(productType, currentTypeInfo.announcement_type);
-  const nextRawPayload = buildUpdatedRawPayloadProductType(
-    batch.raw_payload,
-    nextTypeInfo.product_type,
-    nextTypeInfo.announcement_type
-  );
-
-  await connection.query(
-    `
-      UPDATE announcement_staging_batches
-      SET product_type = ?, raw_payload = ?
-      WHERE id = ?
-    `,
-    [nextTypeInfo.product_type, nextRawPayload, stagingBatchId]
-  );
-
+async function syncPublishedTablesAfterStagingTypeChange(
+  connection,
+  batchSnapshot,
+  stagingBatchId,
+  nextTypeInfo,
+  nextRawPayloadText,
+  skipBackupUpdate = false
+) {
   let updatedPublishedId = null;
   let syncResult = null;
 
   if (nextTypeInfo.announcement_type === 'flight_inspection') {
-    const supervisionId = await resolvePublishedSupervisionId(connection, batch);
+    const supervisionId = await resolvePublishedSupervisionId(connection, batchSnapshot);
     if (supervisionId) {
       const previousCompanyIds = await getSupervisionRelatedCompanyIds(connection, supervisionId);
       await connection.query('UPDATE supervisions SET product_type = ? WHERE id = ?', [nextTypeInfo.product_type, supervisionId]);
@@ -3068,7 +3216,7 @@ async function updateAnnouncementStagingProductType(connection, stagingBatchId, 
       };
     }
   } else {
-    const announcementId = await resolvePublishedAnnouncementId(connection, batch);
+    const announcementId = await resolvePublishedAnnouncementId(connection, batchSnapshot);
     if (announcementId) {
       await connection.query('UPDATE announcements SET product_type = ? WHERE id = ?', [nextTypeInfo.product_type, announcementId]);
       syncResult = await syncPublishedAnnouncementDerivedData(connection, announcementId);
@@ -3087,7 +3235,7 @@ async function updateAnnouncementStagingProductType(connection, stagingBatchId, 
     [stagingBatchId]
   );
 
-  if (backupRows[0]) {
+  if (!skipBackupUpdate && backupRows[0]) {
     const backupPayload = parseJsonSafely(backupRows[0].payload_json, {});
     const nextBackupPayload = {
       ...(backupPayload && typeof backupPayload === 'object' ? backupPayload : {}),
@@ -3096,7 +3244,7 @@ async function updateAnnouncementStagingProductType(connection, stagingBatchId, 
             ...backupPayload.staging_batch,
             product_type: nextTypeInfo.product_type,
             announcement_type: nextTypeInfo.announcement_type,
-            raw_payload: nextRawPayload
+            raw_payload: nextRawPayloadText
           }
         : backupPayload?.staging_batch,
       published_announcement: backupPayload?.published_announcement
@@ -3122,6 +3270,68 @@ async function updateAnnouncementStagingProductType(connection, stagingBatchId, 
   }
 
   return {
+    updatedPublishedId,
+    syncResult
+  };
+}
+
+async function updateAnnouncementStagingProductType(connection, stagingBatchId, options = {}) {
+  await ensureAnnouncementStagingSchema(connection);
+
+  const [rows] = await connection.query(
+    'SELECT * FROM announcement_staging_batches WHERE id = ? LIMIT 1',
+    [stagingBatchId]
+  );
+  const batch = rows[0] || null;
+  if (!batch) {
+    throw new Error('待确认批次不存在');
+  }
+
+  const rawPayload = parseJsonSafely(batch.raw_payload, {});
+  const currentTypeInfo = getBatchTypeInfo(batch, rawPayload);
+
+  const hasProductInput = Object.prototype.hasOwnProperty.call(options, 'product_type');
+  const hasAnnouncementInput = Object.prototype.hasOwnProperty.call(options, 'announcement_type');
+
+  const productTypeForResolve = hasProductInput ? options.product_type : batch.product_type;
+  const announcementTypeForResolve = hasAnnouncementInput
+    ? options.announcement_type
+    : currentTypeInfo.announcement_type;
+
+  const nextTypeInfo = resolveTypeInfo(productTypeForResolve, announcementTypeForResolve);
+
+  const supervisionId = await resolvePublishedSupervisionId(connection, batch);
+  const announcementId = await resolvePublishedAnnouncementId(connection, batch);
+  const isPublished = Boolean(supervisionId || announcementId);
+
+  if (isPublished && currentTypeInfo.announcement_type !== nextTypeInfo.announcement_type) {
+    throw new Error('已入库的通告不能切换「抽检 / 飞检」类型，请先删除正式库记录或使用打回流程');
+  }
+
+  const nextRawPayload = buildUpdatedRawPayloadProductType(
+    batch.raw_payload,
+    nextTypeInfo.product_type,
+    nextTypeInfo.announcement_type
+  );
+
+  await connection.query(
+    `
+      UPDATE announcement_staging_batches
+      SET product_type = ?, announcement_type = ?, raw_payload = ?
+      WHERE id = ?
+    `,
+    [nextTypeInfo.product_type, nextTypeInfo.announcement_type, nextRawPayload, stagingBatchId]
+  );
+
+  const { updatedPublishedId, syncResult } = await syncPublishedTablesAfterStagingTypeChange(
+    connection,
+    batch,
+    stagingBatchId,
+    nextTypeInfo,
+    nextRawPayload
+  );
+
+  return {
     staging_batch_id: Number(stagingBatchId),
     product_type: nextTypeInfo.product_type,
     product_type_label: nextTypeInfo.product_type_label,
@@ -3134,6 +3344,273 @@ async function updateAnnouncementStagingProductType(connection, stagingBatchId, 
     inspection_count: syncResult?.inspectionCount === null || syncResult?.inspectionCount === undefined
       ? null
       : Number(syncResult.inspectionCount)
+  };
+}
+
+function buildUpdatedRawPayloadInfo(rawPayloadText, patch = {}) {
+  const rawPayload = parseJsonSafely(rawPayloadText, {});
+  if (!rawPayload || typeof rawPayload !== 'object') {
+    return rawPayloadText || null;
+  }
+
+  return JSON.stringify({
+    ...rawPayload,
+    title: patch.title,
+    announcement_no: patch.announcement_no,
+    publish_date: patch.publish_date,
+    inspection_unit: patch.inspection_unit,
+    detail_url: patch.source_detail_url,
+    source_detail_url: patch.source_detail_url,
+    source_page: patch.source_page,
+    attachments: Array.isArray(rawPayload.attachments)
+      ? rawPayload.attachments.map((attachment, index) => (
+          index === 0
+            ? {
+                ...attachment,
+                attachment_name: patch.primary_attachment_name || attachment.attachment_name,
+                local_path: patch.primary_attachment_path || attachment.local_path
+              }
+            : attachment
+        ))
+      : rawPayload.attachments
+  });
+}
+
+async function updateAnnouncementStagingInfo(connection, stagingBatchId, payload = {}) {
+  await ensureAnnouncementStagingSchema(connection);
+
+  const [rows] = await connection.query(
+    'SELECT * FROM announcement_staging_batches WHERE id = ? LIMIT 1',
+    [stagingBatchId]
+  );
+  const batch = rows[0] || null;
+  if (!batch) {
+    throw new Error('待确认批次不存在');
+  }
+
+  const rawPayloadSnapshot = parseJsonSafely(batch.raw_payload, {});
+  const originalTypeInfo = getBatchTypeInfo(batch, rawPayloadSnapshot);
+
+  const typeFieldsInPayload =
+    Object.prototype.hasOwnProperty.call(payload, 'product_type')
+    || Object.prototype.hasOwnProperty.call(payload, 'announcement_type');
+
+  const nextTypeInfo = typeFieldsInPayload
+    ? resolveTypeInfo(
+        Object.prototype.hasOwnProperty.call(payload, 'product_type')
+          ? payload.product_type
+          : batch.product_type,
+        Object.prototype.hasOwnProperty.call(payload, 'announcement_type')
+          ? payload.announcement_type
+          : originalTypeInfo.announcement_type
+      )
+    : originalTypeInfo;
+
+  const supervisionIdProbe = await resolvePublishedSupervisionId(connection, batch);
+  const announcementIdProbe = await resolvePublishedAnnouncementId(connection, batch);
+  const isPublished = Boolean(supervisionIdProbe || announcementIdProbe);
+
+  if (isPublished && originalTypeInfo.announcement_type !== nextTypeInfo.announcement_type) {
+    throw new Error('已入库的通告不能切换「抽检 / 飞检」类型，请先删除正式库记录或使用打回流程');
+  }
+
+  const typeFieldsChanged =
+    originalTypeInfo.product_type !== nextTypeInfo.product_type
+    || originalTypeInfo.announcement_type !== nextTypeInfo.announcement_type;
+
+  const patch = {
+    title: normalizeNullableText(payload.title) || batch.title,
+    announcement_no: normalizeNullableText(payload.announcement_no),
+    publish_date: normalizeDateValue(payload.publish_date),
+    inspection_unit: normalizeNullableText(payload.inspection_unit),
+    primary_attachment_name: normalizeNullableText(payload.primary_attachment_name),
+    primary_attachment_path: normalizeNullableText(payload.primary_attachment_path),
+    source_detail_url: normalizeNullableText(payload.source_detail_url),
+    source_page: normalizeNullableText(payload.source_page)
+  };
+
+  let nextRawPayloadStr = buildUpdatedRawPayloadInfo(batch.raw_payload, patch);
+
+  if (typeFieldsChanged) {
+    nextRawPayloadStr = buildUpdatedRawPayloadProductType(
+      nextRawPayloadStr,
+      nextTypeInfo.product_type,
+      nextTypeInfo.announcement_type
+    );
+  }
+
+  await connection.query(
+    `
+      UPDATE announcement_staging_batches
+      SET title = ?,
+          announcement_no = ?,
+          publish_date = ?,
+          inspection_unit = ?,
+          primary_attachment_name = ?,
+          primary_attachment_path = ?,
+          source_detail_url = ?,
+          source_page = ?,
+          raw_payload = ?,
+          product_type = ?,
+          announcement_type = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    [
+      patch.title,
+      patch.announcement_no,
+      patch.publish_date,
+      patch.inspection_unit,
+      patch.primary_attachment_name,
+      patch.primary_attachment_path,
+      patch.source_detail_url,
+      patch.source_page,
+      nextRawPayloadStr,
+      nextTypeInfo.product_type,
+      nextTypeInfo.announcement_type,
+      stagingBatchId
+    ]
+  );
+
+  let updatedPublishedId = null;
+  const publishAsFlight = nextTypeInfo.announcement_type === 'flight_inspection';
+
+  if (publishAsFlight) {
+    const supervisionId = await resolvePublishedSupervisionId(connection, batch);
+    if (supervisionId) {
+      await connection.query(
+        `
+          UPDATE supervisions
+          SET title = ?, supervision_date = ?, publish_date = ?, supervision_unit = ?,
+              attachment_name = ?, attachment_path = ?, source_detail_url = ?, source_page = ?
+          WHERE id = ?
+        `,
+        [
+          patch.title,
+          patch.publish_date,
+          patch.publish_date,
+          patch.inspection_unit,
+          patch.primary_attachment_name,
+          patch.primary_attachment_path,
+          patch.source_detail_url,
+          patch.source_page,
+          supervisionId
+        ]
+      );
+      updatedPublishedId = Number(supervisionId);
+    }
+  } else {
+    const announcementId = await resolvePublishedAnnouncementId(connection, batch);
+    if (announcementId) {
+      await connection.query(
+        `
+          UPDATE announcements
+          SET title = ?, announcement_no = ?, publish_date = ?, inspection_unit = ?,
+              attachment_name = ?, attachment_path = ?, source_detail_url = ?, source_page = ?
+          WHERE id = ?
+        `,
+        [
+          patch.title,
+          patch.announcement_no,
+          patch.publish_date,
+          patch.inspection_unit,
+          patch.primary_attachment_name,
+          patch.primary_attachment_path,
+          patch.source_detail_url,
+          patch.source_page,
+          announcementId
+        ]
+      );
+      updatedPublishedId = Number(announcementId);
+    }
+  }
+
+  let typeDerivedPublishedId = null;
+  if (typeFieldsChanged) {
+    const derived = await syncPublishedTablesAfterStagingTypeChange(
+      connection,
+      batch,
+      stagingBatchId,
+      nextTypeInfo,
+      nextRawPayloadStr,
+      true
+    );
+    typeDerivedPublishedId = derived.updatedPublishedId;
+  }
+
+  const combinedPublishedId = updatedPublishedId || typeDerivedPublishedId || null;
+
+  const [backupRows] = await connection.query(
+    `
+      SELECT id, payload_json
+      FROM announcement_publish_backups
+      WHERE staging_batch_id = ?
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    [stagingBatchId]
+  );
+
+  if (backupRows[0]) {
+    const backupPayload = parseJsonSafely(backupRows[0].payload_json, {});
+    const nextBackupPayload = {
+      ...(backupPayload && typeof backupPayload === 'object' ? backupPayload : {}),
+      staging_batch: {
+        ...(backupPayload?.staging_batch || {}),
+        ...patch,
+        product_type: nextTypeInfo.product_type,
+        announcement_type: nextTypeInfo.announcement_type,
+        raw_payload: nextRawPayloadStr
+      },
+      published_announcement: backupPayload?.published_announcement
+        ? {
+            ...backupPayload.published_announcement,
+            ...patch,
+            product_type: nextTypeInfo.product_type,
+            announcement_type: nextTypeInfo.announcement_type
+          }
+        : backupPayload?.published_announcement,
+      published_supervision: backupPayload?.published_supervision
+        ? {
+            ...backupPayload.published_supervision,
+            title: patch.title,
+            supervision_date: patch.publish_date,
+            publish_date: patch.publish_date,
+            supervision_unit: patch.inspection_unit,
+            attachment_name: patch.primary_attachment_name,
+            attachment_path: patch.primary_attachment_path,
+            source_detail_url: patch.source_detail_url,
+            source_page: patch.source_page,
+            product_type: nextTypeInfo.product_type,
+            announcement_type: nextTypeInfo.announcement_type
+          }
+        : backupPayload?.published_supervision
+    };
+
+    await connection.query(
+      'UPDATE announcement_publish_backups SET title = ?, announcement_no = ?, publish_date = ?, inspection_unit = ?, primary_attachment_name = ?, primary_attachment_path = ?, source_detail_url = ?, source_page = ?, product_type = ?, announcement_type = ?, payload_json = ? WHERE id = ?',
+      [
+        patch.title,
+        patch.announcement_no,
+        patch.publish_date,
+        patch.inspection_unit,
+        patch.primary_attachment_name,
+        patch.primary_attachment_path,
+        patch.source_detail_url,
+        patch.source_page,
+        nextTypeInfo.product_type,
+        nextTypeInfo.announcement_type,
+        JSON.stringify(nextBackupPayload),
+        backupRows[0].id
+      ]
+    );
+  }
+
+  const detail = await getAnnouncementStagingDetail(connection, stagingBatchId);
+  return {
+    ...detail,
+    updated_published_id: combinedPublishedId,
+    published_target: nextTypeInfo.announcement_type === 'flight_inspection' ? 'supervisions' : 'announcements'
   };
 }
 
@@ -3240,10 +3717,14 @@ module.exports = {
   importStagingFromUploadedFiles,
   getAnnouncementStagingOverview,
   getAnnouncementStagingDetail,
+  createAnnouncementStagingItem,
+  updateAnnouncementStagingItem,
+  deleteAnnouncementStagingItem,
   publishAnnouncementStagingBatch,
   deleteAnnouncementStagingBatch,
   deletePublishedAnnouncementStagingBatch,
   updatePublishedAnnouncementStagingBody,
+  updateAnnouncementStagingInfo,
   updateAnnouncementStagingProductType,
 
   movePublishedAnnouncementStagingBatchToTraceback,

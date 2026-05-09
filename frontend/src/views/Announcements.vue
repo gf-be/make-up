@@ -13,13 +13,7 @@
 
       <!-- 筛选栏 -->
       <el-form :model="filters" inline class="filter-form">
-        <el-form-item label="状态">
-          <el-select v-model="filters.status" style="width: 180px" placeholder="选择状态" clearable @change="loadData">
-            <el-option label="已发布" value="published" />
-            <el-option label="草稿" value="draft" />
-            <el-option label="已归档" value="archived" />
-          </el-select>
-        </el-form-item>
+      
         <el-form-item label="产品类型">
           <el-select v-model="filters.product_type" style="width: 180px" placeholder="全部产品类型" clearable @change="loadData">
             <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
@@ -50,8 +44,8 @@
       </el-form>
 
 
-      <!-- 数据表格 -->
-      <el-table :data="tableData" stripe v-loading="loading">
+      <!-- 数据表格：GET /api/announcements → 拦截器返回 { success, data: Row[], pagination } -->
+      <el-table :data="tableData" stripe v-loading="loading" empty-text="暂无公告">
         <el-table-column prop="title" label="标题" min-width="250" show-overflow-tooltip />
         <el-table-column prop="announcement_no" label="公告编号" width="150" />
         <el-table-column label="产品类型" width="120" align="center">
@@ -217,8 +211,10 @@ const loading = ref(false)
 const deletingId = ref(null)
 const tableData = ref([])
 const filters = ref({
-  status: 'published',
+  // 不传 status 或与后端枚举一致时再筛；避免出现「隐性 published」且无筛选项时不显示数据
+  status: '',
   product_type: '',
+  year: '',
   keyword: ''
 })
 
@@ -278,6 +274,13 @@ const handleFileChange = (file) => {
   form.file = file.raw
 }
 
+function normalizeAnnouncementListResponse(res) {
+  const payload = res?.data
+  const list = Array.isArray(payload) ? payload : Array.isArray(payload?.list) ? payload.list : []
+  const total = Number(res?.pagination?.total ?? payload?.total ?? 0)
+  return { list, total }
+}
+
 const loadData = async () => {
   loading.value = true
   try {
@@ -286,10 +289,13 @@ const loadData = async () => {
       page: pagination.value.page,
       limit: pagination.value.limit
     })
-    tableData.value = res.data
-    pagination.value.total = res.pagination.total
+    const { list, total } = normalizeAnnouncementListResponse(res)
+    tableData.value = list
+    pagination.value.total = total
   } catch (error) {
     console.error('加载数据失败:', error)
+    tableData.value = []
+    pagination.value.total = 0
   } finally {
     loading.value = false
   }
@@ -297,7 +303,7 @@ const loadData = async () => {
 
 const resetFilters = () => {
   filters.value = {
-    status: 'published',
+    status: 'imported',
     product_type: '',
     year: '',
     location: '',
@@ -390,9 +396,10 @@ const handleUpload = async () => {
 
       const res = await createAnnouncement(formData)
 
-      const parsedCount = res?.data?.parsed_detail_count || 0
-      const syncedUnqualifiedCount = res?.data?.synced_unqualified_count || 0
-      const parseMessage = res?.data?.parse_message
+      const detail = res?.data ?? res
+      const parsedCount = detail?.parsed_detail_count || 0
+      const syncedUnqualifiedCount = detail?.synced_unqualified_count || 0
+      const parseMessage = detail?.parse_message
       ElMessage.success(
         parsedCount > 0
           ? `${getProductTypeLabel(form.product_type)}通告上传成功，已解析 ${parsedCount} 条批次明细，并同步 ${syncedUnqualifiedCount} 条到问题产品库`

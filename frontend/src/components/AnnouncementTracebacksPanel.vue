@@ -9,33 +9,7 @@
       :title="`当前已按倒溯记录 #${pinnedTracebackId} 精确定位，可清空筛选查看完整列表。`"
     />
 
-    <div class="stats-grid" v-loading="overviewLoading">
-      <div class="stat-card danger">
-        <div class="stat-label">待处理倒溯</div>
-        <div class="stat-value">{{ overview.pending_traceback_count || 0 }}</div>
-        <div class="stat-meta">总计 {{ overview.traceback_count || 0 }} 条</div>
-      </div>
-      <div class="stat-card warning">
-        <div class="stat-label">重复导入</div>
-        <div class="stat-value">{{ overview.duplicate_traceback_count || 0 }}</div>
-        <div class="stat-meta">已识别重复来源记录</div>
-      </div>
-      <div class="stat-card primary">
-        <div class="stat-label">解析失败</div>
-        <div class="stat-value">{{ overview.parse_failed_traceback_count || 0 }}</div>
-        <div class="stat-meta">附件未正常解析成功</div>
-      </div>
-      <div class="stat-card info">
-        <div class="stat-label">导入异常</div>
-        <div class="stat-value">{{ overview.import_failed_traceback_count || 0 }}</div>
-        <div class="stat-meta">JSON 导入过程发生错误</div>
-      </div>
-      <div class="stat-card success">
-        <div class="stat-label">已导入有误</div>
-        <div class="stat-value">{{ overview.published_incorrect_traceback_count || 0 }}</div>
-        <div class="stat-meta">正式库通告已退回倒溯处理</div>
-      </div>
-    </div>
+   
 
     <el-form :model="filters" inline class="filter-form">
       <el-form-item label="状态">

@@ -43,14 +43,16 @@ const route = useRoute()
 const router = useRouter()
 
 const menus = [
+  { index: '/profile', key: 'profile', label: '个人中心', icon: 'User' },
+  { index: '/admin/users', key: 'admin-users', label: '用户管理', icon: 'Setting' },
   { index: '/home', key: 'home', label: '首页', icon: 'House' },
-  { index: '/unqualified-products', key: 'unqualified-products', label: '不合格产品', icon: 'Document' },
-  { index: '/pivot-analysis', key: 'pivot-analysis', label: '数据矩阵', icon: 'DataAnalysis' },
-  { index: '/sampling-search', key: 'sampling-search', label: '数据检索', icon: 'Search' },
-  { index: '/announcement-staging', key: 'announcement-staging', label: '导入检查', icon: 'DataAnalysis' },
-  { index: '/announcements', key: 'announcements', label: '抽检通告', icon: 'Bell' },
+  { index: '/unqualified-products', key: 'unqualified-products', label: '产品', icon: 'Document' },
+  { index: '/announcement-staging', key: 'announcement-staging', label: '数据导入', icon: 'DataAnalysis' },
+  { index: '/announcements', key: 'announcements', label: '已导入通告', icon: 'Bell' },
   { index: '/inspections', key: 'inspections', label: '抽样检查', icon: 'Checked' },
-  { index: '/companies', key: 'companies', label: '企业管理', icon: 'OfficeBuilding' },
+  { index: '/companies', key: 'companies', label: '企业', icon: 'OfficeBuilding' },
+  { index: '/companies-manage', key: 'companies-manage', label: '企业管理', icon: 'OfficeBuilding' },
+  { index: '/products-manage', key: 'products-manage', label: '产品管理', icon: 'Goods' },
   { index: '/companies/unqualified', key: 'unqualified-companies', label: '不合格企业', icon: 'TrendCharts' },
   { index: '/supervisions', key: 'supervisions', label: '飞行检查', icon: 'Warning' }
 ]
@@ -58,11 +60,12 @@ const menus = [
 const visibleMenus = computed(() => menus.filter((item) => hasModuleAccess(item.key)))
 
 const activeMenu = computed(() => {
-  if (route.path.startsWith('/home') || route.path.startsWith('/dashboard')) return '/home'
+  if (route.path.startsWith('/profile')) return '/profile'
+  if (route.path.startsWith('/admin/users')) return '/admin/users'
+
+  if (route.path.startsWith('/home')) return '/home'
   if (route.path.startsWith('/announcements')) return '/announcements'
   if (route.path.startsWith('/announcement-staging')) return '/announcement-staging'
-  if (route.path.startsWith('/pivot-analysis')) return '/pivot-analysis'
-  if (route.path.startsWith('/sampling-search')) return '/sampling-search'
 
   if (route.path.startsWith('/inspections')) return '/inspections'
   if (route.path.startsWith('/companies/unqualified')) return '/companies/unqualified'
@@ -70,6 +73,8 @@ const activeMenu = computed(() => {
   if (route.path.startsWith('/unqualified-products')) return '/unqualified-products'
 
   if (route.path.startsWith('/companies')) return '/companies'
+  if (route.path.startsWith('/products-manage')) return '/products-manage'
+  if (route.path.startsWith('/companies-manage')) return '/companies-manage'
   if (route.path.startsWith('/supervisions')) return '/supervisions'
 
   return route.path

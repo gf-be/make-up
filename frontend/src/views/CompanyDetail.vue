@@ -13,6 +13,9 @@
         <el-descriptions-item label="企业名称">
           {{ detail.company.name }}
         </el-descriptions-item>
+        <el-descriptions-item label="统一社会信用代码">
+          {{ detail.company.credit_code || '-' }}
+        </el-descriptions-item>
         <!-- <el-descriptions-item label="品牌">
           {{ detail.company.brand || '-' }}
         </el-descriptions-item> -->
@@ -24,85 +27,26 @@
         <el-descriptions-item label="省份">
           {{ detail.company.province || '-' }}
         </el-descriptions-item>
-        <!-- <el-descriptions-item label="城市">
+        <el-descriptions-item label="城市">
           {{ detail.company.city || '-' }}
-        </el-descriptions-item> -->
+        </el-descriptions-item>
         <el-descriptions-item label="地址">
           {{ detail.company.address || '-' }}
         </el-descriptions-item>
       </el-descriptions>
 
-      <!-- 统计信息 -->
-      <el-row :gutter="20" class="stats-row">
-        <el-col :span="8">
-          <div class="stat-item">
-            <div class="stat-value">{{ detail.stats.sampled_count || 0 }}</div>
-            <div class="stat-label">被抽查次数</div>
-          </div>
-        </el-col>
-
-        <el-col :span="8">
-          <div class="stat-item product">
-            <div class="stat-value">{{ detail.stats.product_count || 0 }}</div>
-            <div class="stat-label">抽检产品数</div>
-          </div>
-        </el-col>
-        <!-- <el-col :span="6">
-          <div class="stat-item qualified">
-            <div class="stat-value">{{ detail.stats.qualified_count || 0 }}</div>
-            <div class="stat-label">合格数</div>
-          </div>
-        </el-col> -->
-        <el-col :span="8">
-          <div class="stat-item unqualified">
-            <div class="stat-value">{{ detail.stats.unqualified_count || 0 }}</div>
-            <div class="stat-label">不合格数</div>
-          </div>
-        </el-col>
-      </el-row>
-
-      <!-- 合格率展示 -->
-      <!-- <el-row :gutter="20" class="mt-20">
-        <el-col :span="12">
-          <el-card>
-            <template #header>
-              <span>合格率统计</span>
-            </template>
-            <el-progress
-              type="dashboard"
-              :percentage="detail.stats.qualified_rate || 0"
-              :color="getProgressColor(detail.stats.qualified_rate)"
-              :width="200"
-            >
-              <template #default="{ percentage }">
-                <span class="percentage-value">{{ percentage.toFixed(1) }}%</span>
-                <span class="percentage-label">合格率</span>
-              </template>
-            </el-progress>
-          </el-card>
-        </el-col>
-        <el-col :span="12">
-          <el-card>
-            <template #header>
-              <span>检查结果分布</span>
-            </template>
-            <div class="result-distribution">
-              <div class="result-item qualified">
-                <div class="result-label">合格</div>
-                <div class="result-value">{{ detail.stats.qualified_count || 0 }}</div>
-              </div>
-              <div class="result-item unqualified">
-                <div class="result-label">不合格</div>
-                <div class="result-value">{{ detail.stats.unqualified_count || 0 }}</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row> -->
-
+    
       <!-- 检查历史 -->
       <div class="history-section">
         <h3>检查历史记录</h3>
+        <el-alert
+          v-if="detail.history_meta?.truncated"
+          type="info"
+          :closable="false"
+          show-icon
+          class="history-truncated-tip"
+          title="历史记录较多，当前仅返回最近条目（单次最多 10000 条）；完整数据请走导出或分页接口。"
+        />
         <el-table :data="detail.history" stripe border>
           <el-table-column type="index" label="序号" width="60" />
           <el-table-column prop="title" label="检查批次" min-width="200" show-overflow-tooltip />
@@ -149,7 +93,7 @@ const detail = ref(null)
 const loadData = async () => {
   loading.value = true
   try {
-    const res = await getCompanyDetail(route.params.id)
+    const res = await getCompanyDetail(route.params.id, { history_limit: 10000 })
     detail.value = res.data
   } catch (error) {
     console.error('加载详情失败:', error)
@@ -222,6 +166,10 @@ onMounted(() => {
   align-items: center;
   font-size: 18px;
   font-weight: bold;
+}
+
+.history-truncated-tip {
+  margin-bottom: 12px;
 }
 
 .stats-row {
