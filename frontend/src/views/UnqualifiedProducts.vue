@@ -1,7 +1,7 @@
 <template>
   <div class="unqualified-products">
     <el-card class="page-card" shadow="never">
-      <template #header>
+      <!-- <template #header>
         <el-row :gutter="16" >
           <el-col :span="6">
               <div>已录入条目{{ stats.loaded_count || 0 }}</div>
@@ -19,8 +19,8 @@
               <div>可筛选问题项{{ stats.issue_item_count || 0 }}</div>
           </el-col>
         </el-row>
-      </template>
-
+      </template> -->
+      <!-- 筛选框 -->
       <el-form :model="filters" class="filter-form" label-width="96px">
         <el-row :gutter="16">
           <!-- <el-col :span="6">
@@ -126,7 +126,7 @@
       <el-alert v-if="hasActiveFilters" type="info" :closable="false" show-icon class="mb-20"
         :title="`当前检索条件命中 ${summary.matched_count || 0} 条结果`" />
 
-      <div class="result-summary mb-20">
+      <!-- <div class="result-summary mb-20">
         <el-tag type="danger" effect="dark">命中 {{ summary.matched_count || 0 }} 条</el-tag>
         <el-tag type="info">树根节点 {{ summary.root_count || treeRootCount || 0 }} 个</el-tag>
         <el-tag type="success">涉及生产省份 {{ summary.province_count || 0 }} 个</el-tag>
@@ -134,7 +134,7 @@
         <el-tag v-if="activeYearLabel" type="warning">年份：{{ activeYearLabel }}</el-tag>
         <el-tag v-if="filters.announcement_id" type="warning">已锁定来源通告</el-tag>
         <el-tag v-if="filters.supervision_id" type="warning">已锁定飞检通告</el-tag>
-      </div>
+      </div> -->
 
 
 
@@ -142,88 +142,21 @@
         <el-col :span="8">
           <el-card shadow="never" class="tree-card" v-loading="treeLoading">
             <template #header>
-              <div class="panel-header">
+              <div class="panel-header panel-header--stacked">
                 <div>
-                  <div class="panel-title">层级设计器</div>
-                  <div class="panel-subtitle">从可选字段拖入「行标签」；自上而下最多 5 级，未选满则树随之变短。</div>
+                  <div class="panel-title">分类</div>
+                  <!-- <div v-if="hierarchyPresetDisplayName" class="panel-subtitle">
+                    {{ hierarchyPresetDisplayName }}
+                  </div> -->
                 </div>
-                <div class="dimension-actions">
-                  <el-button size="small" type="primary" @click="applyDimensionDraft">应用层级</el-button>
-                  <el-button size="small" @click="resetDimensionDraft">重置</el-button>
+                <div class="panel-header-actions">
+                  <el-button size="small" type="primary" @click="openCategorySettingDialog">设置</el-button>
+                  <el-button size="small" type="success" @click="openCategoryThemeDialog">主题</el-button>
                 </div>
               </div>
             </template>
 
             <div class="tree-card-body-inner">
-              <div v-if="recentAppliedDimensionPresets.length" class="dimension-history mb-20">
-                <span class="dimension-history-label">最近应用</span>
-                <el-button v-for="item in recentAppliedDimensionPresets" :key="item.key" size="small" text
-                  class="dimension-history-item" @click="applySavedDimensionPreset(item.order)">
-                  {{ item.label }}
-                </el-button>
-                <el-button size="small" link type="danger" @click="clearAppliedDimensionHistory">清空记录</el-button>
-              </div>
-
-              <div class="pivot-dimension-designer mb-20">
-                <div class="pivot-panel pivot-panel--pool">
-                  <div class="pivot-panel-head">
-                    <span class="pivot-panel-title">可选字段</span>
-                    <span class="pivot-panel-hint">拖到右侧「行标签」加入层级</span>
-                  </div>
-                  <div class="pivot-fields-pool">
-                    <div v-for="item in poolDimensions" :key="`pool-${item.key}`" class="pivot-field-chip"
-                      draggable="true" @dragstart="onPoolFieldDragStart($event, item.key)"
-                      @dragend="onDimensionDragEnd">
-                      <el-icon class="pivot-drag-icon">
-                        <Rank />
-                      </el-icon>
-                      <span>{{ item.label }}</span>
-                    </div>
-                    <div v-if="!poolDimensions.length" class="pivot-pool-empty">全部字段已加入行标签</div>
-                  </div>
-                </div>
-
-                <div class="pivot-panel pivot-panel--rows">
-                  <div class="pivot-panel-head">
-                    <span class="pivot-panel-title">行标签</span>
-                    <span class="pivot-panel-hint">自上而下最多 5 级；可拖拽排序，未满则树高度变短</span>
-                  </div>
-                  <div class="pivot-rows-drop" :class="{ 'is-drag-over': rowDropZoneActive }"
-                    @dragover.prevent="onRowZoneDragOver" @dragleave="onRowZoneDragLeave"
-                    @drop.prevent="onRowZoneDropEnd">
-                    <template v-if="!hierarchyRow.length">
-                      <div class="pivot-rows-placeholder">从上方将字段拖入此处</div>
-                    </template>
-                    <div v-for="(rowKey, index) in hierarchyRow" :key="`row-${rowKey}-${index}`" class="pivot-row-line"
-                      :class="{ 'is-drag-over': rowInsertBeforeIndex === index }"
-                      @dragover.prevent="onRowLineDragOver($event, index)" @dragleave="onRowLineDragLeave"
-                      @drop.prevent="onRowLineDrop($event, index)">
-                      <div class="pivot-row-item" draggable="true" @dragstart="onRowItemDragStart($event, index)"
-                        @dragend="onDimensionDragEnd">
-                        <el-icon class="pivot-drag-icon">
-                          <Rank />
-                        </el-icon>
-                        <span class="pivot-row-item-label">{{ getDimensionLabel(rowKey) }}</span>
-                        <el-tag size="small" type="info" effect="plain">第 {{ index + 1 }} 级</el-tag>
-                        <el-button link type="danger" class="pivot-row-remove" :icon="Close" aria-label="移除此级"
-                          @click.stop="removeHierarchyAt(index)" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="tree-section-head mb-20">
-                <div>
-                  <div class="tree-section-title">分类</div>
-                  <!-- <div class="tree-section-subtitle">节点含当前维度取值与 path；勾选多个节点后右侧合并查询明细。搜索后树与筛选条件（含年份）一致。</div> -->
-                </div>
-                <div class="tree-section-tags">
-                  <el-tag v-if="activeYearLabel" type="warning" size="small">树数据年份 {{ activeYearLabel }}</el-tag>
-                  <el-tag type="info">共 {{ treeRootCount }} 个</el-tag>
-                </div>
-              </div>
-
               <div class="tree-scroll-area">
                 <el-empty v-if="treeIsEmpty" description="暂无树形结果" />
 
@@ -252,14 +185,11 @@
           <el-card shadow="never" class="detail-card">
             <template #header>
               <div class="panel-header detail-card-header">
-                <div>
-                  <div class="panel-title">节点详情</div>
-                  <div class="panel-subtitle">{{ currentNodeBreadcrumb || '请选择左侧树节点' }}</div>
-                </div>
+                
                 <div v-if="currentNode" class="detail-card-header-actions">
                   <el-tag type="success">{{ pagination.total }} 条</el-tag>
                   <el-button type="success" plain size="small" @click="detailChartDialogVisible = true">
-                    统计图表
+                    绘图
                   </el-button>
                   <el-button type="primary" plain size="small" :loading="exportingNodeDetails"
                     :disabled="!nodeDetailsCanExport" @click="exportNodeDetailsExcel">
@@ -276,31 +206,25 @@
             <el-empty v-if="!currentNode" description="请选择左侧树节点查看详情" />
 
             <template v-else>
-              <div class="selected-node-summary mb-20">
-                <el-tag type="primary">{{ currentNode.label }}</el-tag>
-                <el-tag>{{ getNodeLevelLabel(currentNode.level) }}</el-tag>
-                <el-tag v-if="currentNode.source_publish_date" type="info">{{ currentNode.source_publish_date
-                  }}</el-tag>
-                <el-tag v-if="currentNode.source_title" type="warning">{{ currentNode.source_title }}</el-tag>
-              </div>
+              
 
               <el-table :data="tableData" stripe border v-loading="tableLoading" max-height="1080">
                 <el-table-column type="expand" width="50">
                   <template #default="{ row }">
                     <el-descriptions :column="2" border>
                       <el-descriptions-item label="来源标题">{{ row.source_title || row.batch_title || '-'
-                        }}</el-descriptions-item>
+                      }}</el-descriptions-item>
                       <el-descriptions-item label="来源日期">{{ row.source_publish_date || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="产品类型">{{ row.product_type_label || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="通告类型">{{ row.announcement_type_label || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="生产企业名称">{{ row.manufacturer_name || row.company_names || '-'
-                        }}</el-descriptions-item>
+                      }}</el-descriptions-item>
                       <el-descriptions-item label="生产企业地址">{{ row.manufacturer_address || row.company_addresses || '-'
-                        }}</el-descriptions-item>
+                      }}</el-descriptions-item>
                       <el-descriptions-item label="经营企业名称">{{ row.operator_name || row.sample_unit_name || '-'
-                        }}</el-descriptions-item>
+                      }}</el-descriptions-item>
                       <el-descriptions-item label="经营企业地址">{{ row.operator_address || row.sample_unit_address || '-'
-                        }}</el-descriptions-item>
+                      }}</el-descriptions-item>
                       <el-descriptions-item label="原始标示企业">{{ row.company_names || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="原始企业地址">{{ row.company_addresses || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="包装规格">{{ row.package_spec || '-' }}</el-descriptions-item>
@@ -317,16 +241,17 @@
                       <el-descriptions-item label="问题类型">{{ row.issue_category || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="产品分类">{{ row.product_category || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="检验结果/处理措施" :span="2">{{ row.inspection_result || '-'
-                        }}</el-descriptions-item>
+                      }}</el-descriptions-item>
                       <el-descriptions-item label="依据/规定要求" :span="2">{{ row.requirement || '-'
-                        }}</el-descriptions-item>
+                      }}</el-descriptions-item>
                       <el-descriptions-item label="备注" :span="2">{{ row.remarks || '-' }}</el-descriptions-item>
                     </el-descriptions>
                   </template>
                 </el-table-column>
+                <el-table-column prop="product_name" label="产品名称" min-width="220" show-overflow-tooltip />
+                <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="160" show-overflow-tooltip />
                 <el-table-column prop="source_publish_date" label="日期" width="120" />
                 <el-table-column prop="source_title" label="来源通告" min-width="240" show-overflow-tooltip />
-                <el-table-column prop="product_name" label="问题对象/标题" min-width="220" show-overflow-tooltip />
                 <el-table-column prop="manufacturer_name" label="生产企业" min-width="220" show-overflow-tooltip>
                   <template #default="{ row }">{{ row.manufacturer_name || row.company_names || '-' }}</template>
                 </el-table-column>
@@ -335,11 +260,10 @@
                 </el-table-column>
                 <el-table-column prop="manufacturer_province" label="生产省份" width="120" show-overflow-tooltip />
                 <el-table-column prop="manufacturer_city" label="生产城市" width="120" show-overflow-tooltip />
-                <el-table-column prop="unqualified_items" label="不符合规定项目/检查问题" min-width="240" show-overflow-tooltip />
                 <el-table-column label="操作" width="80" fixed="right">
                   <template #default="{ row }">
                     <el-button link type="primary" @click="viewDetail(row.id)">查看详情</el-button>
-                    <el-button link type="success" @click="goSource(row)" style="margin-left: 0;">查看来源</el-button>
+                    <!-- <el-button link type="success" @click="goSource(row)" style="margin-left: 0;">查看来源</el-button> -->
                     <el-button v-if="row.company_id" link type="warning" style="margin-left: 0;"
                       @click="goCompany(row.company_id)">企业详情</el-button>
                   </template>
@@ -379,6 +303,81 @@
       </div>
     </el-dialog>
 
+    <el-dialog v-model="categorySettingDialogVisible" title="分类设置" width="min(720px, 96vw)" align-center
+      append-to-body class="category-setting-dialog" @closed="onCategorySettingDialogClosed">
+      <div class="category-setting-dialog-body">
+        <el-form label-width="100px" class="category-setting-name-form">
+          <el-form-item label="方案名称" required>
+            <el-input v-model="dimensionPresetName" maxlength="200" show-word-limit placeholder="为该层级方案命名，应用后将保存到账号"
+              clearable />
+          </el-form-item>
+        </el-form>
+        <div class="dimension-actions">
+          <el-button size="small" type="primary" :loading="savingDimensionPreset" @click="applyCategoryDimensionWithName">
+            应用
+          </el-button>
+          <el-button size="small" :disabled="savingDimensionPreset" @click="resetDimensionDraft">重置</el-button>
+        </div>
+        <!-- <div v-if="recentAppliedDimensionPresets.length" class="dimension-history mb-20">
+          <span class="dimension-history-label">最近应用</span>
+          <el-button v-for="item in recentAppliedDimensionPresets" :key="item.key" size="small" text
+            class="dimension-history-item" @click="applySavedDimensionPreset(item.order)">
+            {{ item.label }}
+          </el-button>
+          <el-button size="small" link type="danger" @click="clearAppliedDimensionHistory">清空记录</el-button>
+        </div> -->
+
+        <div class="pivot-dimension-designer mb-20">
+          <div class="pivot-panel pivot-panel--pool">
+            <div class="pivot-panel-head">
+              <span class="pivot-panel-title">可选字段</span>
+              <span class="pivot-panel-hint">拖到右侧「行标签」加入层级</span>
+            </div>
+            <div class="pivot-fields-pool">
+              <div v-for="item in poolDimensions" :key="`pool-${item.key}`" class="pivot-field-chip" draggable="true"
+                @dragstart="onPoolFieldDragStart($event, item.key)" @dragend="onDimensionDragEnd">
+                <el-icon class="pivot-drag-icon">
+                  <Rank />
+                </el-icon>
+                <span>{{ item.label }}</span>
+              </div>
+              <div v-if="!poolDimensions.length" class="pivot-pool-empty">全部字段已加入行标签</div>
+            </div>
+          </div>
+
+          <div class="pivot-panel pivot-panel--rows">
+            <div class="pivot-panel-head">
+              <span class="pivot-panel-title">行标签（最多5级）</span>
+            </div>
+            <div class="pivot-rows-drop" :class="{ 'is-drag-over': rowDropZoneActive }"
+              @dragover.prevent="onRowZoneDragOver" @dragleave="onRowZoneDragLeave" @drop.prevent="onRowZoneDropEnd">
+              <template v-if="!hierarchyRow.length">
+                <div class="pivot-rows-placeholder">从上方将字段拖入此处</div>
+              </template>
+              <div v-for="(rowKey, index) in hierarchyRow" :key="`row-${rowKey}-${index}`" class="pivot-row-line"
+                :class="{ 'is-drag-over': rowInsertBeforeIndex === index }"
+                @dragover.prevent="onRowLineDragOver($event, index)" @dragleave="onRowLineDragLeave"
+                @drop.prevent="onRowLineDrop($event, index)">
+                <div class="pivot-row-item" draggable="true" @dragstart="onRowItemDragStart($event, index)"
+                  @dragend="onDimensionDragEnd">
+                  <el-icon class="pivot-drag-icon">
+                    <Rank />
+                  </el-icon>
+                  <span class="pivot-row-item-label">{{ getDimensionLabel(rowKey) }}</span>
+                  <el-tag size="small" type="info" effect="plain">第 {{ index + 1 }} 级</el-tag>
+                  <el-button link type="danger" class="pivot-row-remove" :icon="Close" aria-label="移除此级"
+                    @click.stop="removeHierarchyAt(index)" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="categorySettingDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="videoCopyDialogVisible" title="视频文案" width="min(820px, 94vw)" align-center append-to-body
       destroy-on-close>
       <div v-loading="generatingVideoCopy" class="video-copy-dialog-body">
@@ -407,9 +406,10 @@ import {
   getUnqualifiedProductStats,
   getUnqualifiedProductTree,
   getUnqualifiedProductTreeChildren,
-  createOperationLog
+  createOperationLog,
+  updateCurrentUserProfile
 } from '@/api/index'
-import { currentUser, getUserScopedStorageKey } from '@/utils/auth'
+import { currentUser, getAuthToken, getUserScopedStorageKey, setAuthSession } from '@/utils/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -605,6 +605,9 @@ const dimensionDraft = ref([...DEFAULT_DIMENSION_ORDER])
 /** 行标签顺序（与数据透视表行字段一致），最多 5 项 */
 const hierarchyRow = ref([...DEFAULT_DIMENSION_ORDER])
 const appliedDimensionHistory = ref([])
+const categorySettingDialogVisible = ref(false)
+const dimensionPresetName = ref('')
+const savingDimensionPreset = ref(false)
 const dragContext = ref(null)
 const rowDropZoneActive = ref(false)
 const rowInsertBeforeIndex = ref(null)
@@ -708,6 +711,50 @@ const recentAppliedDimensionPresets = computed(() => (
     label: order.map((key) => getDimensionLabel(key)).join(' / ')
   }))
 ))
+
+const hierarchyPresetDisplayName = computed(() => {
+  const named = String(currentUser.value?.unqualified_dimension_preset_name || '').trim()
+  if (named) return named
+  const order = dimensionOrder.value || []
+  if (!order.length) return ''
+  return order.map((k) => getDimensionLabel(k)).join(' / ')
+})
+
+function openCategorySettingDialog() {
+  const suggested = hierarchyRow.value.map((k) => getDimensionLabel(k)).join(' / ')
+  dimensionPresetName.value =
+    String(currentUser.value?.unqualified_dimension_preset_name || '').trim() || suggested
+  categorySettingDialogVisible.value = true
+}
+
+function onCategorySettingDialogClosed() {
+  savingDimensionPreset.value = false
+}
+
+function openCategoryThemeDialog() {
+  
+}
+
+async function applyCategoryDimensionWithName() {
+  const name = String(dimensionPresetName.value || '').trim()
+  if (!name) {
+    ElMessage.warning('请填写层级名称')
+    return
+  }
+  savingDimensionPreset.value = true
+  try {
+    applyDimensionDraft()
+    const res = await updateCurrentUserProfile({ unqualified_dimension_preset_name: name })
+    const next = res.data
+    if (next) {
+      setAuthSession(getAuthToken(), next)
+    }
+    ElMessage.success('层级已应用并保存名称')
+    categorySettingDialogVisible.value = false
+  } finally {
+    savingDimensionPreset.value = false
+  }
+}
 
 function onPoolFieldDragStart(e, key) {
   dragContext.value = { source: 'pool', key }
@@ -2119,15 +2166,15 @@ function viewDetail(id) {
   router.push(`/unqualified-products/${id}`)
 }
 
-function goSource(row) {
-  if (row.announcement_id) {
-    router.push(`/announcements/${row.announcement_id}`)
-    return
-  }
-  if (row.supervision_id) {
-    router.push(`/supervisions/${row.supervision_id}`)
-  }
-}
+// function goSource(row) {
+//   if (row.announcement_id) {
+//     router.push(`/announcements/${row.announcement_id}`)
+//     return
+//   }
+//   if (row.supervision_id) {
+//     router.push(`/supervisions/${row.supervision_id}`)
+//   }
+// }
 
 function goCompany(companyId) {
   router.push(`/companies/${companyId}`)
@@ -2173,6 +2220,26 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.panel-header--stacked {
+  align-items: flex-start;
+}
+
+.panel-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.category-setting-dialog-body {
+  padding: 4px 0 8px;
+}
+
+.category-setting-name-form {
+  margin-bottom: 12px;
 }
 
 .detail-card-header-actions {

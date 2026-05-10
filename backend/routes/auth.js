@@ -70,6 +70,9 @@ async function ensureUserSchema() {
   await addColumn('ALTER TABLE users ADD COLUMN display_name VARCHAR(100) AFTER password');
   await addColumn("ALTER TABLE users ADD COLUMN status ENUM('active', 'disabled') DEFAULT 'active' AFTER role");
   await addColumn('ALTER TABLE users ADD COLUMN last_login_at TIMESTAMP NULL AFTER status');
+  await addColumn(
+    'ALTER TABLE users ADD COLUMN unqualified_dimension_preset_name VARCHAR(200) NULL'
+  );
   await pool.query('ALTER TABLE users MODIFY email VARCHAR(100) NULL');
 
   try {
@@ -232,6 +235,14 @@ router.put('/me', authenticate, async (req, res) => {
       values.push(v);
     }
 
+    if (Object.prototype.hasOwnProperty.call(body, 'unqualified_dimension_preset_name')) {
+      fields.push('unqualified_dimension_preset_name = ?');
+      const v =
+        body.unqualified_dimension_preset_name == null || body.unqualified_dimension_preset_name === ''
+          ? null
+          : String(body.unqualified_dimension_preset_name).trim().slice(0, 200) || null;
+      values.push(v);
+    }
 
     if (!fields.length) {
       return res.status(400).json({ success: false, message: '没有可更新的字段' });
@@ -289,6 +300,7 @@ function toPublicUser(row) {
     username: row.username,
     email: row.email || '',
     display_name: row.display_name || '',
+    unqualified_dimension_preset_name: row.unqualified_dimension_preset_name || '',
     role: row.role,
     role_label: ROLE_LABELS[row.role] || row.role,
     status: row.status || 'active',
@@ -313,7 +325,8 @@ router.get('/users', requireRoles(['system_admin']), async (req, res) => {
   try {
     await ensureUserSchema();
     const [rows] = await pool.query(
-      `SELECT id, username, email, password, display_name, role, status, last_login_at, created_at
+      `SELECT id, username, email, password, display_name, role, status, last_login_at, created_at,
+              unqualified_dimension_preset_name
        FROM users
        ORDER BY id ASC`
     );
@@ -354,7 +367,7 @@ router.post('/users', requireRoles(['system_admin']), async (req, res) => {
     );
 
     const [rows] = await pool.query(
-      'SELECT id, username, email, display_name, role, status, last_login_at, created_at FROM users WHERE username = ? LIMIT 1',
+      'SELECT id, username, email, display_name, role, status, last_login_at, created_at, unqualified_dimension_preset_name FROM users WHERE username = ? LIMIT 1',
       [normalizedUsername]
     );
     res.json({ success: true, message: '用户已创建', data: toPublicUser(rows[0]) });
@@ -492,7 +505,7 @@ router.patch('/users/:id', requireRoles(['system_admin']), async (req, res) => {
     await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, vals);
 
     const [rows] = await pool.query(
-      'SELECT id, username, email, display_name, role, status, last_login_at, created_at FROM users WHERE id = ? LIMIT 1',
+      'SELECT id, username, email, display_name, role, status, last_login_at, created_at, unqualified_dimension_preset_name FROM users WHERE id = ? LIMIT 1',
       [id]
     );
     res.json({ success: true, message: '用户已更新', data: toPublicUser(rows[0]) });

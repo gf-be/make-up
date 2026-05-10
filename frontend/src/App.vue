@@ -47,15 +47,15 @@ const menus = [
   { index: '/profile', key: 'profile', label: '个人中心', icon: 'User' },
   { index: '/admin/users', key: 'admin-users', label: '用户管理', icon: 'Setting' },
   { index: '/home', key: 'home', label: '首页', icon: 'House' },
-  { index: '/unqualified-products', key: 'unqualified-products', label: '产品', icon: 'Document' },
+  { index: '/unqualified-products', key: 'unqualified-products', label: '产品文案', icon: 'Document' },
   { index: '/announcement-staging', key: 'announcement-staging', label: '数据导入', icon: 'DataAnalysis' },
-  { index: '/announcements', key: 'announcements', label: '已导入通告', icon: 'Bell' },
-  { index: '/inspections', key: 'inspections', label: '抽样检查', icon: 'Checked' },
-  { index: '/companies', key: 'companies', label: '企业', icon: 'OfficeBuilding' },
+  { index: '/announcements', key: 'announcements', label: '数据管理', icon: 'Bell' },
+  // { index: '/inspections', key: 'inspections', label: '抽样检查', icon: 'Checked' },
+  // { index: '/companies', key: 'companies', label: '企业', icon: 'OfficeBuilding' },
   { index: '/companies-manage', key: 'companies-manage', label: '企业管理', icon: 'OfficeBuilding' },
   { index: '/products-manage', key: 'products-manage', label: '产品管理', icon: 'Goods' },
   { index: '/companies/unqualified', key: 'unqualified-companies', label: '不合格企业', icon: 'TrendCharts' },
-  { index: '/supervisions', key: 'supervisions', label: '飞行检查', icon: 'Warning' }
+  // { index: '/supervisions', key: 'supervisions', label: '飞行检查', icon: 'Warning' }
 ]
 
 const visibleMenus = computed(() => menus.filter((item) => hasModuleAccess(item.key)))

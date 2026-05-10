@@ -17,7 +17,8 @@ function sanitizeUser(user) {
     email: user.email || '',
     role: user.role,
     role_label: ROLE_LABELS[user.role] || user.role,
-    display_name: user.display_name || user.username
+    display_name: user.display_name || user.username,
+    unqualified_dimension_preset_name: user.unqualified_dimension_preset_name || ''
   };
 }
 
@@ -46,7 +47,7 @@ function createSession(user) {
 
 async function login(pool, username, password) {
   const [rows] = await pool.query(
-    'SELECT id, username, password, role, display_name, email, status FROM users WHERE username = ? LIMIT 1',
+    'SELECT id, username, password, role, display_name, email, status, unqualified_dimension_preset_name FROM users WHERE username = ? LIMIT 1',
     [username]
   );
   const user = rows[0];
@@ -106,7 +107,7 @@ async function refreshSessionUser(pool, token) {
   }
 
   const [rows] = await pool.query(
-    'SELECT id, username, password, role, display_name, email, status FROM users WHERE id = ? LIMIT 1',
+    'SELECT id, username, password, role, display_name, email, status, unqualified_dimension_preset_name FROM users WHERE id = ? LIMIT 1',
     [existing.id]
   );
   const user = rows[0];

@@ -18,41 +18,65 @@ export const MODULE_PERMISSIONS = {
 const AUTH_STORAGE_KEY = 'cosmetics_current_user'
 const TOKEN_STORAGE_KEY = 'cosmetics_auth_token'
 
-/** 登录态用 sessionStorage：同站点下每个浏览器标签页独立会话，可多账号同时在线且互不影响。 */
+/**
+ * 登录态仅依赖浏览器本地存储（localStorage），不根据服务端会话/cookie 推断是否已登录。
+ * 路由与 UI 以本地 token + 用户信息为准；无有效本地缓存则进入登录页。
+ */
 function authStorage() {
   try {
-    return typeof sessionStorage !== 'undefined' ? sessionStorage : null
+    return typeof localStorage !== 'undefined' ? localStorage : null
   } catch {
     return null
   }
 }
 
-/**
- * 历史版本将 token 存在 localStorage（全标签页共享）。首次加载时若当前标签 session 为空则迁入并清空 localStorage，避免旧行为与多标签多用户冲突。
- */
-function migrateLegacyAuthFromLocalStorage() {
+/** 旧版曾使用 sessionStorage；若 localStorage 尚无登录态则迁入，便于升级后仍保持登录 */
+function migrateFromSessionStorage() {
   try {
-    const ls = localStorage
-    const ss = authStorage()
-    if (!ss) return
-    const existingToken = ss.getItem(TOKEN_STORAGE_KEY)
-    const existingUser = ss.getItem(AUTH_STORAGE_KEY)
-    if (existingToken != null || existingUser != null) return
+    const ls = authStorage()
+    const ss = typeof sessionStorage !== 'undefined' ? sessionStorage : null
+    if (!ls || !ss) return
+    if (ls.getItem(TOKEN_STORAGE_KEY) || ls.getItem(AUTH_STORAGE_KEY)) return
 
-    const token = ls.getItem(TOKEN_STORAGE_KEY)
-    const userJson = ls.getItem(AUTH_STORAGE_KEY)
+    const token = ss.getItem(TOKEN_STORAGE_KEY)
+    const userJson = ss.getItem(AUTH_STORAGE_KEY)
     if (token == null && userJson == null) return
 
-    if (token != null) ss.setItem(TOKEN_STORAGE_KEY, token)
-    if (userJson != null) ss.setItem(AUTH_STORAGE_KEY, userJson)
-    ls.removeItem(TOKEN_STORAGE_KEY)
-    ls.removeItem(AUTH_STORAGE_KEY)
+    if (token != null) ls.setItem(TOKEN_STORAGE_KEY, token)
+    if (userJson != null) ls.setItem(AUTH_STORAGE_KEY, userJson)
+    ss.removeItem(TOKEN_STORAGE_KEY)
+    ss.removeItem(AUTH_STORAGE_KEY)
   } catch {
     /* 隐私模式 / 禁用存储 */
   }
 }
 
-migrateLegacyAuthFromLocalStorage()
+/** token 与用户信息需成对存在，否则视为未登录，避免仅依赖不完整本地状态 */
+function ensureStoredAuthConsistent() {
+  const store = authStorage()
+  if (!store) return
+  try {
+    const token = String(store.getItem(TOKEN_STORAGE_KEY) || '').trim()
+    const raw = store.getItem(AUTH_STORAGE_KEY)
+    let user = null
+    try {
+      user = JSON.parse(raw || 'null')
+    } catch {
+      user = null
+    }
+    const hasToken = token.length > 0
+    const hasUser = user != null && typeof user === 'object'
+    if (hasToken !== hasUser) {
+      store.removeItem(TOKEN_STORAGE_KEY)
+      store.removeItem(AUTH_STORAGE_KEY)
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+migrateFromSessionStorage()
+ensureStoredAuthConsistent()
 
 function readStoredUser() {
   const ss = authStorage()
@@ -75,11 +99,15 @@ export function getAuthToken() {
 }
 
 export function setAuthSession(token, user) {
-  const ss = authStorage()
+  const ls = authStorage()
   try {
-    if (ss) {
-      ss.setItem(TOKEN_STORAGE_KEY, token || '')
-      ss.setItem(AUTH_STORAGE_KEY, JSON.stringify(user || null))
+    if (ls) {
+      ls.setItem(TOKEN_STORAGE_KEY, token || '')
+      ls.setItem(AUTH_STORAGE_KEY, JSON.stringify(user || null))
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+      sessionStorage.removeItem(AUTH_STORAGE_KEY)
     }
   } catch {
     /* ignore */
@@ -89,13 +117,15 @@ export function setAuthSession(token, user) {
 
 export function clearAuthSession() {
   try {
-    const ss = authStorage()
-    if (ss) {
-      ss.removeItem(TOKEN_STORAGE_KEY)
-      ss.removeItem(AUTH_STORAGE_KEY)
+    const ls = authStorage()
+    if (ls) {
+      ls.removeItem(TOKEN_STORAGE_KEY)
+      ls.removeItem(AUTH_STORAGE_KEY)
     }
-    localStorage.removeItem(TOKEN_STORAGE_KEY)
-    localStorage.removeItem(AUTH_STORAGE_KEY)
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+      sessionStorage.removeItem(AUTH_STORAGE_KEY)
+    }
   } catch {
     /* ignore */
   }
