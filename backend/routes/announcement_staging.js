@@ -13,6 +13,7 @@ const {
   createAnnouncementStagingItem,
   updateAnnouncementStagingItem,
   deleteAnnouncementStagingItem,
+  resyncAnnouncementStagingItemsTable,
   publishAnnouncementStagingBatch,
   deleteAnnouncementStagingBatch,
   deletePublishedAnnouncementStagingBatch,
@@ -738,6 +739,30 @@ router.delete('/:id/items', async (req, res) => {
     if (connection) await connection.rollback();
     console.error('删除临时批次产品明细失败:', error);
     res.status(500).json({ success: false, message: error.message || '删除产品明细失败' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+router.post('/:id/sync-items', async (req, res) => {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const detail = await resyncAnnouncementStagingItemsTable(connection, req.params.id);
+    await connection.commit();
+    res.json({
+      success: true,
+      message: '产品明细已写入 announcement_staging_items',
+      data: detail
+    });
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error('同步临时批次明细表失败:', error);
+    if (error.message === '待确认批次不存在') {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    res.status(500).json({ success: false, message: error.message || '同步临时明细表失败' });
   } finally {
     if (connection) connection.release();
   }

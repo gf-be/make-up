@@ -57,7 +57,7 @@
           </el-table>
           <el-pagination
             class="list-pagination"
-            small
+            size="small"
             layout="total, prev, pager, next"
             :total="pagination.total"
             :page-size="pagination.limit"

@@ -11,7 +11,7 @@
           <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
         </el-form-item>
         <el-button type="primary" class="login-button" :loading="loading" @click="handleLogin">登录</el-button>
-        <el-button class="login-button secondary" @click="registerDialogVisible = true">注册普通用户</el-button>
+        <!-- <el-button class="login-button secondary" @click="registerDialogVisible = true">注册普通用户</el-button> -->
       </el-form>
       <!-- <div class="account-tips">
         <div>开发人员：admin / admin</div>
@@ -20,7 +20,7 @@
       </div>  -->
     </el-card>
 
-    <el-dialog v-model="registerDialogVisible" title="注册普通用户" width="420px" :close-on-click-modal="false">
+    <!-- <el-dialog v-model="registerDialogVisible" title="注册普通用户" width="420px" :close-on-click-modal="false">
       <el-form :model="registerForm" label-width="84px">
         <el-form-item label="账号">
           <el-input v-model="registerForm.username" placeholder="3-30 位字母、数字或下划线" />
@@ -39,7 +39,7 @@
         <el-button @click="registerDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="registering" @click="handleRegister">注册</el-button>
       </template>
-    </el-dialog>
+    </el-dialog> -->
   </div>
 </template>
 

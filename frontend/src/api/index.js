@@ -24,6 +24,20 @@ export const updateCurrentUserProfile = (data) => {
   return request.put('/auth/me', data)
 }
 
+/** 当前账号已关联保存的不合格产品层级方案（服务端） */
+export const listMyUnqualifiedDimensionPresets = (params) => {
+  return request.get('/auth/me/unqualified-dimension-presets', { params })
+}
+
+/** 保存一套层级方案：写入标题表并写入用户关联表 */
+export const createMyUnqualifiedDimensionPreset = (data) => {
+  return request.post('/auth/me/unqualified-dimension-presets', data)
+}
+
+export const deleteMyUnqualifiedDimensionPreset = (id) => {
+  return request.delete(`/auth/me/unqualified-dimension-presets/${id}`)
+}
+
 export const listAdminUsers = () => {
   return request.get('/auth/users')
 }
@@ -185,6 +199,10 @@ export const updateAnnouncementStagingBody = (id, data = {}) => {
 
 export const updateAnnouncementStagingInfo = (id, data = {}) => {
   return request.put(`/announcement-staging/${id}/info`, data)
+}
+
+export const syncAnnouncementStagingItems = (id) => {
+  return request.post(`/announcement-staging/${id}/sync-items`)
 }
 
 export const updateAnnouncementStagingProductType = (id, data = {}) => {

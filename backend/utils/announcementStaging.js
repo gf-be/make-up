@@ -2246,6 +2246,17 @@ async function deleteAnnouncementStagingItem(connection, stagingBatchId, locator
   return persistStagingDetailPayload(connection, stagingBatchId, rawPayload);
 }
 
+/** 按当前批次 raw_payload 重建 announcement_staging_items（抽检）；飞检批次会清空明细表对应行 */
+async function resyncAnnouncementStagingItemsTable(connection, stagingBatchId) {
+  await ensureAnnouncementStagingSchema(connection);
+  const batch = await getStagingBatchForItemEdit(connection, stagingBatchId);
+  const rawPayload = parseJsonSafely(batch.raw_payload, {});
+  const typeInfo = getBatchTypeInfo(batch, rawPayload);
+  const items = collectBatchRows(rawPayload, typeInfo.announcement_type);
+  await replaceStagingItems(connection, stagingBatchId, items, typeInfo.announcement_type);
+  return getAnnouncementStagingDetail(connection, stagingBatchId);
+}
+
 
 async function getAnnouncementStagingOverview(connection, directoryPath = DEFAULT_STAGING_SOURCE_DIR) {
   await ensureAnnouncementStagingSchema(connection);
@@ -3720,6 +3731,7 @@ module.exports = {
   createAnnouncementStagingItem,
   updateAnnouncementStagingItem,
   deleteAnnouncementStagingItem,
+  resyncAnnouncementStagingItemsTable,
   publishAnnouncementStagingBatch,
   deleteAnnouncementStagingBatch,
   deletePublishedAnnouncementStagingBatch,

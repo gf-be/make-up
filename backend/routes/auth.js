@@ -112,6 +112,68 @@ async function ensureUserSchema() {
   );
 
   await reconcileSeedAccounts();
+
+  await ensureUnqualifiedDimensionPresetTables();
+}
+
+/** 不合格产品层级方案：标题表 + 用户关联表（同一用户可保存多套方案） */
+async function ensureUnqualifiedDimensionPresetTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS unqualified_dimension_preset_titles (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      creator_user_id INT NOT NULL,
+      title VARCHAR(200) NOT NULL,
+      dimension_order_json JSON NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_udpt_creator (creator_user_id),
+      CONSTRAINT fk_udpt_creator FOREIGN KEY (creator_user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_unqualified_dimension_preset_members (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      preset_title_id INT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_u_udpm_user_preset (user_id, preset_title_id),
+      INDEX idx_u_udpm_user (user_id),
+      CONSTRAINT fk_u_udpm_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_u_udpm_preset FOREIGN KEY (preset_title_id) REFERENCES unqualified_dimension_preset_titles(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+}
+
+const UNQUALIFIED_DIMENSION_KEYS = new Set([
+  'source',
+  'province',
+  'manufacturer_province',
+  'manufacturer_city',
+  'sampled_province',
+  'sampled_city',
+  'product_category',
+  'issue_item',
+  'year'
+]);
+
+const DEFAULT_UNQUALIFIED_DIMENSION_ORDER = [
+  'source',
+  'manufacturer_province',
+  'manufacturer_city',
+  'product_category',
+  'issue_item'
+];
+
+function normalizeUnqualifiedDimensionOrder(raw) {
+  const list = Array.isArray(raw) ? raw : [];
+  const unique = [];
+  list.forEach((key) => {
+    const k = String(key || '').trim();
+    if (UNQUALIFIED_DIMENSION_KEYS.has(k) && !unique.includes(k) && unique.length < 5) {
+      unique.push(k);
+    }
+  });
+  return unique.length ? unique : [...DEFAULT_UNQUALIFIED_DIMENSION_ORDER];
 }
 
 function parseDetails(raw) {
@@ -198,6 +260,148 @@ router.post('/logout', authenticate, (req, res) => {
 
 router.get('/me', authenticate, (req, res) => {
   res.json({ success: true, data: req.user });
+});
+
+/** 当前用户在关联表中可用的不合格产品层级方案（来自标题表） */
+router.get('/me/unqualified-dimension-presets', authenticate, async (req, res) => {
+  try {
+    await ensureUserSchema();
+
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 40, 1), 100);
+
+    const [rows] = await pool.query(
+      `SELECT t.id, t.title, t.dimension_order_json, m.created_at AS linked_at
+       FROM user_unqualified_dimension_preset_members m
+       INNER JOIN unqualified_dimension_preset_titles t ON t.id = m.preset_title_id
+       WHERE m.user_id = ?
+       ORDER BY m.created_at DESC
+       LIMIT ?`,
+      [req.user.id, limit]
+    );
+
+    const data = rows.map((row) => {
+      let order = row.dimension_order_json;
+      if (typeof order === 'string') {
+        try {
+          order = JSON.parse(order);
+        } catch {
+          order = [];
+        }
+      }
+      return {
+        id: row.id,
+        title: row.title,
+        dimension_order: normalizeUnqualifiedDimensionOrder(order),
+        linked_at: row.linked_at
+      };
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('获取层级方案列表失败:', error);
+    res.status(500).json({ success: false, message: '获取层级方案列表失败' });
+  }
+});
+
+/** 保存一套层级方案：写入标题表并在关联表中关联当前用户 */
+router.post('/me/unqualified-dimension-presets', authenticate, async (req, res) => {
+  try {
+    await ensureUserSchema();
+
+    const body = req.body || {};
+    const title = String(body.title || body.preset_name || '').trim().slice(0, 200);
+    if (!title) {
+      return res.status(400).json({ success: false, message: '方案名称不能为空' });
+    }
+
+    const dimensionOrder = normalizeUnqualifiedDimensionOrder(body.dimension_order);
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [insertTitle] = await conn.query(
+        'INSERT INTO unqualified_dimension_preset_titles (creator_user_id, title, dimension_order_json) VALUES (?, ?, ?)',
+        [req.user.id, title, JSON.stringify(dimensionOrder)]
+      );
+
+      const presetTitleId = insertTitle.insertId;
+
+      await conn.query(
+        `INSERT INTO user_unqualified_dimension_preset_members (user_id, preset_title_id)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE created_at = created_at`,
+        [req.user.id, presetTitleId]
+      );
+
+      await conn.commit();
+
+      res.json({
+        success: true,
+        message: '方案已保存',
+        data: {
+          id: presetTitleId,
+          title,
+          dimension_order: dimensionOrder
+        }
+      });
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    console.error('保存层级方案失败:', error);
+    res.status(500).json({ success: false, message: '保存层级方案失败' });
+  }
+});
+
+/** 移除当前用户与该方案的关联；若无其他用户关联则删除标题记录 */
+router.delete('/me/unqualified-dimension-presets/:id', authenticate, async (req, res) => {
+  try {
+    await ensureUserSchema();
+
+    const presetTitleId = Number.parseInt(req.params.id, 10);
+    if (!presetTitleId || presetTitleId < 1) {
+      return res.status(400).json({ success: false, message: '无效的方案 id' });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [delMember] = await conn.query(
+        'DELETE FROM user_unqualified_dimension_preset_members WHERE user_id = ? AND preset_title_id = ?',
+        [req.user.id, presetTitleId]
+      );
+
+      if (!delMember.affectedRows) {
+        await conn.rollback();
+        return res.status(404).json({ success: false, message: '方案不存在或无权删除' });
+      }
+
+      const [[countRow]] = await conn.query(
+        'SELECT COUNT(*) AS c FROM user_unqualified_dimension_preset_members WHERE preset_title_id = ?',
+        [presetTitleId]
+      );
+
+      if (Number(countRow.c) === 0) {
+        await conn.query('DELETE FROM unqualified_dimension_preset_titles WHERE id = ?', [presetTitleId]);
+      }
+
+      await conn.commit();
+      res.json({ success: true, message: '已删除' });
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    console.error('删除层级方案失败:', error);
+    res.status(500).json({ success: false, message: '删除层级方案失败' });
+  }
 });
 
 router.put('/me', authenticate, async (req, res) => {

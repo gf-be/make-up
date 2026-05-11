@@ -136,14 +136,6 @@
                         :value="opt.value" />
                     </el-select>
                   </el-form-item>
-                  <el-form-item label="状态">
-                    <el-select v-model="filters.status" clearable placeholder="全部" style="width: 112px"
-                      @change="applyFilters">
-                      <el-option label="待确认" value="pending" />
-                      <el-option label="已导入" value="confirmed" />
-                    </el-select>
-                  </el-form-item>
-               
                   <el-form-item style="margin-bottom: 0px;">
                     <el-button type="primary" @click="applyFilters">检索</el-button>
                     <el-button @click="resetFilters">重置</el-button>
@@ -157,17 +149,17 @@
 
                 <el-table class="batch-table" :data="batchListRows" row-key="id" :max-height="batchReviewTableMaxHeight"
                   size="small" stripe 
-                  :row-class-name="batchRowClassName" @row-click="handleBatchRowClick">
-                  <el-table-column label="通告标题" min-width="210" show-overflow-tooltip>
+                  :row-class-name="batchRowClassName" @row-click="handleBatchRowClick" >
+                  <el-table-column label="通告标题" min-width="190" show-overflow-tooltip>
                     <template #default="{ row }">{{ row.title || '（无标题）' }}</template>
                   </el-table-column>
-                  <!-- <el-table-column prop="announcement_type_label" label="年号" width="90" align="center" /> -->
-                  <el-table-column label="状态" width="82" align="center">
+                  <el-table-column prop="announcement_no" label="年号" width="90" align="center" show-overflow-tooltip/>
+                  <!-- <el-table-column label="状态" width="82" align="center">
                     <template #default="{ row }">
                       <el-tag size="small" :type="getStatusTagType(row.status)">{{ getStatusLabel(row.status)
                         }}</el-tag>
                     </template>
-                  </el-table-column>
+                  </el-table-column> -->
                   <el-table-column label="上传人" width="88" show-overflow-tooltip>
                     <template #default="{ row }">{{ getSourceUserLabel(row) }}</template>
                   </el-table-column>
@@ -191,8 +183,9 @@
                       <div class="panel-subtitle">{{ currentBatchSubtitle }}</div>
                     </div>
                     <div v-if="currentBatch" class="panel-actions">
-                      <el-button type="primary" plain @click="openInfoEditor()">
-                        编辑通告信息
+                      <el-button type="primary" plain :loading="stagingDraftSaving"
+                        @click="handleStagingDraftSave">
+                        暂存
                       </el-button>
                       <el-button v-if="nextBatch" type="primary" plain :loading="switchingBatchId === nextBatch.id"
                         @click="handleGoNextBatch()">
@@ -218,63 +211,80 @@
 
                       <div class="section-toolbar">
                         <div>
-                          <div class="section-title">通告正文内容</div>
-                          <div class="panel-tip">支持先在临时批次修订正文再决定是否导入正式库；若该通告已导入正式库，保存时会同步更新正式库正文。</div>
-                        </div>
-                        <div class="inline-tags">
-                          <el-tag>{{ currentBatch.publish_date || '无日期' }}</el-tag>
-                          <el-tag type="success">{{ currentBatch.announcement_no || '无编号' }}</el-tag>
-                          <el-button v-if="currentBatch" type="primary" plain size="small" @click="openInfoEditor()">
-                            编辑通告信息
-                          </el-button>
-                          <el-button v-if="currentBatch" type="primary" plain size="small"
-                            :loading="savingBodyId === currentBatch.id" @click="openBodyEditor()">
-                            编辑正文
-                          </el-button>
+                          <!-- <div class="section-title">{{ currentBatch ? currentBatch.title : '批次详情工作区' }}</div> -->
+                          <!-- <div class="panel-tip">支持先在临时批次修订正文再决定是否导入正式库；若该通告已导入正式库，保存时会同步更新正式库正文。</div> -->
                         </div>
                       </div>
 
-                      <div v-if="currentBatchBodyText" class="content-scroll-panel ">
-                        <el-descriptions :column="2" border>
-                          <el-descriptions-item label="列表期号展示">{{ getBatchPeriodLabel(currentBatch) || '-'
-                          }}</el-descriptions-item>
-
-                          <el-descriptions-item label="状态">
-                            <el-tag :type="getStatusTagType(currentBatch.status)">{{ getStatusLabel(currentBatch.status)
-                            }}</el-tag>
-                          </el-descriptions-item>
-                          <el-descriptions-item label="公告编号">{{ currentBatch.announcement_no || '-'
-                          }}</el-descriptions-item>
-                          <el-descriptions-item label="发布日期">{{ currentBatch.publish_date || '-'
-                          }}</el-descriptions-item>
-                          <el-descriptions-item label="产品类型">{{ currentTypeInfo.product_type_label
-                          }}</el-descriptions-item>
-                          <el-descriptions-item label="通告类型">{{ currentTypeInfo.announcement_type_label
-                          }}</el-descriptions-item>
-                          <el-descriptions-item label="检验/检查单位">{{ currentBatch.inspection_unit || '-'
-                          }}</el-descriptions-item>
-                          <el-descriptions-item label="待转入表">{{ currentTypeInfo.target_table }}</el-descriptions-item>
-                          <el-descriptions-item label="主附件">{{ currentBatch.primary_attachment_name || '-'
-                          }}</el-descriptions-item>
-                          <el-descriptions-item label="来源用户">{{ getSourceUserLabel(currentBatch)
-                          }}</el-descriptions-item>
-                          <el-descriptions-item label="通告网址" :span="2">
-                            <a v-if="currentBatch.source_detail_url" :href="currentBatch.source_detail_url"
-                              target="_blank" rel="noreferrer">{{ currentBatch.source_detail_url }}</a>
-                            <span v-else class="muted-text">-</span>
-                          </el-descriptions-item>
-                        </el-descriptions>
-                        <div class="content-body-text">{{ currentBatchBodyText }}</div>
+                      <div v-if="currentBatch" class="content-scroll-panel">
+                        <el-form ref="infoEditFormRef" :model="infoEditForm" :rules="infoEditRules"
+                          class="inline-staging-info-form">
+                          <el-descriptions :column="2" border>
+                            <el-descriptions-item label="列表期号展示">{{ getBatchPeriodLabel(currentBatch) || '-'
+                            }}</el-descriptions-item>
+                            <el-descriptions-item label="通告标题">
+                              <el-form-item prop="title" class="nested-form-item">
+                                <el-input v-model="infoEditForm.title" size="small" placeholder="通告标题" />
+                              </el-form-item>
+                            </el-descriptions-item>
+                            <el-descriptions-item label="公告编号">
+                              <el-input v-model="infoEditForm.announcement_no" size="small" />
+                            </el-descriptions-item>
+                            <el-descriptions-item label="发布日期">
+                              <el-date-picker v-model="infoEditForm.publish_date" type="date" value-format="YYYY-MM-DD"
+                                placeholder="选择日期" style="width: 100%" size="small" />
+                            </el-descriptions-item>
+                            <el-descriptions-item label="产品类型">
+                              <el-form-item class="nested-form-item">
+                                <el-select v-model="infoEditForm.product_type" placeholder="请选择" style="width: 100%"
+                                  size="small">
+                                  <el-option v-for="opt in productTypeOptions" :key="opt.value" :label="opt.label"
+                                    :value="opt.value" />
+                                </el-select>
+                              </el-form-item>
+                            </el-descriptions-item>
+                            <el-descriptions-item label="通告类型">
+                              <el-form-item class="nested-form-item">
+                                <el-select v-model="infoEditForm.announcement_type" placeholder="请选择"
+                                  style="width: 100%" size="small">
+                                  <el-option v-for="opt in announcementTypeOptions" :key="opt.value" :label="opt.label"
+                                    :value="opt.value" />
+                                </el-select>
+                              </el-form-item>
+                            </el-descriptions-item>
+                            <el-descriptions-item label="检验/检查单位">
+                              <el-input v-model="infoEditForm.inspection_unit" size="small" />
+                            </el-descriptions-item>
+                            <!-- <el-descriptions-item label="主附件">
+                              <el-input v-model="infoEditForm.primary_attachment_name" size="small" />
+                            </el-descriptions-item> -->
+                            <el-descriptions-item label="来源用户" :span="2">{{ getSourceUserLabel(currentBatch)
+                            }}</el-descriptions-item>
+                            <!-- <el-descriptions-item label="主附件路径" :span="2">
+                              <el-input v-model="infoEditForm.primary_attachment_path" size="small" />
+                            </el-descriptions-item> -->
+                            <el-descriptions-item label="通告网址" :span="2">
+                              <el-input v-model="infoEditForm.source_detail_url" size="small" />
+                            </el-descriptions-item>
+                            <el-descriptions-item label="来源页" :span="2">
+                              <el-input v-model="infoEditForm.source_page" size="small" />
+                            </el-descriptions-item>
+                          </el-descriptions>
+                        </el-form>
+                        <div class="content-body-text content-body-editor-wrap">
+                          <el-input v-model="bodyEditForm.content" type="textarea" :rows="18" resize="vertical"
+                            maxlength="30000" show-word-limit class="content-body-editor-input"
+                            placeholder="通告正文（可在此直接编辑）" />
+                        </div>
                       </div>
-                      <el-empty v-else description="当前批次暂无正文内容" />
                     </el-tab-pane>
 
                     <el-tab-pane label="附件解析产品列表" name="attachments">
                       <div class="section-toolbar section-toolbar-wrap">
-                        <div>
+                        <!-- <div>
                           <div class="section-title">附件解析产品列表</div>
                           <div class="panel-tip">支持按附件切换查看解析结果，也可结合“下一个通告”连续快速核验。</div>
-                        </div>
+                        </div> -->
                         <!-- <div class="detail-filter-actions">
                           <el-input v-model="detailFilters.keyword" clearable placeholder="搜索产品名 / 企业名 / 问题项 / 检查问题"
                             style="width: 320px" />
@@ -284,7 +294,7 @@
                       <el-alert v-if="currentParseNotice" :type="currentParseNotice.type" :closable="false" show-icon
                         class="mb-16" :title="currentParseNotice.title" />
 
-                      <div v-if="currentBatchAttachments.length" class="attachment-filter-bar">
+                      <!-- <div v-if="currentBatchAttachments.length" class="attachment-filter-bar">
                         <el-button size="small" :type="selectedAttachmentIndex === null ? 'primary' : undefined"
                           @click="selectAttachmentFilter(null)">
                           全部附件
@@ -294,17 +304,17 @@
                           @click="selectAttachmentFilter(attachment.index)">
                           {{ attachment.attachment_name || `附件${attachment.index}` }}
                         </el-button>
-                      </div>
+                      </div> -->
 
                       <div v-if="currentAttachmentGroups.length" class="attachment-group-list">
                         <div v-for="attachment in currentAttachmentGroups" :key="attachment.index"
                           class="attachment-group-card">
-                          <div class="attachment-group-header">
-                            <div>
+                          <!-- <div class="attachment-group-header"> -->
+                            <!-- <div>
                               <div class="tree-title">{{ attachment.attachment_name || `附件${attachment.index}` }}</div>
                               <div class="tree-subtitle">{{ attachment.parse_message || '已进入附件解析产品列表' }}</div>
-                            </div>
-                            <div class="inline-tags end">
+                            </div> -->
+                            <!-- <div class="inline-tags end">
                               <el-tag>{{ attachment.attachment_type || 'unknown' }}</el-tag>
                               <el-tag type="success">解析 {{ attachment.parsed_count || 0 }} 条</el-tag>
                               <el-tag v-if="!isFlightBatch" :type="attachment.counterfeit_count ? 'danger' : 'info'">涉假
@@ -313,12 +323,12 @@
                                 @click="openCreateStagingItem(attachment)">
                                 新增产品
                               </el-button>
-                            </div>
-                          </div>
+                            </div> -->
+                          <!-- </div> -->
 
-                          <template v-if="attachment.filtered_rows.length">
+                          <template v-if="attachment.filtered_rows.length"  >
                             <el-table v-if="isFlightBatch" :data="attachment.filtered_rows" size="small" stripe
-                              :max-height="attachmentTableMaxHeight">
+                              :max-height="attachmentTableMaxHeight" class="table-height">
                               <el-table-column prop="sequence_no" label="序号" width="70" align="center" />
                               <el-table-column prop="title" label="标题" min-width="220" show-overflow-tooltip />
                               <el-table-column prop="company_name" label="企业名称" min-width="220" show-overflow-tooltip />
@@ -331,34 +341,57 @@
                             </el-table>
 
                             <el-table v-else :data="attachment.filtered_rows" size="small" stripe
-                              :max-height="attachmentTableMaxHeight">
+                              :max-height="attachmentTableMaxHeight"
+                              :row-key="(row) => stagingSamplingTableRowKey(attachment, row)">
                               <el-table-column type="expand" width="50">
                                 <template #default="{ row }">
                                   <el-descriptions :column="2" border size="small" class="detail-expanded">
-                                    <el-descriptions-item label="注册人/备案人等名称">{{ row.company_names || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="注册人/备案人等地址">{{ row.company_addresses || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="被抽样单位名称">{{ row.sample_unit_name || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="被抽样单位地址">{{ row.sample_unit_address || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="生产日期">{{ row.production_date || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="限期使用日期/保质期">{{ row.expiry_date || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="所在地/进口地区">{{ row.product_region || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="注册/备案编号">{{ row.registration_no || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="生产许可证号">{{ row.production_license_no || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="检验结果">{{ row.inspection_result || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="规定要求">{{ row.requirement || '暂无'
-                                    }}</el-descriptions-item>
-                                    <el-descriptions-item label="备注" :span="2">{{ row.remarks || '暂无'
-                                    }}</el-descriptions-item>
+                                    <el-descriptions-item label="注册人/备案人等名称">
+                                      <el-input v-model="row.company_names" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+                                        size="small" placeholder="注册人/备案人等名称" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="注册人/备案人等地址">
+                                      <el-input v-model="row.company_addresses" type="textarea"
+                                        :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="地址" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="被抽样单位名称">
+                                      <el-input v-model="row.sample_unit_name" size="small" placeholder="被抽样单位名称" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="被抽样单位地址">
+                                      <el-input v-model="row.sample_unit_address" type="textarea"
+                                        :autosize="{ minRows: 2, maxRows: 4 }" size="small" placeholder="地址" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="生产日期">
+                                      <el-input v-model="row.production_date" size="small" placeholder="生产日期" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="限期使用日期/保质期">
+                                      <el-input v-model="row.expiry_date" size="small" placeholder="限期使用日期/保质期" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="所在地/进口地区">
+                                      <el-input v-model="row.product_region" size="small" placeholder="所在地/进口地区" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="注册/备案编号">
+                                      <el-input v-model="row.registration_no" size="small" placeholder="注册/备案编号" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="生产许可证号">
+                                      <el-input v-model="row.production_license_no" size="small" placeholder="生产许可证号" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="检验结果">
+                                      <el-input v-model="row.inspection_result" type="textarea"
+                                        :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="检验结果" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="规定要求">
+                                      <el-input v-model="row.requirement" type="textarea"
+                                        :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="规定要求" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="备注" :span="2">
+                                      <el-input v-model="row.remarks" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+                                        size="small" placeholder="备注" />
+                                    </el-descriptions-item>
+                                    <el-descriptions-item label="涉嫌假冒">
+                                      <el-switch :model-value="Boolean(Number(row.is_counterfeit))"
+                                        @update:model-value="(v) => { row.is_counterfeit = v ? 1 : 0 }" />
+                                    </el-descriptions-item>
                                   </el-descriptions>
                                 </template>
                               </el-table-column>
@@ -373,7 +406,10 @@
                               <!-- <el-table-column prop="remarks" label="备注" min-width="180" show-overflow-tooltip /> -->
                               <el-table-column label="操作" width="120" fixed="right" align="center">
                                 <template #default="{ row }">
-                                  <el-button link type="primary" @click="openEditStagingItem(row)">编辑</el-button>
+                                  <el-button link type="primary" :loading="isSavingStagingRow(row)"
+                                    @click="handleSaveStagingRow(row)">
+                                    保存
+                                  </el-button>
                                   <el-button link type="danger" @click="handleDeleteStagingItem(row)">删除</el-button>
                                 </template>
                               </el-table-column>
@@ -404,89 +440,6 @@
 
     </el-card>
 
-    <el-dialog v-model="bodyEditDialogVisible" width="820px" destroy-on-close
-      :title="currentBatch ? `编辑正文：${currentBatch.title || '当前通告'}` : '编辑通告正文'">
-      <div class="panel-tip mb-16">保存后会更新当前临时批次正文；若该通告已导入正式库，也会同步更新正式库正文，不会重跑附件解析结果。</div>
-
-      <el-input v-model="bodyEditForm.content" type="textarea" :rows="20" resize="vertical" maxlength="30000"
-        show-word-limit placeholder="请输入修订后的通告正文" />
-      <template #footer>
-        <el-button @click="bodyEditDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="savingBodyId === currentBatchId"
-          @click="handleSaveBodyEdit()">保存正文</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="infoEditDialogVisible" width="760px" destroy-on-close :close-on-click-modal="false"
-      :title="currentBatch ? `编辑通告信息：${currentBatch.title || '当前通告'}` : '编辑通告信息'">
-      <div class="panel-tip mb-16">以下为列表与详情中所示字段；正文请在「编辑正文」中单独修改。若已入库，保存后会尽力同步正式库对应字段。</div>
-      <el-form ref="infoEditFormRef" :model="infoEditForm" :rules="infoEditRules" label-width="112px">
-        <el-form-item label="通告标题" prop="title">
-          <el-input v-model="infoEditForm.title" />
-        </el-form-item>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="通告类型">
-              <el-select v-model="infoEditForm.announcement_type" placeholder="请选择" style="width: 100%">
-                <el-option v-for="opt in announcementTypeOptions" :key="opt.value" :label="opt.label"
-                  :value="opt.value" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="产品类型">
-              <el-select v-model="infoEditForm.product_type" placeholder="请选择" style="width: 100%">
-                <el-option v-for="opt in productTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="公告编号">
-              <el-input v-model="infoEditForm.announcement_no" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="发布日期">
-              <el-date-picker
-                v-model="infoEditForm.publish_date"
-                type="date"
-                value-format="YYYY-MM-DD"
-                placeholder="选择日期"
-                style="width: 100%"
-              />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="检验/检查单位">
-              <el-input v-model="infoEditForm.inspection_unit" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="主附件名称">
-              <el-input v-model="infoEditForm.primary_attachment_name" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="主附件路径">
-          <el-input v-model="infoEditForm.primary_attachment_path" />
-        </el-form-item>
-        <el-form-item label="通告网址">
-          <el-input v-model="infoEditForm.source_detail_url" />
-        </el-form-item>
-        <el-form-item label="来源页">
-          <el-input v-model="infoEditForm.source_page" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="infoEditDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="savingInfoId === currentBatchId" @click="handleSaveInfoEdit">保存</el-button>
-      </template>
-    </el-dialog>
-
     <el-dialog v-model="productTypeEditDialogVisible" width="480px" destroy-on-close
       :title="currentBatch ? `修改产品类型：${currentBatch.title || '当前通告'}` : '修改产品类型'">
       <div class="panel-tip mb-16">保存后会更新当前临时批次产品类型；若该通告已导入正式库，也会同步更新正式库、企业关联和问题产品数据。</div>
@@ -501,7 +454,7 @@
     </el-dialog>
 
     <el-dialog v-model="stagingItemDialogVisible" width="900px" destroy-on-close :close-on-click-modal="false"
-      :title="stagingItemEditMode === 'create' ? '新增产品明细' : '编辑产品明细'">
+      title="新增产品明细">
       <el-form ref="stagingItemFormRef" :model="stagingItemForm" :rules="stagingItemRules" label-width="125px">
         <el-row :gutter="16">
           <el-col :span="8">
@@ -621,7 +574,7 @@
 
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRaw, watch } from 'vue'
 
 import { useRoute, useRouter } from 'vue-router'
 import { Refresh, Upload } from '@element-plus/icons-vue'
@@ -640,6 +593,7 @@ import {
   updateAnnouncementStagingBody,
   updateAnnouncementStagingInfo,
   updateAnnouncementStagingProductType,
+  syncAnnouncementStagingItems,
   retreatAnnouncementStagingToTraceback,
 
   confirmAllAnnouncementStaging
@@ -672,8 +626,7 @@ const importing = ref(false)
 const bulkConfirming = ref(false)
 const detailLoadingId = ref(null)
 const confirmingId = ref(null)
-const savingBodyId = ref(null)
-const savingInfoId = ref(null)
+const stagingDraftSaving = ref(false)
 
 const batchReviewTableMaxHeight = ref(480)
 const attachmentTableMaxHeight = ref(520)
@@ -703,11 +656,9 @@ const selectedTreeKey = ref('')
 const activeDetailTab = ref('body')
 const selectedAttachmentIndex = ref(null)
 const workspaceCacheReady = ref(false)
-const bodyEditDialogVisible = ref(false)
 const bodyEditForm = reactive({
   content: ''
 })
-const infoEditDialogVisible = ref(false)
 const infoEditFormRef = ref(null)
 const infoEditForm = reactive({
   title: '',
@@ -730,7 +681,6 @@ const productTypeEditForm = reactive({
   product_type: 'unknown'
 })
 const stagingItemDialogVisible = ref(false)
-const stagingItemEditMode = ref('create')
 const stagingItemFormRef = ref(null)
 const savingStagingItem = ref(false)
 const stagingItemLocator = ref(null)
@@ -747,8 +697,11 @@ let workspaceSaveTimer = null
 const preloadingBatchIds = new Set()
 
 
+/** 左侧通告列表固定只拉取待确认批次（与正式库已导入区分） */
+const STAGING_BATCH_LIST_STATUS = 'pending'
+
 const filters = reactive({
-  status: '',
+  status: STAGING_BATCH_LIST_STATUS,
   product_type: '',
   announcement_type: '',
   keyword: '',
@@ -813,6 +766,94 @@ function applyStagingItemToForm(row = {}) {
     sequence_no: Number(row.sequence_no || 1),
     is_counterfeit: Boolean(row.is_counterfeit)
   })
+}
+
+function buildStagingItemPayloadFromRow(row = {}) {
+  return {
+    sequence_no: Number(row.sequence_no || 1),
+    product_name: row.product_name || '',
+    company_names: row.company_names || '',
+    company_addresses: row.company_addresses || '',
+    manufacturer_name: row.manufacturer_name || '',
+    manufacturer_address: row.manufacturer_address || '',
+    operator_name: row.operator_name || '',
+    operator_address: row.operator_address || '',
+    sample_unit_name: row.sample_unit_name || '',
+    sample_unit_address: row.sample_unit_address || '',
+    package_spec: row.package_spec || '',
+    batch_no: row.batch_no || '',
+    production_date: row.production_date || '',
+    expiry_date: row.expiry_date || '',
+    product_region: row.product_region || '',
+    registration_no: row.registration_no || '',
+    production_license_no: row.production_license_no || '',
+    inspection_institution: row.inspection_institution || '',
+    unqualified_items: row.unqualified_items || '',
+    inspection_result: row.inspection_result || '',
+    requirement: row.requirement || '',
+    remarks: row.remarks || '',
+    is_counterfeit: Number(row.is_counterfeit) ? 1 : 0
+  }
+}
+
+function getStagingRowSaveKey(row = {}) {
+  return `${row.__attachment_index ?? ''}:${row.__row_index ?? ''}:${row.sequence_no ?? ''}`
+}
+
+const savingStagingRowKey = ref('')
+
+function isSavingStagingRow(row = {}) {
+  return savingStagingRowKey.value === getStagingRowSaveKey(row)
+}
+
+async function handleSaveStagingRow(row = {}) {
+  if (!currentBatch.value?.id || isFlightBatch.value) {
+    if (isFlightBatch.value) {
+      ElMessage.warning('飞行检查批次暂不支持在此编辑产品明细')
+    }
+    return
+  }
+
+  const productName = String(row.product_name || '').trim()
+  const companyNames = String(row.company_names || '').trim()
+  const unqualified = String(row.unqualified_items || '').trim()
+  if (!productName) {
+    ElMessage.warning('请输入产品名称（主表「产品名称」列）')
+    return
+  }
+  if (!companyNames) {
+    ElMessage.warning('请输入注册人/备案人等名称')
+    return
+  }
+  if (!unqualified) {
+    ElMessage.warning('请输入不符合规定项目（主表「不符合规定项目」列）')
+    return
+  }
+
+  const key = getStagingRowSaveKey(row)
+  if (savingStagingRowKey.value) {
+    return
+  }
+
+  savingStagingRowKey.value = key
+  try {
+    const payload = buildStagingItemPayloadFromRow(row)
+    const res = await updateAnnouncementStagingItem(currentBatch.value.id, {
+      locator: {
+        attachment_index: row.__attachment_index || 1,
+        row_index: row.__row_index,
+        sequence_no: row.sequence_no
+      },
+      item: payload
+    })
+    updateCurrentBatchDetail(res.data)
+    ElMessage.success('已保存至临时明细表')
+  } catch (error) {
+    console.error('保存临时产品明细失败:', error)
+    ElMessage.error(error?.response?.data?.message || '保存产品明细失败')
+  } finally {
+    savingStagingRowKey.value = ''
+  }
 }
 
 function buildStagingItemPayload() {
@@ -1161,27 +1202,27 @@ function getPublishedId(row = {}) {
     : row.published_announcement_id || null
 }
 
-function getImportActionMeta(record = {}) {
-  const action = typeof record === 'string' ? record : record?.action
-  const needsManualReview = Boolean(record?.needs_manual_review)
+// function getImportActionMeta(record = {}) {
+//   const action = typeof record === 'string' ? record : record?.action
+//   const needsManualReview = Boolean(record?.needs_manual_review)
 
-  if (action === 'created' && needsManualReview) {
-    return { label: '已入临时区待核验', type: 'warning' }
-  }
-  if (action === 'created') {
-    return { label: '新增临时批次', type: 'success' }
-  }
-  if (action === 'skipped_duplicate') {
-    return { label: '重复跳过（未入倒溯）', type: 'info' }
-  }
-  if (action === 'skipped_parse_failed') {
-    return { label: '历史跳过记录', type: 'info' }
-  }
-  if (action === 'failed') {
-    return { label: '导入异常', type: 'info' }
-  }
-  return { label: action || '未知状态', type: 'info' }
-}
+//   if (action === 'created' && needsManualReview) {
+//     return { label: '已入临时区待核验', type: 'warning' }
+//   }
+//   if (action === 'created') {
+//     return { label: '新增临时批次', type: 'success' }
+//   }
+//   if (action === 'skipped_duplicate') {
+//     return { label: '重复跳过（未入倒溯）', type: 'info' }
+//   }
+//   if (action === 'skipped_parse_failed') {
+//     return { label: '历史跳过记录', type: 'info' }
+//   }
+//   if (action === 'failed') {
+//     return { label: '导入异常', type: 'info' }
+//   }
+//   return { label: action || '未知状态', type: 'info' }
+// }
 
 function normalizeText(value) {
   return String(value || '').trim()
@@ -1206,22 +1247,22 @@ function getBatchPeriodLabel(row = {}) {
   return normalizeText(row.announcement_no) || ''
 }
 
-function getBatchYearKey(row = {}) {
-  const sourceText = `${row.publish_date || ''} ${row.announcement_no || ''} ${row.title || ''}`.replace(/\s+/g, '')
-  const match = sourceText.match(/(20\d{2})年|^(20\d{2})-/)
-  const year = match?.[1] || match?.[2] || ''
-  return year || 'unknown'
-}
+// function getBatchYearKey(row = {}) {
+//   const sourceText = `${row.publish_date || ''} ${row.announcement_no || ''} ${row.title || ''}`.replace(/\s+/g, '')
+//   const match = sourceText.match(/(20\d{2})年|^(20\d{2})-/)
+//   const year = match?.[1] || match?.[2] || ''
+//   return year || 'unknown'
+// }
 
-function getYearLabel(yearKey = '') {
-  return yearKey && yearKey !== 'unknown' ? `${yearKey}年` : '未识别年份'
-}
+// function getYearLabel(yearKey = '') {
+//   return yearKey && yearKey !== 'unknown' ? `${yearKey}年` : '未识别年份'
+// }
 
-function getYearMeta(yearItem) {
-  if (yearItem.value === 'all') return '全部年号'
-  if (!yearItem.latest_date) return '暂无日期'
-  return `最新: ${yearItem.latest_date}`
-}
+// function getYearMeta(yearItem) {
+//   if (yearItem.value === 'all') return '全部年号'
+//   if (!yearItem.latest_date) return '暂无日期'
+//   return `最新: ${yearItem.latest_date}`
+// }
 
 function sortRowsByDisplayOrder(rows = []) {
   return [...rows].sort((left, right) => {
@@ -1241,10 +1282,10 @@ function sortRowsByDisplayOrder(rows = []) {
   })
 }
 
-function buildCompanyKey(company = {}) {
+// function buildCompanyKey(company = {}) {
 
-  return `${company.company_name || ''}__${company.company_address || ''}`
-}
+//   return `${company.company_name || ''}__${company.company_address || ''}`
+// }
 
 function getCachedDetail(batchId) {
   return batchId ? detailMap.value[batchId] || null : null
@@ -1294,21 +1335,28 @@ function filterAttachmentRows(rows = [], keyword = '') {
   }
 
   return sourceRows.filter((item) => {
+    const raw = toRaw(item)
     const text = [
-      item.product_name,
-      item.company_names,
-      item.sample_unit_name,
-      item.unqualified_items,
-      item.remarks,
-      item.title,
-      item.company_name,
-      item.defects_and_problems,
-      item.handling_measures,
-      item.inspection_unit
+      raw.product_name,
+      raw.company_names,
+      raw.sample_unit_name,
+      raw.unqualified_items,
+      raw.remarks,
+      raw.title,
+      raw.company_name,
+      raw.defects_and_problems,
+      raw.handling_measures,
+      raw.inspection_unit
     ].filter(Boolean).join(' ').toLowerCase()
 
     return text.includes(normalizedKeyword)
   })
+}
+
+function stagingSamplingTableRowKey(attachment, row) {
+  const attIdx = attachment?.__attachment_index ?? attachment?.index ?? 0
+  const r = row || {}
+  return `${attIdx}-${r.__row_index ?? 'r'}-${r.sequence_no ?? 's'}`
 }
 
 function buildWorkspacePayload() {
@@ -1326,7 +1374,7 @@ function buildWorkspacePayload() {
 
 function applyWorkspacePayload(payload = {}) {
   const nextFilters = payload.filters || {}
-  filters.status = nextFilters.status ?? ''
+  filters.status = STAGING_BATCH_LIST_STATUS
   filters.product_type = nextFilters.product_type ?? ''
   filters.announcement_type = nextFilters.announcement_type ?? ''
   filters.keyword = nextFilters.keyword ?? ''
@@ -1439,24 +1487,24 @@ const currentBatchSummary = computed(() => {
   }
 })
 
-const currentCompanyPreviewList = computed(() => {
-  const keyword = String(detailFilters.companyKeyword || '').trim().toLowerCase()
-  const rows = Array.isArray(currentBatchDetail.value?.company_preview) ? currentBatchDetail.value.company_preview : []
+// const currentCompanyPreviewList = computed(() => {
+//   const keyword = String(detailFilters.companyKeyword || '').trim().toLowerCase()
+//   const rows = Array.isArray(currentBatchDetail.value?.company_preview) ? currentBatchDetail.value.company_preview : []
 
-  if (!keyword) {
-    return rows
-  }
+//   if (!keyword) {
+//     return rows
+//   }
 
-  return rows.filter((item) => {
-    const text = [
-      item.company_name,
-      item.company_address,
-      item.province,
-      item.product_names
-    ].filter(Boolean).join(' ').toLowerCase()
-    return text.includes(keyword)
-  })
-})
+//   return rows.filter((item) => {
+//     const text = [
+//       item.company_name,
+//       item.company_address,
+//       item.province,
+//       item.product_names
+//     ].filter(Boolean).join(' ').toLowerCase()
+//     return text.includes(keyword)
+//   })
+// })
 
 const currentAttachmentGroups = computed(() => {
   const sourceAttachments = Array.isArray(currentBatchAttachments.value) ? currentBatchAttachments.value : []
@@ -1504,7 +1552,7 @@ const currentBatchSubtitle = computed(() => {
 
   const periodLabel = getBatchPeriodLabel(currentBatch.value)
   return [
-    currentBatchPositionText.value,
+    // currentBatchPositionText.value,
     periodLabel || getStatusLabel(currentBatch.value.status),
     `${currentTypeInfo.value.product_type_label} / ${currentTypeInfo.value.announcement_type_label}`,
     `${currentBatchSummary.value.detail_count} 条内容`
@@ -1618,7 +1666,7 @@ async function preloadNextBatchDetail(batchId) {
   })
 }
 
-function ensureDirectorySelection() { }
+// function ensureDirectorySelection() { }
 
 async function selectFirstVisibleBatch(options = {}) {
   if (!batchListRows.value.length) {
@@ -1780,13 +1828,13 @@ async function focusBatchById(batchId, options = {}) {
     return
   }
 
-  filters.status = ''
+  filters.status = STAGING_BATCH_LIST_STATUS
   filters.product_type = ''
   filters.announcement_type = ''
   filters.keyword = ''
   filters.year = ''
 
-  ElMessage.info('当前批次不在现有筛选结果中，已清空筛选条件后重新定位')
+  ElMessage.info('当前批次不在现有筛选结果中，已重置筛选条件后重新定位')
   await Promise.all([loadStagingFilterYears(), loadTreeData({ preferredKey, force: true })])
 }
 
@@ -1803,17 +1851,21 @@ function goTracebackCenter(row = {}) {
   })
 }
 
-function openBodyEditor() {
+function fillInlineStagingEditors() {
   if (!currentBatch.value) {
-    return
-  }
-
-  bodyEditForm.content = currentBatchBodyText.value || ''
-  bodyEditDialogVisible.value = true
-}
-
-function openInfoEditor() {
-  if (!currentBatch.value) {
+    Object.assign(infoEditForm, {
+      title: '',
+      announcement_no: '',
+      publish_date: '',
+      inspection_unit: '',
+      primary_attachment_name: '',
+      primary_attachment_path: '',
+      source_detail_url: '',
+      source_page: '',
+      product_type: 'cosmetics',
+      announcement_type: 'sampling'
+    })
+    bodyEditForm.content = ''
     return
   }
 
@@ -1830,12 +1882,12 @@ function openInfoEditor() {
     product_type: typeInfo.product_type || 'cosmetics',
     announcement_type: typeInfo.announcement_type || 'sampling'
   })
-  infoEditDialogVisible.value = true
+  bodyEditForm.content = currentBatchBodyText.value || ''
   nextTick(() => infoEditFormRef.value?.clearValidate?.())
 }
 
-async function handleSaveInfoEdit() {
-  if (!currentBatch.value?.id || savingInfoId.value) {
+async function handleStagingDraftSave() {
+  if (!currentBatch.value?.id || stagingDraftSaving.value) {
     return
   }
 
@@ -1844,28 +1896,45 @@ async function handleSaveInfoEdit() {
     return
   }
 
-  try {
-    savingInfoId.value = currentBatch.value.id
-    const res = await updateAnnouncementStagingInfo(currentBatch.value.id, { ...infoEditForm })
-    updateCurrentBatchDetail(res.data)
-    infoEditDialogVisible.value = false
-    ElMessage.success(res.data?.updated_published_id ? '基础信息已同步更新到正式库' : '基础信息已更新')
-  } catch (error) {
-    console.error('保存基础信息失败:', error)
-    ElMessage.error(error?.response?.data?.message || '保存基础信息失败')
-  } finally {
-    savingInfoId.value = null
-  }
-}
-
-function openProductTypeEditor() {
-  if (!currentBatch.value) {
+  const nextContent = String(bodyEditForm.content || '').trim()
+  if (!nextContent) {
+    ElMessage.warning('通告正文不能为空')
     return
   }
 
-  productTypeEditForm.product_type = currentBatch.value.product_type || 'unknown'
-  productTypeEditDialogVisible.value = true
+  const batchId = currentBatch.value.id
+  stagingDraftSaving.value = true
+  try {
+    const infoRes = await updateAnnouncementStagingInfo(batchId, { ...infoEditForm })
+    const bodyRes = await updateAnnouncementStagingBody(batchId, {
+      content: nextContent
+    })
+    const syncRes = await syncAnnouncementStagingItems(batchId)
+    updateCurrentBatchDetail(syncRes.data)
+    fillInlineStagingEditors()
+
+    const syncedPub = infoRes.data?.updated_published_id || bodyRes.data?.updated_published_id
+    ElMessage.success(
+      syncedPub
+        ? '已暂存，并已同步正式库相关字段；产品明细已写入 announcement_staging_items'
+        : '已暂存：基础信息、正文与临时产品明细表已更新'
+    )
+  } catch (error) {
+    console.error('暂存失败:', error)
+    ElMessage.error(error?.response?.data?.message || error?.message || '暂存失败')
+  } finally {
+    stagingDraftSaving.value = false
+  }
 }
+
+// function openProductTypeEditor() {
+//   if (!currentBatch.value) {
+//     return
+//   }
+
+//   productTypeEditForm.product_type = currentBatch.value.product_type || 'unknown'
+//   productTypeEditDialogVisible.value = true
+// }
 
 async function handleSaveProductType() {
   if (!currentBatch.value?.id || savingProductTypeId.value) {
@@ -1925,29 +1994,12 @@ function openCreateStagingItem(attachment = {}) {
     ElMessage.warning('飞行检查批次暂不支持在此编辑产品明细')
     return
   }
-  stagingItemEditMode.value = 'create'
   stagingItemLocator.value = {
     attachment_index: attachment.__attachment_index || attachment.index || 1
   }
   applyStagingItemToForm({
     sequence_no: Number(currentBatchSummary.value.detail_count || 0) + 1
   })
-  stagingItemDialogVisible.value = true
-  nextTick(() => stagingItemFormRef.value?.clearValidate?.())
-}
-
-function openEditStagingItem(row = {}) {
-  if (isFlightBatch.value) {
-    ElMessage.warning('飞行检查批次暂不支持在此编辑产品明细')
-    return
-  }
-  stagingItemEditMode.value = 'edit'
-  stagingItemLocator.value = {
-    attachment_index: row.__attachment_index || 1,
-    row_index: row.__row_index,
-    sequence_no: row.sequence_no
-  }
-  applyStagingItemToForm(row)
   stagingItemDialogVisible.value = true
   nextTick(() => stagingItemFormRef.value?.clearValidate?.())
 }
@@ -1973,18 +2025,13 @@ async function handleSaveStagingItem() {
   try {
     const payload = buildStagingItemPayload()
     const locator = stagingItemLocator.value || {}
-    const res = stagingItemEditMode.value === 'create'
-      ? await createAnnouncementStagingItem(currentBatch.value.id, {
-          attachment_index: locator.attachment_index || 1,
-          item: payload
-        })
-      : await updateAnnouncementStagingItem(currentBatch.value.id, {
-          locator,
-          item: payload
-        })
+    const res = await createAnnouncementStagingItem(currentBatch.value.id, {
+      attachment_index: locator.attachment_index || 1,
+      item: payload
+    })
 
     updateCurrentBatchDetail(res.data)
-    ElMessage.success(stagingItemEditMode.value === 'create' ? '产品明细已新增' : '产品明细已更新')
+    ElMessage.success('产品明细已新增')
     closeStagingItemDialog()
   } catch (error) {
     console.error('保存临时产品明细失败:', error)
@@ -2025,56 +2072,6 @@ async function handleDeleteStagingItem(row = {}) {
     }
     console.error('删除临时产品明细失败:', error)
     ElMessage.error(error?.response?.data?.message || '删除产品明细失败')
-  }
-}
-
-
-async function handleSaveBodyEdit() {
-
-  if (!currentBatch.value?.id || savingBodyId.value) {
-    return
-  }
-
-  const nextContent = String(bodyEditForm.content || '').trim()
-  if (!nextContent) {
-    ElMessage.warning('通告正文不能为空')
-    return
-  }
-
-  try {
-    savingBodyId.value = currentBatch.value.id
-    const res = await updateAnnouncementStagingBody(currentBatch.value.id, {
-      content: nextContent
-    })
-
-    const data = res.data || {}
-    const savedContent = data.updated_content || nextContent
-
-    detailMap.value = {
-      ...detailMap.value,
-      [currentBatch.value.id]: {
-        ...(detailMap.value[currentBatch.value.id] || createEmptyDetail()),
-        batch: {
-          ...(detailMap.value[currentBatch.value.id]?.batch || {}),
-          content: savedContent
-        }
-      }
-    }
-
-    treeRows.value = treeRows.value.map((row) => (
-      Number(row.id) === Number(currentBatch.value.id)
-        ? { ...row, content: savedContent }
-        : row
-    ))
-
-    bodyEditDialogVisible.value = false
-    ElMessage.success(data.updated_published_id ? '正文已同步更新到正式库' : '正文已更新')
-    await ensureBatchDetailLoaded(currentBatch.value.id, true)
-  } catch (error) {
-    console.error('保存通告正文失败:', error)
-    ElMessage.error(error?.response?.data?.message || '保存通告正文失败')
-  } finally {
-    savingBodyId.value = null
   }
 }
 
@@ -2283,7 +2280,7 @@ const applyFilters = async () => {
 }
 
 const resetFilters = async () => {
-  filters.status = ''
+  filters.status = STAGING_BATCH_LIST_STATUS
   filters.product_type = ''
   filters.announcement_type = ''
   filters.keyword = ''
@@ -2343,6 +2340,19 @@ watch(
     }
 
     await focusBatchById(fid, { skipMerge: true })
+  },
+  { flush: 'post' }
+)
+
+watch(
+  selectedBatchId,
+  async (batchId) => {
+    if (!batchId) {
+      fillInlineStagingEditors()
+      return
+    }
+    await ensureBatchDetailLoaded(batchId, false)
+    fillInlineStagingEditors()
   },
   { flush: 'post' }
 )
@@ -3123,6 +3133,36 @@ onBeforeUnmount(() => {
   line-height: 1.9;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.content-body-editor-wrap {
+  margin-top: 12px;
+}
+
+.content-body-editor-input :deep(textarea.el-textarea__inner) {
+  min-height: 320px;
+  line-height: 1.9;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  resize: vertical;
+}
+
+.inline-staging-info-form {
+  margin-bottom: 4px;
+}
+
+.inline-staging-info-form :deep(.nested-form-item) {
+  margin-bottom: 0;
+}
+
+.inline-staging-info-form :deep(.nested-form-item .el-form-item__content) {
+  margin-left: 0 !important;
+}
+
+.detail-expanded :deep(.el-input),
+.detail-expanded :deep(.el-textarea) {
+  width: 100%;
 }
 
 .attachment-group-list {

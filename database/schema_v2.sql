@@ -659,6 +659,28 @@ CREATE TABLE IF NOT EXISTS operation_logs (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 不合格产品页：层级方案标题（命名 + 维度顺序）与用户关联（同一用户多套方案）
+CREATE TABLE IF NOT EXISTS unqualified_dimension_preset_titles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    creator_user_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL COMMENT '方案命名',
+    dimension_order_json JSON NOT NULL COMMENT '层级字段顺序',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_udpt_creator (creator_user_id),
+    CONSTRAINT fk_udpt_creator FOREIGN KEY (creator_user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_unqualified_dimension_preset_members (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    preset_title_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_u_udpm_user_preset (user_id, preset_title_id),
+    INDEX idx_u_udpm_user (user_id),
+    CONSTRAINT fk_u_udpm_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_u_udpm_preset FOREIGN KEY (preset_title_id) REFERENCES unqualified_dimension_preset_titles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 插入默认用户（后端首次登录会将历史明文密码自动升级为带盐哈希）
 INSERT IGNORE INTO users (username, email, password, display_name, role, status) VALUES
 ('admin', 'admin@cosmetics.com', 'admin', '系统管理员', 'developer', 'active'),

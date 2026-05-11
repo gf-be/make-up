@@ -1,33 +1,11 @@
 <template>
   <div class="unqualified-products">
     <el-card class="page-card" shadow="never">
-      <!-- <template #header>
-        <el-row :gutter="16" >
-          <el-col :span="6">
-              <div>已录入条目{{ stats.loaded_count || 0 }}</div>
-          </el-col>
-          <el-col :span="6">
-              <div>来源通告数{{ stats.source_count || 0 }}</div>
-           
-          </el-col>
-          <el-col :span="6">
-            <div >
-              <div >企业总数{{ stats.company_count || 0 }}</div>
-            </div>
-          </el-col>
-          <el-col :span="6">
-              <div>可筛选问题项{{ stats.issue_item_count || 0 }}</div>
-          </el-col>
-        </el-row>
-      </template> -->
+
       <!-- 筛选框 -->
       <el-form :model="filters" class="filter-form" label-width="96px">
         <el-row :gutter="16">
-          <!-- <el-col :span="6">
-            <el-form-item label="综合关键词">
-              <el-input v-model="filters.keyword" placeholder="搜索产品、企业、机构、标题" clearable @keyup.enter="handleSearch" />
-            </el-form-item>
-          </el-col> -->
+
           <el-col :span="6">
             <el-form-item label="企业关键词">
               <el-input v-model="filters.company_keyword" placeholder="搜索企业或被抽样单位" clearable
@@ -50,18 +28,25 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <!-- <el-col :span="6">
-            <el-form-item label="来源通告">
-              <el-input v-model="filters.source_keyword" placeholder="搜索通告/飞检标题" clearable @keyup.enter="handleSearch" />
+          <el-col :span="5">
+            <el-form-item label="生产省份">
+              <el-select v-model="filters.manufacturer_province" clearable filterable placeholder="全部生产省份"
+                style="width: 100%">
+                <el-option v-for="item in filterOptions.manufacturer_provinces" :key="item.value" :label="item.label"
+                  :value="item.value" />
+              </el-select>
             </el-form-item>
-          </el-col> -->
-          <!-- <el-col :span="6">
-            <el-form-item label="项目关键词">
-              <el-input v-model="filters.unqualified_item" placeholder="如：菌落总数、甲硝唑" clearable @keyup.enter="handleSearch" />
+          </el-col>
+          <el-col :span="5">
+            <el-form-item label="样品省份">
+              <el-select v-model="filters.sampled_province" clearable filterable placeholder="全部样品省份"
+                style="width: 100%">
+                <el-option v-for="item in filterOptions.sampled_provinces" :key="item.value" :label="item.label"
+                  :value="item.value" />
+              </el-select>
             </el-form-item>
-          </el-col> -->
+          </el-col>
         </el-row>
-
         <el-row :gutter="16">
           <el-col :span="8">
             <el-form-item label="不符合项目">
@@ -72,13 +57,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <!-- <el-col :span="4">
-            <el-form-item label="产品分类">
-              <el-select v-model="filters.product_category" clearable filterable placeholder="全部分类" style="width: 100%">
-                <el-option v-for="item in filterOptions.product_categories" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
-            </el-form-item>
-          </el-col> -->
+
           <el-col :span="4">
             <el-form-item label="产品类型">
               <el-select v-model="filters.product_type" clearable placeholder="全部产品类型" style="width: 100%">
@@ -101,43 +80,13 @@
               <el-button @click="resetFilters">重置</el-button>
             </div>
           </el-col>
-          <el-col :span="4">
-            <el-form-item label="生产省份">
-              <el-select v-model="filters.manufacturer_province" clearable filterable placeholder="全部生产省份"
-                style="width: 100%">
-                <el-option v-for="item in filterOptions.manufacturer_provinces" :key="item.value" :label="item.label"
-                  :value="item.value" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="4">
-            <el-form-item label="样品省份">
-              <el-select v-model="filters.sampled_province" clearable filterable placeholder="全部样品省份"
-                style="width: 100%">
-                <el-option v-for="item in filterOptions.sampled_provinces" :key="item.value" :label="item.label"
-                  :value="item.value" />
-              </el-select>
-            </el-form-item>
-          </el-col>
+
         </el-row>
 
       </el-form>
 
-      <el-alert v-if="hasActiveFilters" type="info" :closable="false" show-icon class="mb-20"
+      <el-alert v-if="hasActiveFilters" type="success" :closable="false" show-icon class="mb-20"
         :title="`当前检索条件命中 ${summary.matched_count || 0} 条结果`" />
-
-      <!-- <div class="result-summary mb-20">
-        <el-tag type="danger" effect="dark">命中 {{ summary.matched_count || 0 }} 条</el-tag>
-        <el-tag type="info">树根节点 {{ summary.root_count || treeRootCount || 0 }} 个</el-tag>
-        <el-tag type="success">涉及生产省份 {{ summary.province_count || 0 }} 个</el-tag>
-        <el-tag type="warning">当前详情 {{ pagination.total || 0 }} 条</el-tag>
-        <el-tag v-if="activeYearLabel" type="warning">年份：{{ activeYearLabel }}</el-tag>
-        <el-tag v-if="filters.announcement_id" type="warning">已锁定来源通告</el-tag>
-        <el-tag v-if="filters.supervision_id" type="warning">已锁定飞检通告</el-tag>
-      </div> -->
-
-
-
       <el-row :gutter="16" class="content-row">
         <el-col :span="8">
           <el-card shadow="never" class="tree-card" v-loading="treeLoading">
@@ -145,13 +94,23 @@
               <div class="panel-header panel-header--stacked">
                 <div>
                   <div class="panel-title">分类</div>
-                  <!-- <div v-if="hierarchyPresetDisplayName" class="panel-subtitle">
-                    {{ hierarchyPresetDisplayName }}
-                  </div> -->
+
                 </div>
                 <div class="panel-header-actions">
                   <el-button size="small" type="primary" @click="openCategorySettingDialog">设置</el-button>
-                  <el-button size="small" type="success" @click="openCategoryThemeDialog">主题</el-button>
+                  <el-select v-model="themePresetSelectValue" class="theme-preset-select" placeholder="方案主题" clearable
+                    filterable size="small" :disabled="!themePresetDropdownEnabled"
+                    @visible-change="onThemePresetDropdownVisible" @change="onThemePresetSelected">
+                    <el-option v-for="p in serverSavedDimensionPresets" :key="p.id" :label="p.title" :value="p.id">
+                      <div class="theme-preset-option">
+                        <span class="theme-preset-option-name">{{ p.title }}</span>
+                        <button type="button" class="theme-preset-option-delete" :disabled="deletingPresetId === p.id"
+                          @click.stop.prevent="confirmDeleteDimensionPreset(p)">
+                          删除
+                        </button>
+                      </div>
+                    </el-option>
+                  </el-select>
                 </div>
               </div>
             </template>
@@ -164,11 +123,10 @@
                   ref="treeRef" :data="treeData" lazy :load="loadTreeNode" :props="treeProps" node-key="key"
                   show-checkbox check-strictly highlight-current :expand-on-click-node="false"
                   @node-click="handleTreeNodeClick" @check="handleTreeCheck">
-                  <template #default="{ data }">
-                    <div class="tree-node" @click.stop>
+                  <template #default="{ node, data }">
+                    <div class="tree-node" @click.stop="onTreeRowContentClick(node, data, $event)">
                       <div class="tree-node-main">
                         <span class="tree-node-label">{{ data.label }}</span>
-                        <!-- <span class="tree-node-meta">{{ getDimensionLabel(data.dimension) }}</span> -->
                       </div>
                       <div class="tree-node-side">
                         <el-tag size="small" type="danger">{{ data.count }}</el-tag>
@@ -185,9 +143,9 @@
           <el-card shadow="never" class="detail-card">
             <template #header>
               <div class="panel-header detail-card-header">
-                
+
                 <div v-if="currentNode" class="detail-card-header-actions">
-                  <el-tag type="success">{{ pagination.total }} 条</el-tag>
+                  <el-tag type="success">共{{ pagination.total }}/已选中{{ detailTableSelectedCount }} 条</el-tag>
                   <el-button type="success" plain size="small" @click="detailChartDialogVisible = true">
                     绘图
                   </el-button>
@@ -206,9 +164,10 @@
             <el-empty v-if="!currentNode" description="请选择左侧树节点查看详情" />
 
             <template v-else>
-              
 
-              <el-table :data="tableData" stripe border v-loading="tableLoading" max-height="1080">
+
+              <el-table ref="detailTableRef" :data="tableData" row-key="id" stripe border v-loading="tableLoading"
+                max-height="1080" @selection-change="onDetailTableSelectionChange">
                 <el-table-column type="expand" width="50">
                   <template #default="{ row }">
                     <el-descriptions :column="2" border>
@@ -248,6 +207,8 @@
                     </el-descriptions>
                   </template>
                 </el-table-column>
+                <el-table-column type="selection" width="48" />
+
                 <el-table-column prop="product_name" label="产品名称" min-width="220" show-overflow-tooltip />
                 <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="160" show-overflow-tooltip />
                 <el-table-column prop="source_publish_date" label="日期" width="120" />
@@ -263,7 +224,7 @@
                 <el-table-column label="操作" width="80" fixed="right">
                   <template #default="{ row }">
                     <el-button link type="primary" @click="viewDetail(row.id)">查看详情</el-button>
-                    <!-- <el-button link type="success" @click="goSource(row)" style="margin-left: 0;">查看来源</el-button> -->
+
                     <el-button v-if="row.company_id" link type="warning" style="margin-left: 0;"
                       @click="goCompany(row.company_id)">企业详情</el-button>
                   </template>
@@ -285,9 +246,9 @@
       <div v-loading="detailChartDataLoading" class="detail-chart-dialog-body">
         <div class="detail-chart-toolbar">
           <el-select v-model="detailChartType" placeholder="图表类型" size="small" style="width: 120px">
+            <el-option label="饼图" value="pie" />
             <el-option label="柱状图" value="bar" />
             <el-option label="折线图" value="line" />
-            <el-option label="饼图" value="pie" />
           </el-select>
           <el-select v-model="detailChartDimension" placeholder="统计字段" size="small" style="width: 220px" filterable>
             <el-option v-for="opt in NODE_DETAIL_CHART_FIELDS" :key="opt.key" :label="opt.label" :value="opt.key" />
@@ -296,15 +257,15 @@
             重新加载
           </el-button>
           <span class="detail-chart-hint">
-            数据与右侧节点详情范围一致，已加载全量共 {{ detailChartAllRows.length }} 条（分页拉取），按所选字段分组计数
+            包含 {{ detailChartAllRows.length }} 条内容
           </span>
         </div>
         <div ref="detailChartRef" class="detail-chart-canvas detail-chart-canvas--dialog" />
       </div>
     </el-dialog>
 
-    <el-dialog v-model="categorySettingDialogVisible" title="分类设置" width="min(720px, 96vw)" align-center
-      append-to-body class="category-setting-dialog" @closed="onCategorySettingDialogClosed">
+    <el-dialog v-model="categorySettingDialogVisible" title="分类设置" width="min(720px, 96vw)" align-center append-to-body
+      class="category-setting-dialog" @closed="onCategorySettingDialogClosed">
       <div class="category-setting-dialog-body">
         <el-form label-width="100px" class="category-setting-name-form">
           <el-form-item label="方案名称" required>
@@ -313,19 +274,17 @@
           </el-form-item>
         </el-form>
         <div class="dimension-actions">
-          <el-button size="small" type="primary" :loading="savingDimensionPreset" @click="applyCategoryDimensionWithName">
-            应用
-          </el-button>
-          <el-button size="small" :disabled="savingDimensionPreset" @click="resetDimensionDraft">重置</el-button>
+
+          <el-button size="small" type="info" :disabled="savingDimensionPreset"
+            @click="resetDimensionDraft">重置</el-button>
         </div>
-        <!-- <div v-if="recentAppliedDimensionPresets.length" class="dimension-history mb-20">
-          <span class="dimension-history-label">最近应用</span>
-          <el-button v-for="item in recentAppliedDimensionPresets" :key="item.key" size="small" text
+        <div v-if="dimensionPresetPickList.length" class="dimension-history mb-20">
+          <span class="dimension-history-label">猜你想用</span>
+          <el-button v-for="item in dimensionPresetPickList" :key="item.key" size="small" text
             class="dimension-history-item" @click="applySavedDimensionPreset(item.order)">
             {{ item.label }}
           </el-button>
-          <el-button size="small" link type="danger" @click="clearAppliedDimensionHistory">清空记录</el-button>
-        </div> -->
+        </div>
 
         <div class="pivot-dimension-designer mb-20">
           <div class="pivot-panel pivot-panel--pool">
@@ -374,7 +333,11 @@
         </div>
       </div>
       <template #footer>
+        <el-button type="primary" :loading="savingDimensionPreset" @click="applyCategoryDimensionWithName">
+          保存
+        </el-button>
         <el-button @click="categorySettingDialogVisible = false">关闭</el-button>
+        <!-- <el-button @click="categorySettingDialogVisible = false">关闭</el-button> -->
       </template>
     </el-dialog>
 
@@ -393,9 +356,9 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import ExcelJS from 'exceljs'
 import * as echarts from 'echarts'
 import { Close, Rank } from '@element-plus/icons-vue'
@@ -407,7 +370,10 @@ import {
   getUnqualifiedProductTree,
   getUnqualifiedProductTreeChildren,
   createOperationLog,
-  updateCurrentUserProfile
+  updateCurrentUserProfile,
+  listMyUnqualifiedDimensionPresets,
+  createMyUnqualifiedDimensionPreset,
+  deleteMyUnqualifiedDimensionPreset
 } from '@/api/index'
 import { currentUser, getAuthToken, getUserScopedStorageKey, setAuthSession } from '@/utils/auth'
 
@@ -433,6 +399,13 @@ const treeProps = {
 /** 懒加载树：由 load 的 resolve 写内部 store，这里保持空数组即可 */
 const treeData = ref([])
 const tableData = ref([])
+const detailTableRef = ref(null)
+/** 跨分页累积勾选的明细 id（paths + 筛选不变时保留） */
+const detailTableSelectedIds = shallowRef(new Set())
+/** 与 paths + buildTreeRequestParams 序列化一致；变化则丢弃跨页勾选 */
+const detailTableSelectionScopeKey = ref('')
+const syncingDetailTableSelectionDom = ref(false)
+const detailTableSelectedCount = computed(() => detailTableSelectedIds.value.size)
 
 /** 节点详情表：可选作图表分类轴的字段（与表格列、行数据一致） */
 const NODE_DETAIL_CHART_FIELDS = [
@@ -453,7 +426,7 @@ const NODE_DETAIL_CHART_FIELDS = [
 ]
 
 const detailChartDialogVisible = ref(false)
-const detailChartType = ref('bar')
+const detailChartType = ref('pie')
 const detailChartDimension = ref('manufacturer_province')
 const detailChartRef = ref(null)
 /** 图表统计：与导出一致，为当前 path + 筛选下的全部分页明细 */
@@ -608,6 +581,13 @@ const appliedDimensionHistory = ref([])
 const categorySettingDialogVisible = ref(false)
 const dimensionPresetName = ref('')
 const savingDimensionPreset = ref(false)
+/** 服务端保存的方案（标题表 + 关联表），供「猜你想用」优先展示 */
+const serverSavedDimensionPresets = ref([])
+/** 分类卡片 header：方案主题下拉当前选中 id */
+const themePresetSelectValue = ref(null)
+const deletingPresetId = ref(null)
+
+const themePresetDropdownEnabled = computed(() => Boolean(currentUser.value?.id))
 const dragContext = ref(null)
 const rowDropZoneActive = ref(false)
 const rowInsertBeforeIndex = ref(null)
@@ -632,7 +612,7 @@ const filterOptions = ref({
 const filters = ref(createDefaultFilters())
 const pagination = ref({
   page: 1,
-  limit: 20,
+  limit: 10,
   total: 0
 })
 let treeRequestController = null
@@ -704,35 +684,110 @@ const poolDimensions = computed(() => {
   return list.filter((item) => !inRow.has(item.key))
 })
 
-const recentAppliedDimensionPresets = computed(() => (
-  appliedDimensionHistory.value.map((order) => ({
-    key: order.join('|'),
-    order,
-    label: order.map((key) => getDimensionLabel(key)).join(' / ')
-  }))
-))
-
-const hierarchyPresetDisplayName = computed(() => {
-  const named = String(currentUser.value?.unqualified_dimension_preset_name || '').trim()
-  if (named) return named
-  const order = dimensionOrder.value || []
-  if (!order.length) return ''
-  return order.map((k) => getDimensionLabel(k)).join(' / ')
+/** 服务端已命名方案优先，其余为本机最近应用的层级（按维度顺序去重） */
+const dimensionPresetPickList = computed(() => {
+  const seen = new Set()
+  const out = []
+  for (const p of serverSavedDimensionPresets.value) {
+    const order = normalizeDimensionOrder(p.dimension_order || [])
+    const sig = order.join('|')
+    if (seen.has(sig)) continue
+    seen.add(sig)
+    out.push({
+      key: `srv-${p.id}`,
+      label: String(p.title || '').trim() || order.map((key) => getDimensionLabel(key)).join(' / '),
+      order
+    })
+  }
+  for (const order of appliedDimensionHistory.value) {
+    const normalized = normalizeDimensionOrder(order)
+    const sig = normalized.join('|')
+    if (seen.has(sig)) continue
+    seen.add(sig)
+    out.push({
+      key: sig,
+      label: normalized.map((key) => getDimensionLabel(key)).join(' / '),
+      order: normalized
+    })
+  }
+  return out.slice(0, 24)
 })
+
+async function fetchSavedDimensionPresets() {
+  if (!getAuthToken()) {
+    serverSavedDimensionPresets.value = []
+    themePresetSelectValue.value = null
+    return
+  }
+  try {
+    const res = await listMyUnqualifiedDimensionPresets()
+    serverSavedDimensionPresets.value = Array.isArray(res.data) ? res.data : []
+    if (
+      themePresetSelectValue.value != null
+      && !serverSavedDimensionPresets.value.some((x) => x.id === themePresetSelectValue.value)
+    ) {
+      themePresetSelectValue.value = null
+    }
+  } catch {
+    serverSavedDimensionPresets.value = []
+  }
+}
+
+function onThemePresetDropdownVisible(visible) {
+  if (visible) {
+    fetchSavedDimensionPresets()
+  }
+}
+
+function onThemePresetSelected(id) {
+  if (id == null || id === '') {
+    return
+  }
+  const preset = serverSavedDimensionPresets.value.find((x) => x.id === id)
+  if (!preset) {
+    return
+  }
+  applySavedDimensionPreset(preset.dimension_order || [])
+}
+
+async function confirmDeleteDimensionPreset(p) {
+  if (!p?.id || deletingPresetId.value) {
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`确定删除方案「${String(p.title || '').trim() || '未命名'}」？`, '删除方案', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
+  deletingPresetId.value = p.id
+  try {
+    await deleteMyUnqualifiedDimensionPreset(p.id)
+    ElMessage.success('已删除')
+    if (themePresetSelectValue.value === p.id) {
+      themePresetSelectValue.value = null
+    }
+    serverSavedDimensionPresets.value = serverSavedDimensionPresets.value.filter((x) => x.id !== p.id)
+  } catch {
+    await fetchSavedDimensionPresets()
+  } finally {
+    deletingPresetId.value = null
+  }
+}
 
 function openCategorySettingDialog() {
   const suggested = hierarchyRow.value.map((k) => getDimensionLabel(k)).join(' / ')
   dimensionPresetName.value =
     String(currentUser.value?.unqualified_dimension_preset_name || '').trim() || suggested
   categorySettingDialogVisible.value = true
+  fetchSavedDimensionPresets()
 }
 
 function onCategorySettingDialogClosed() {
   savingDimensionPreset.value = false
-}
-
-function openCategoryThemeDialog() {
-  
 }
 
 async function applyCategoryDimensionWithName() {
@@ -744,11 +799,16 @@ async function applyCategoryDimensionWithName() {
   savingDimensionPreset.value = true
   try {
     applyDimensionDraft()
+    const order = normalizeDimensionOrder([...dimensionOrder.value])
+    if (getAuthToken()) {
+      await createMyUnqualifiedDimensionPreset({ title: name, dimension_order: order })
+    }
     const res = await updateCurrentUserProfile({ unqualified_dimension_preset_name: name })
     const next = res.data
     if (next) {
       setAuthSession(getAuthToken(), next)
     }
+    await fetchSavedDimensionPresets()
     ElMessage.success('层级已应用并保存名称')
     categorySettingDialogVisible.value = false
   } finally {
@@ -948,14 +1008,7 @@ function pushAppliedDimensionHistory(order) {
   persistAppliedDimensionHistory(next)
 }
 
-function clearAppliedDimensionHistory() {
-  try {
-    localStorage.removeItem(appliedDimensionHistoryStorageKey())
-  } catch {
-    /* ignore */
-  }
-  appliedDimensionHistory.value = []
-}
+
 
 function syncDraftWithOrder(order) {
   const normalized = normalizeDimensionOrder(order)
@@ -1300,26 +1353,43 @@ function buildVideoProductLine(row) {
   return `${head}，${middle}，${tail}。`
 }
 
-function buildVideoCopyText(rows) {
+function buildVideoCopyTextShared(rows, fromTableSelection) {
   const sourceTitles = uniqueCopyValues((rows || []).map((row) => row?.source_title || row?.batch_title))
   const problemTypes = uniqueCopyValues((rows || []).map((row) => row?.issue_category || row?.announcement_type_label))
   const categories = uniqueCopyValues((rows || []).flatMap((row) => [row?.product_category, row?.product_type_label]))
   const provincePhrase = topProvincePhrase(rows) || '多地'
-  const selectedRows = pickVideoCopyRows(rows, VIDEO_COPY_PRODUCT_LIMIT)
+  const productLinesRows = fromTableSelection
+    ? [...(rows || [])]
+    : pickVideoCopyRows(rows, VIDEO_COPY_PRODUCT_LIMIT)
 
   const lines = [
-    `据本次资料梳理，共涉及通告 ${sourceTitles.length} 份、不合格记录 ${(rows || []).length} 条。`,
+    fromTableSelection
+      ? `据本次在明细表中勾选的产品梳理，共涉及通告 ${sourceTitles.length} 份、不合格记录 ${(rows || []).length} 条。`
+      : `据本次资料梳理，共涉及通告 ${sourceTitles.length} 份、不合格记录 ${(rows || []).length} 条。`,
     `根据${formatCopyList(sourceTitles, 4)}，本次共发现${formatCopyList(problemTypes, 8)}等情况，涵盖${formatCopyList(categories, 8)}等品类，样本主要分布在${provincePhrase}。`
   ]
 
-  if (selectedRows.length) {
-    lines.push(`以下按通报节选 ${selectedRows.length} 个典型产品，口播时可按序号稍作停顿：`)
-    selectedRows.forEach((row, index) => {
+  if (productLinesRows.length) {
+    lines.push(
+      fromTableSelection
+        ? `以下为勾选的 ${productLinesRows.length} 个产品：`
+        : `以下按通报节选 ${productLinesRows.length} 个典型产品：`
+    )
+    productLinesRows.forEach((row, index) => {
       lines.push(`${index + 1}. ${buildVideoProductLine(row)}`)
     })
   }
 
   return lines.join('\n')
+}
+
+function buildVideoCopyText(rows) {
+  return buildVideoCopyTextShared(rows, false)
+}
+
+/** 仅基于表格已勾选行（调用方已按 id 筛好）生成文案 */
+function buildVideoCopyTextForSelectedRows(rows) {
+  return buildVideoCopyTextShared(rows, true)
 }
 
 function buildCurrentDimensionLabel() {
@@ -1371,14 +1441,26 @@ async function openVideoCopyDialog() {
   generatingVideoCopy.value = true
   videoCopyDialogVisible.value = true
   try {
-    const rows = await fetchAllNodeDetailRows(pathsPayload)
-    if (!rows.length) {
+    const allRows = await fetchAllNodeDetailRows(pathsPayload)
+    if (!allRows.length) {
       videoCopyText.value = ''
       ElMessage.warning('当前范围没有可生成文案的明细')
       return
     }
-    videoCopyText.value = buildVideoCopyText(rows)
-    await recordVideoCopyLog(rows, videoCopyText.value)
+    const selectedIds = detailTableSelectedIds.value
+    if (selectedIds.size > 0) {
+      const rowsForCopy = allRows.filter((r) => r?.id != null && selectedIds.has(r.id))
+      if (!rowsForCopy.length) {
+        videoCopyText.value = ''
+        ElMessage.warning('当前勾选的产品在所选范围内未匹配到明细，请刷新列表或重新勾选后再试')
+        return
+      }
+      videoCopyText.value = buildVideoCopyTextForSelectedRows(rowsForCopy)
+      await recordVideoCopyLog(rowsForCopy, videoCopyText.value)
+    } else {
+      videoCopyText.value = buildVideoCopyText(allRows)
+      await recordVideoCopyLog(allRows, videoCopyText.value)
+    }
   } catch (error) {
     console.error('生成视频文案失败:', error)
     ElMessage.error(error?.message || '生成视频文案失败')
@@ -1482,6 +1564,7 @@ function loadTreeNode(node, resolve) {
         currentNodeKey.value = ''
         tableData.value = []
         pagination.value.total = 0
+        resetDetailTableSelection()
         return
       }
       currentNode.value = initial
@@ -1582,6 +1665,7 @@ async function loadTree() {
     currentNodeKey.value = ''
     tableData.value = []
     pagination.value.total = 0
+    resetDetailTableSelection()
     treeListFetched.value = true
   } finally {
     treeRequestController = null
@@ -1988,13 +2072,76 @@ async function exportNodeDetailsExcel() {
   }
 }
 
+function getDetailTableSelectionScopeKey(pathsPayload) {
+  return JSON.stringify({
+    paths: pathsPayload || [],
+    q: buildTreeRequestParams()
+  })
+}
+
+function onDetailTableSelectionChange(selection) {
+  if (syncingDetailTableSelectionDom.value) {
+    return
+  }
+  const pageRows = tableData.value || []
+  const pageIdSet = new Set(pageRows.map((r) => r?.id).filter((id) => id != null && id !== ''))
+  const selectedOnPage = new Set((selection || []).map((r) => r?.id).filter((id) => id != null && id !== ''))
+  const next = new Set(detailTableSelectedIds.value)
+  pageIdSet.forEach((id) => {
+    if (selectedOnPage.has(id)) next.add(id)
+    else next.delete(id)
+  })
+  detailTableSelectedIds.value = next
+}
+
+/** 清空跨页勾选（切换树范围、无 path、加载失败等） */
+function resetDetailTableSelection() {
+  detailTableSelectedIds.value = new Set()
+  detailTableSelectionScopeKey.value = ''
+  nextTick(() => {
+    detailTableRef.value?.clearSelection?.()
+  })
+}
+
+/** 当前页 DOM 与 detailTableSelectedIds 对齐（翻页、接口返回后调用） */
+function syncDetailTableSelectionToDom() {
+  nextTick(() => {
+    const table = detailTableRef.value
+    if (!table) return
+    syncingDetailTableSelectionDom.value = true
+    try {
+      table.clearSelection()
+      const ids = detailTableSelectedIds.value
+      for (const row of tableData.value || []) {
+        if (row?.id != null && ids.has(row.id)) {
+          table.toggleRowSelection(row, true)
+        }
+      }
+    } finally {
+      nextTick(() => {
+        syncingDetailTableSelectionDom.value = false
+      })
+    }
+  })
+}
+
 async function loadNodeDetails() {
   const pathsPayload = getNodeDetailsPathsPayload()
 
   if (!pathsPayload.length) {
     tableData.value = []
     pagination.value.total = 0
+    resetDetailTableSelection()
     return
+  }
+
+  const scopeKey = getDetailTableSelectionScopeKey(pathsPayload)
+  if (scopeKey !== detailTableSelectionScopeKey.value) {
+    detailTableSelectedIds.value = new Set()
+    detailTableSelectionScopeKey.value = scopeKey
+    nextTick(() => {
+      detailTableRef.value?.clearSelection?.()
+    })
   }
 
   cancelDetailRequest()
@@ -2011,6 +2158,8 @@ async function loadNodeDetails() {
     })
     tableData.value = res.data || []
     pagination.value.total = res.pagination?.total || 0
+    await nextTick()
+    syncDetailTableSelectionToDom()
   } catch (error) {
     if (isAbortError(error)) {
       return
@@ -2018,6 +2167,7 @@ async function loadNodeDetails() {
     console.error('加载节点详情失败:', error)
     tableData.value = []
     pagination.value.total = 0
+    resetDetailTableSelection()
   } finally {
     detailRequestController = null
     tableLoading.value = false
@@ -2084,6 +2234,21 @@ async function handleTreeNodeClick(data) {
   currentNodeKey.value = data.key
   pagination.value.page = 1
   await loadNodeDetails()
+}
+
+/** 点击标签行区域切换勾选（与复选框一致，并走 handleTreeCheck 级联） */
+function onTreeRowContentClick(_node, data, e) {
+  e?.stopPropagation?.()
+  const tree = treeRef.value
+  if (!tree || data?.key == null) {
+    return
+  }
+  currentNode.value = data
+  currentNodeKey.value = data.key
+  pagination.value.page = 1
+  const wasChecked = tree.getCheckedKeys().includes(data.key)
+  tree.setChecked(data.key, !wasChecked, false)
+  void handleTreeCheck(data)
 }
 
 function setsEqualForKeys(a, bList) {
@@ -2166,15 +2331,7 @@ function viewDetail(id) {
   router.push(`/unqualified-products/${id}`)
 }
 
-// function goSource(row) {
-//   if (row.announcement_id) {
-//     router.push(`/announcements/${row.announcement_id}`)
-//     return
-//   }
-//   if (row.supervision_id) {
-//     router.push(`/supervisions/${row.supervision_id}`)
-//   }
-// }
+
 
 function goCompany(companyId) {
   router.push(`/companies/${companyId}`)
@@ -2188,6 +2345,7 @@ onMounted(async () => {
   applyRouteFilters()
   appliedDimensionHistory.value = readSavedAppliedDimensionHistory()
   syncDraftWithOrder(readSavedAppliedDimensionOrder() ?? DEFAULT_DIMENSION_ORDER)
+  fetchSavedDimensionPresets()
   await Promise.all([loadStats(), loadFilterOptions()])
   await loadTree()
   window.addEventListener('resize', onWindowResizeDetailChart)
@@ -2232,6 +2390,49 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.theme-preset-select {
+  width: 168px;
+  max-width: 42vw;
+}
+
+.theme-preset-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 24px;
+}
+
+.theme-preset-option-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-preset-option-delete {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--el-color-danger);
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.theme-preset-option-delete:hover:not(:disabled) {
+  color: var(--el-color-danger-dark-2);
+}
+
+.theme-preset-option-delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .category-setting-dialog-body {
@@ -2625,6 +2826,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 4px 0;
+  cursor: pointer;
 }
 
 .tree-node-main,

@@ -19,39 +19,7 @@
           <el-button type="primary" plain class="password-button" @click="passwordDialogVisible = true">修改密码</el-button>
         </el-card>
       </el-col>
-      <el-col :xs="24" :sm="24" :md="16" :lg="16">
-        <el-card shadow="never">
-          <template #header>
-            <div class="card-header">
-              <span>文案生产日志</span>
-              <el-button link type="primary" :loading="loading" @click="loadLogs">刷新</el-button>
-            </div>
-          </template>
-          <el-table :data="logs" stripe v-loading="loading" empty-text="暂无文案生产日志">
-            <el-table-column prop="created_at" label="时间" width="180">
-              <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
-            </el-table-column>
-            <el-table-column prop="username" label="用户" width="110" />
-            <el-table-column prop="dimension_label" label="维度线" min-width="220" show-overflow-tooltip />
-            <el-table-column prop="range_label" label="生成范围" min-width="220" show-overflow-tooltip />
-            <el-table-column prop="detail_count" label="明细数" width="90" align="center" />
-            <el-table-column label="复用文案" width="120" align="center">
-              <template #default="{ row }">
-                <el-button
-                  link
-                  type="primary"
-                  :disabled="!row?.details?.copy_text"
-                  @click="handleReuseCopy(row)"
-                >
-                  复制
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
     </el-row>
-
     <el-dialog v-model="passwordDialogVisible" title="修改当前账号密码" width="420px" :close-on-click-modal="false">
       <el-form :model="passwordForm" label-width="84px">
         <el-form-item label="当前密码">
@@ -68,15 +36,7 @@
         <el-button @click="passwordDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="savingPassword" @click="handleUpdatePassword">保存</el-button>
       </template>
-    </el-dialog>
-
-    <el-dialog v-model="reuseDialogVisible" title="复用文案" width="720px" :close-on-click-modal="false">
-      <el-input v-model="reuseCopyText" type="textarea" :rows="14" readonly />
-      <template #footer>
-        <el-button @click="reuseDialogVisible = false">关闭</el-button>
-        <el-button type="primary" :disabled="!reuseCopyText" @click="copyReuseText">复制文案</el-button>
-      </template>
-    </el-dialog>
+    </el-dialog>  
   </div>
 </template>
 
@@ -90,9 +50,7 @@ import { MODULE_PERMISSIONS, currentUser, getRoleLabel } from '@/utils/auth'
 const loading = ref(false)
 const savingPassword = ref(false)
 const passwordDialogVisible = ref(false)
-const reuseDialogVisible = ref(false)
 const logs = ref([])
-const reuseCopyText = ref('')
 const passwordForm = reactive({
   current_password: '',
   new_password: '',
@@ -117,10 +75,7 @@ const visibleModuleLabels = computed(() => {
   return (MODULE_PERMISSIONS[currentUser.value?.role] || []).map((key) => MODULE_LABELS[key] || key)
 })
 
-const formatDateTime = (value) => {
-  const date = dayjs(value)
-  return date.isValid() ? date.format('YYYY-MM-DD HH:mm:ss') : value || '-'
-}
+
 
 const loadLogs = async () => {
   loading.value = true
@@ -132,26 +87,8 @@ const loadLogs = async () => {
   }
 }
 
-const handleReuseCopy = async (row) => {
-  const copyText = row?.details?.copy_text || ''
-  if (!copyText) {
-    ElMessage.warning('该条日志暂无可复用文案')
-    return
-  }
-  reuseCopyText.value = copyText
-  reuseDialogVisible.value = true
-}
 
-const copyReuseText = async () => {
-  if (!reuseCopyText.value) return
-  try {
-    await navigator.clipboard.writeText(reuseCopyText.value)
-    ElMessage.success('文案已复制')
-  } catch (error) {
-    console.error('复制复用文案失败:', error)
-    ElMessage.error('复制失败，请手动复制')
-  }
-}
+
 
 const handleUpdatePassword = async () => {
   if (!passwordForm.current_password || !passwordForm.new_password) {

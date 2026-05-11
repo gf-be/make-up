@@ -12,7 +12,8 @@ export const MODULE_PERMISSIONS = {
   developer: ['home', 'unqualified-products', 'products-manage', 'pivot-analysis', 'sampling-search', 'announcement-staging', 'announcements', 'inspections', 'companies', 'companies-manage', 'unqualified-companies', 'supervisions'],
   // data_admin: ['home', 'announcement-staging', 'announcements', 'companies', 'unqualified-companies'],
   data_admin: ['announcement-staging', 'announcements', 'companies-manage', 'products-manage'],
-  normal_user: ['home', 'unqualified-products', 'inspections', 'companies','supervisions']
+  // normal_user: ['home', 'unqualified-products', 'inspections', 'companies','supervisions']
+  normal_user: ['unqualified-products']
 }
 
 const AUTH_STORAGE_KEY = 'cosmetics_current_user'
