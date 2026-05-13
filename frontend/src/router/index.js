@@ -96,6 +96,12 @@ const routes = [
     meta: { module: 'companies-manage' }
   },
   {
+    path: '/category-manage',
+    name: 'CategoryManage',
+    component: () => import('../views/CategoryManage.vue'),
+    meta: { module: 'category-manage' }
+  },
+  {
     path: '/products-manage',
     name: 'ProductsManage',
     component: () => import('../views/ProductsManage.vue'),

@@ -155,19 +155,15 @@
                   </el-button>
                   <el-button type="warning" plain size="small" :loading="generatingVideoCopy"
                     :disabled="!nodeDetailsCanExport" @click="openVideoCopyDialog">
-                    生成文案
+                    文案
                   </el-button>
                 </div>
               </div>
             </template>
-
             <el-empty v-if="!currentNode" description="请选择左侧树节点查看详情" />
-
-            <template v-else>
-
-
+            <template v-else class="unqualified-product-detail-table">
               <el-table ref="detailTableRef" :data="tableData" row-key="id" stripe border v-loading="tableLoading"
-                max-height="1080" @selection-change="onDetailTableSelectionChange">
+                max-height="1080" @selection-change="onDetailTableSelectionChange" class="table-height ">
                 <el-table-column type="expand" width="50">
                   <template #default="{ row }">
                     <el-descriptions :column="2" border>
@@ -208,25 +204,22 @@
                   </template>
                 </el-table-column>
                 <el-table-column type="selection" width="48" />
-
-                <el-table-column prop="product_name" label="产品名称" min-width="220" show-overflow-tooltip />
-                <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="160" show-overflow-tooltip />
-                <el-table-column prop="source_publish_date" label="日期" width="120" />
-                <el-table-column prop="source_title" label="来源通告" min-width="240" show-overflow-tooltip />
-                <el-table-column prop="manufacturer_name" label="生产企业" min-width="220" show-overflow-tooltip>
-                  <template #default="{ row }">{{ row.manufacturer_name || row.company_names || '-' }}</template>
-                </el-table-column>
-                <el-table-column prop="operator_name" label="经营企业" min-width="200" show-overflow-tooltip>
-                  <template #default="{ row }">{{ row.operator_name || row.sample_unit_name || '-' }}</template>
-                </el-table-column>
-                <el-table-column prop="manufacturer_province" label="生产省份" width="120" show-overflow-tooltip />
-                <el-table-column prop="manufacturer_city" label="生产城市" width="120" show-overflow-tooltip />
-                <el-table-column label="操作" width="80" fixed="right">
+                <el-table-column prop="product_name" label="产品名称" min-width="220" show-overflow-tooltip>
                   <template #default="{ row }">
-                    <el-button link type="primary" @click="viewDetail(row.id)">查看详情</el-button>
-
-                    <el-button v-if="row.company_id" link type="warning" style="margin-left: 0;"
-                      @click="goCompany(row.company_id)">企业详情</el-button>
+                    <span class="detail-product-name-cell" title="双击查看详情" @click="viewDetail(row.id)">{{
+                      row.product_name }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="160" show-overflow-tooltip />
+                <el-table-column prop="usage_user" label="使用记录" min-width="160" show-overflow-tooltip>
+                  <template #default="{ row }">{{ formatUsageUsernamesDisplay(row.usage_user) }}</template>
+                </el-table-column>
+                <el-table-column prop="manufacturer_name" label="生产企业" min-width="220" show-overflow-tooltip>
+                  <template #default="{ row }">
+                    <span class="manufacturer-nav-cell" :class="{ 'manufacturer-nav-cell--link': row.company_id }"
+                      :title="row.company_id ? '点击查看企业详情' : '暂无关联企业'"
+                      @click="row.company_id && goCompany(row.company_id)">{{ row.manufacturer_name || row.company_names
+                        || '-' }}</span>
                   </template>
                 </el-table-column>
               </el-table>
@@ -278,13 +271,13 @@
           <el-button size="small" type="info" :disabled="savingDimensionPreset"
             @click="resetDimensionDraft">重置</el-button>
         </div>
-        <div v-if="dimensionPresetPickList.length" class="dimension-history mb-20">
+        <!-- <div v-if="dimensionPresetPickList.length" class="dimension-history mb-20">
           <span class="dimension-history-label">猜你想用</span>
           <el-button v-for="item in dimensionPresetPickList" :key="item.key" size="small" text
             class="dimension-history-item" @click="applySavedDimensionPreset(item.order)">
             {{ item.label }}
           </el-button>
-        </div>
+        </div> -->
 
         <div class="pivot-dimension-designer mb-20">
           <div class="pivot-panel pivot-panel--pool">
@@ -307,6 +300,7 @@
           <div class="pivot-panel pivot-panel--rows">
             <div class="pivot-panel-head">
               <span class="pivot-panel-title">行标签（最多5级）</span>
+              <el-button type="danger" size="small" @click="resetHierarchy">清空</el-button>
             </div>
             <div class="pivot-rows-drop" :class="{ 'is-drag-over': rowDropZoneActive }"
               @dragover.prevent="onRowZoneDragOver" @dragleave="onRowZoneDragLeave" @drop.prevent="onRowZoneDropEnd">
@@ -337,11 +331,10 @@
           保存
         </el-button>
         <el-button @click="categorySettingDialogVisible = false">关闭</el-button>
-        <!-- <el-button @click="categorySettingDialogVisible = false">关闭</el-button> -->
       </template>
     </el-dialog>
 
-    <el-dialog v-model="videoCopyDialogVisible" title="视频文案" width="min(820px, 94vw)" align-center append-to-body
+    <el-dialog v-model="videoCopyDialogVisible" title="文案" width="min(820px, 94vw)" align-center append-to-body
       destroy-on-close>
       <div v-loading="generatingVideoCopy" class="video-copy-dialog-body">
         <el-input v-model="videoCopyText" type="textarea" :rows="16" readonly resize="vertical"
@@ -349,7 +342,10 @@
       </div>
       <template #footer>
         <el-button @click="videoCopyDialogVisible = false">关闭</el-button>
-        <el-button type="primary" :disabled="!videoCopyText" @click="copyVideoCopyText">复制文案</el-button>
+        <el-button type="success" :loading="savingVideoCopy" :disabled="!videoCopyText"
+          @click="saveVideoCopyText">保存</el-button>
+        <el-button type="primary" :disabled="!videoCopyText" @click="copyVideoCopyText">复制</el-button>
+
       </template>
     </el-dialog>
   </div>
@@ -373,7 +369,8 @@ import {
   updateCurrentUserProfile,
   listMyUnqualifiedDimensionPresets,
   createMyUnqualifiedDimensionPreset,
-  deleteMyUnqualifiedDimensionPreset
+  deleteMyUnqualifiedDimensionPreset,
+  saveUnqualifiedProductCopyText
 } from '@/api/index'
 import { currentUser, getAuthToken, getUserScopedStorageKey, setAuthSession } from '@/utils/auth'
 
@@ -435,7 +432,10 @@ const detailChartDataLoading = ref(false)
 let detailChartInstance = null
 const videoCopyDialogVisible = ref(false)
 const videoCopyText = ref('')
+/** 与当前文案正文对应的产品明细 id（文案中「节选/勾选」出现的条目） */
+const videoCopyProductIds = ref([])
 const generatingVideoCopy = ref(false)
+const savingVideoCopy = ref(false)
 
 function formatDetailChartCategoryValue(raw) {
   if (raw == null || raw === '') return '(空)'
@@ -924,6 +924,10 @@ function removeHierarchyAt(index) {
   hierarchyRow.value = hierarchyRow.value.filter((_, i) => i !== index)
 }
 
+function resetHierarchy() {
+  hierarchyRow.value = []
+}
+
 function normalizeDimensionOrder(raw) {
   const allowed = new Set(['source', 'province', 'manufacturer_province', 'manufacturer_city', 'sampled_province', 'sampled_city', 'product_category', 'issue_item', 'year'])
   const list = Array.isArray(raw) ? raw : []
@@ -1210,6 +1214,29 @@ function formatCopyList(items, max = 6) {
   return list.length > max ? `${head}等` : head
 }
 
+/** usage_user：后端 JSON 数组 [{ username, display_name, saved_at }] → 去重后的用户名，中文分号分隔 */
+function formatUsageUsernamesDisplay(raw) {
+  if (raw == null || raw === '') return '-'
+  let parsed = raw
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      return '-'
+    }
+  }
+  if (!Array.isArray(parsed) || !parsed.length) return '-'
+  const seen = new Set()
+  const names = []
+  for (const item of parsed) {
+    const u = item && typeof item.username === 'string' ? item.username.trim() : ''
+    if (!u || seen.has(u)) continue
+    seen.add(u)
+    names.push(u)
+  }
+  return names.length ? names.join('；') : '-'
+}
+
 function topProvincePhrase(rows, maxShow = 5) {
   const counts = new Map()
   for (const row of rows || []) {
@@ -1353,14 +1380,18 @@ function buildVideoProductLine(row) {
   return `${head}，${middle}，${tail}。`
 }
 
+function getVideoCopyProductLineRows(rows, fromTableSelection) {
+  return fromTableSelection
+    ? [...(rows || [])]
+    : pickVideoCopyRows(rows || [], VIDEO_COPY_PRODUCT_LIMIT)
+}
+
 function buildVideoCopyTextShared(rows, fromTableSelection) {
   const sourceTitles = uniqueCopyValues((rows || []).map((row) => row?.source_title || row?.batch_title))
   const problemTypes = uniqueCopyValues((rows || []).map((row) => row?.issue_category || row?.announcement_type_label))
   const categories = uniqueCopyValues((rows || []).flatMap((row) => [row?.product_category, row?.product_type_label]))
   const provincePhrase = topProvincePhrase(rows) || '多地'
-  const productLinesRows = fromTableSelection
-    ? [...(rows || [])]
-    : pickVideoCopyRows(rows, VIDEO_COPY_PRODUCT_LIMIT)
+  const productLinesRows = getVideoCopyProductLineRows(rows, fromTableSelection)
 
   const lines = [
     fromTableSelection
@@ -1441,9 +1472,11 @@ async function openVideoCopyDialog() {
   generatingVideoCopy.value = true
   videoCopyDialogVisible.value = true
   try {
+    videoCopyProductIds.value = []
     const allRows = await fetchAllNodeDetailRows(pathsPayload)
     if (!allRows.length) {
       videoCopyText.value = ''
+      videoCopyProductIds.value = []
       ElMessage.warning('当前范围没有可生成文案的明细')
       return
     }
@@ -1452,19 +1485,27 @@ async function openVideoCopyDialog() {
       const rowsForCopy = allRows.filter((r) => r?.id != null && selectedIds.has(r.id))
       if (!rowsForCopy.length) {
         videoCopyText.value = ''
+        videoCopyProductIds.value = []
         ElMessage.warning('当前勾选的产品在所选范围内未匹配到明细，请刷新列表或重新勾选后再试')
         return
       }
       videoCopyText.value = buildVideoCopyTextForSelectedRows(rowsForCopy)
+      videoCopyProductIds.value = getVideoCopyProductLineRows(rowsForCopy, true)
+        .map((r) => r?.id)
+        .filter((id) => id != null && id !== '')
       await recordVideoCopyLog(rowsForCopy, videoCopyText.value)
     } else {
       videoCopyText.value = buildVideoCopyText(allRows)
+      videoCopyProductIds.value = getVideoCopyProductLineRows(allRows, false)
+        .map((r) => r?.id)
+        .filter((id) => id != null && id !== '')
       await recordVideoCopyLog(allRows, videoCopyText.value)
     }
   } catch (error) {
     console.error('生成视频文案失败:', error)
     ElMessage.error(error?.message || '生成视频文案失败')
     videoCopyText.value = ''
+    videoCopyProductIds.value = []
   } finally {
     generatingVideoCopy.value = false
   }
@@ -1478,6 +1519,28 @@ async function copyVideoCopyText() {
   } catch (error) {
     console.error('复制文案失败:', error)
     ElMessage.error('复制失败，请手动选择文本复制')
+  }
+}
+
+async function saveVideoCopyText() {
+  if (!videoCopyText.value) return
+  if (!currentUser.value?.id) {
+    ElMessage.warning('请先登录后再保存')
+    return
+  }
+  savingVideoCopy.value = true
+  try {
+    await saveUnqualifiedProductCopyText({
+      copy_text: videoCopyText.value,
+      product_ids: [...videoCopyProductIds.value],
+      dimension_label: buildCurrentDimensionLabel(),
+      range_label: buildCurrentRangeLabel()
+    })
+    ElMessage.success('保存成功')
+  } catch {
+    /* request 拦截器已提示 */
+  } finally {
+    savingVideoCopy.value = false
   }
 }
 
@@ -2361,9 +2424,26 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.unqualified-product-detail-table{
+  padding: 4px !important;
+}
 .unqualified-products {
   max-width: 1580px;
   margin: 0 auto;
+}
+
+.detail-product-name-cell {
+  cursor: pointer;
+  color: #4c87a3;
+}
+
+.manufacturer-nav-cell--link {
+  cursor: pointer;
+  color: #4c87a3;
+}
+
+.manufacturer-nav-cell--link:hover {
+  text-decoration: underline;
 }
 
 .page-card,

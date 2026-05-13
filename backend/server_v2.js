@@ -59,6 +59,7 @@ app.use('/api/inspections', require('./routes/inspections_v2'));
 app.use('/api/companies', require('./routes/companies'));
 // app.use('/api/companies-manage', require('./routes/companies_manage'));
 app.use('/api/unqualified-products', require('./routes/unqualified_products'));
+app.use('/api/category-catalog', require('./routes/category_catalog'));
 app.use('/api/supervisions', require('./routes/supervisions'));
 app.use('/api/food-inspections', require('./routes/food_inspections'));
 
@@ -83,6 +84,7 @@ app.get('/', (req, res) => {
       companies: '/api/companies',
       companiesManage: '/api/companies-manage',
       unqualifiedProducts: '/api/unqualified-products',
+      categoryCatalog: '/api/category-catalog',
       supervisions: '/api/supervisions',
       foodInspections: '/api/food-inspections'
     }

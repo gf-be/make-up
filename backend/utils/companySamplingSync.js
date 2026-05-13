@@ -87,6 +87,19 @@ async function ensureCompaniesSamplingSchema(connection) {
     'UNIQUE INDEX uk_companies_credit_code (credit_code)'
   );
 
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS company_name_history (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      company_id INT NOT NULL,
+      name_before VARCHAR(200) NOT NULL,
+      existing_credit_code VARCHAR(64) NULL,
+      attempted_credit_code VARCHAR(64) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_company_name_history_company (company_id),
+      CONSTRAINT fk_company_name_history_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
 
   await connection.query(`
     CREATE TABLE IF NOT EXISTS company_sampling_records (

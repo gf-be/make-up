@@ -329,6 +329,40 @@ export const getUnqualifiedProductSourcesInRange = (params) => {
   })
 }
 
+/** 保存文案：写入文案表并在关联明细上追加「使用用户」记录 */
+export const saveUnqualifiedProductCopyText = (data) => {
+  return request.post('/unqualified-products/save-copy-text', data)
+}
+
+/** 数据管理员：按产品类型维护产品分类词条 */
+export const getCategoryCatalogProductTypes = () => {
+  return request.get('/category-catalog/product-types')
+}
+
+export const listCategoryCatalog = (params) => {
+  return request.get('/category-catalog/list', { params })
+}
+
+export const createCategoryCatalog = (data) => {
+  return request.post('/category-catalog', data)
+}
+
+export const createCategoryCatalogProductType = (data) => {
+  return request.post('/category-catalog/product-types', data)
+}
+
+export const listCategoryCatalogProducts = (params) => {
+  return request.get('/category-catalog/category-products', { params })
+}
+
+export const assignCategoryCatalogProduct = (data) => {
+  return request.post('/category-catalog/assign-product-category', data)
+}
+
+export const deleteCategoryCatalog = (id) => {
+  return request.delete(`/category-catalog/${id}`)
+}
+
 export const postFoodInspectionImportJson = (data = {}) => {
   return request.post('/food-inspections/import-json', data)
 }
@@ -352,6 +386,11 @@ export const updateCompany = (id, data) => {
 
 export const bulkImportCompanyCreditCodes = (data) => {
   return request.post('/companies/bulk-credit-codes', data)
+}
+
+/** 批量导入后用户确认企业更名：写 company_name_history 并更新名称 */
+export const confirmImportCompanyNameChange = (data) => {
+  return request.post('/companies/confirm-import-name-change', data)
 }
 
 export const deleteCompany = (id) => {

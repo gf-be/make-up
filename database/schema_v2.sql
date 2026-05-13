@@ -203,6 +203,18 @@ CREATE TABLE IF NOT EXISTS companies (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 企业名称沿革：批量导入信用代码且目标企业已有信用代码时写入（不覆盖原代码）
+CREATE TABLE IF NOT EXISTS company_name_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    company_id INT NOT NULL,
+    name_before VARCHAR(200) NOT NULL,
+    existing_credit_code VARCHAR(64) NULL,
+    attempted_credit_code VARCHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_company_name_history_company (company_id),
+    CONSTRAINT fk_company_name_history_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 抽样检查详情表
 CREATE TABLE IF NOT EXISTS inspection_details (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -407,6 +419,7 @@ CREATE TABLE IF NOT EXISTS unqualified_products (
     supervision_id INT NULL,
     supervision_detail_id INT NULL,
     is_counterfeit TINYINT(1) DEFAULT 0,
+    usage_user TEXT NULL COMMENT '使用用户（保存文案时追加 JSON）',
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -452,6 +465,25 @@ CREATE TABLE IF NOT EXISTS unqualified_product_category_items (
     CONSTRAINT fk_upci_unqualified_product FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 数据管理员维护：按产品类型维度的产品分类词条（从拆分表与主表回填，可独立增删）
+CREATE TABLE IF NOT EXISTS unqualified_product_category_catalog (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+    category_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_upccc_type_category (product_type, category_name),
+    INDEX idx_upccc_product_type (product_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 分类管理页：手动扩充的产品类型
+CREATE TABLE IF NOT EXISTS unqualified_product_type_catalog (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_type VARCHAR(50) NOT NULL,
+    display_label VARCHAR(100) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_uptc_product_type (product_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS unqualified_product_issue_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     unqualified_product_id INT NOT NULL,
@@ -465,6 +497,22 @@ CREATE TABLE IF NOT EXISTS unqualified_product_issue_items (
     INDEX idx_upii_announcement (announcement_id),
     INDEX idx_upii_announcement_detail (announcement_detail_id),
     CONSTRAINT fk_upii_unqualified_product FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 不合格产品页：用户保存的口播/文案记录
+CREATE TABLE IF NOT EXISTS unqualified_product_copy_records (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
+    username VARCHAR(191) NOT NULL DEFAULT '',
+    display_name VARCHAR(255) NULL,
+    copy_text LONGTEXT NOT NULL,
+    product_ids JSON NOT NULL,
+    dimension_label VARCHAR(512) NULL,
+    range_label VARCHAR(512) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_upcr_user_id (user_id),
+    INDEX idx_upcr_created_at (created_at),
+    CONSTRAINT fk_upcr_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO unqualified_products (

@@ -137,14 +137,21 @@ const menus = [
   { index: '/announcement-staging', key: 'announcement-staging', label: '数据导入', icon: 'DataAnalysis' },
   { index: '/announcements', key: 'announcements', label: '数据管理', icon: 'Bell' },
   // { index: '/inspections', key: 'inspections', label: '抽样检查', icon: 'Checked' },
-  // { index: '/companies', key: 'companies', label: '企业', icon: 'OfficeBuilding' },
+  { index: '/companies', key: 'companies', label: '企业', icon: 'OfficeBuilding' },
   { index: '/companies-manage', key: 'companies-manage', label: '企业管理', icon: 'OfficeBuilding' },
+  { index: '/category-manage', key: 'category-manage', label: '分类管理', icon: 'CollectionTag' },
   { index: '/products-manage', key: 'products-manage', label: '产品管理', icon: 'Goods' },
   { index: '/companies/unqualified', key: 'unqualified-companies', label: '不合格企业', icon: 'TrendCharts' },
   // { index: '/supervisions', key: 'supervisions', label: '飞行检查', icon: 'Warning' }
 ]
 
-const visibleMenus = computed(() => menus.filter((item) => hasModuleAccess(item.key)))
+const visibleMenus = computed(() =>
+  menus.filter((item) => {
+    if (!hasModuleAccess(item.key)) return false
+    if (item.key === 'companies' && currentUser.value?.role === 'normal_user') return false
+    return true
+  })
+)
 
 const MODULE_LABELS = {
   profile: '个人中心',
@@ -156,6 +163,7 @@ const MODULE_LABELS = {
   inspections: '抽样检查',
   companies: '企业管理',
   'companies-manage': '企业管理',
+  'category-manage': '分类管理',
   'products-manage': '产品管理',
   'unqualified-companies': '不合格企业',
   supervisions: '飞行检查',
@@ -163,9 +171,9 @@ const MODULE_LABELS = {
   'sampling-search': '抽样检索'
 }
 
-const visibleModuleLabels = computed(() =>
-  (MODULE_PERMISSIONS[currentUser.value?.role] || []).map((key) => MODULE_LABELS[key] || key)
-)
+// const visibleModuleLabels = computed(() =>
+//   (MODULE_PERMISSIONS[currentUser.value?.role] || []).map((key) => MODULE_LABELS[key] || key)
+// )
 
 const isLoggedIn = computed(() => Boolean(currentUser.value?.username))
 
@@ -324,9 +332,13 @@ const activeMenu = computed(() => {
 
   if (route.path.startsWith('/unqualified-products')) return '/unqualified-products'
 
-  if (route.path.startsWith('/companies')) return '/companies'
+  if (route.path.startsWith('/companies')) {
+    if (currentUser.value?.role === 'normal_user') return '/unqualified-products'
+    return '/companies'
+  }
   if (route.path.startsWith('/products-manage')) return '/products-manage'
   if (route.path.startsWith('/companies-manage')) return '/companies-manage'
+  if (route.path.startsWith('/category-manage')) return '/category-manage'
   if (route.path.startsWith('/supervisions')) return '/supervisions'
 
   return route.path

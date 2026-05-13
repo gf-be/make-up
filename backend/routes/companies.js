@@ -17,6 +17,14 @@ function normalizeUsEinDigits(raw) {
   return US_EIN_DIGITS_RE.test(compact) ? compact : null;
 }
 
+/**
+ * SQL：去掉全角/半角括号及其中内容后的省份主名，用于列表筛选与筛选项 DISTINCT（「河南」「河南（豫）」归为同一项）
+ * @param {string} columnRef 如 c.province、province
+ */
+function sqlProvinceBaseName(columnRef) {
+  return `TRIM(SUBSTRING_INDEX(REPLACE(REPLACE(IFNULL(${columnRef},''), '（', '('), '）', ')'), '(', 1))`;
+}
+
 /** 中国 USCC / 日本法人番号 / 美国 EIN，返回存库用字符串；不合法则 null */
 function normalizeCreditCodeValue(raw) {
   if (raw === null || raw === undefined) return null;
@@ -130,8 +138,9 @@ function applyUnqualifiedCompanyFilters(queryParts, params, filters = {}) {
   }
 
   if (province) {
-    queryParts.push('c.province = ?');
-    params.push(province);
+    const pnorm = sqlProvinceBaseName('c.province');
+    queryParts.push(`(${pnorm} = ? OR c.province = ?)`);
+    params.push(province, province);
   }
 
   if (productType) {
@@ -243,10 +252,12 @@ router.get('/', async (req, res) => {
       countParams.push(`%${brand}%`);
     }
     if (province) {
-      query += ' AND c.province = ?';
-      countQuery += ' AND c.province = ?';
-      params.push(province);
-      countParams.push(province);
+      const provinceKw = String(province).trim();
+      const pnorm = sqlProvinceBaseName('c.province');
+      query += ` AND (${pnorm} = ? OR c.province = ?)`;
+      countQuery += ` AND (${pnorm} = ? OR c.province = ?)`;
+      params.push(provinceKw, provinceKw);
+      countParams.push(provinceKw, provinceKw);
     }
     if (product_category) {
       query += ' AND c.product_category = ?';
@@ -380,14 +391,18 @@ router.get('/unqualified/filter-options', async (req, res) => {
     await ensureCompaniesSamplingSchema(pool);
 
     const sourceSql = buildUnqualifiedCompanySourceSql();
+    const upnorm = sqlProvinceBaseName('c.province');
     const [[provinceRows], [productTypeRows], [yearRows]] = await Promise.all([
-      pool.query(`
-        SELECT DISTINCT c.province
+      pool.query(
+        `
+        SELECT DISTINCT ${upnorm} AS province_norm
         FROM companies c
         JOIN (${sourceSql}) source ON c.id = source.company_id
         WHERE c.province IS NOT NULL AND TRIM(c.province) != ''
-        ORDER BY c.province ASC
-      `),
+          AND ${upnorm} != ''
+        ORDER BY province_norm ASC
+      `
+      ),
       pool.query(`
         SELECT DISTINCT source.product_type
         FROM (${sourceSql}) source
@@ -405,7 +420,7 @@ router.get('/unqualified/filter-options', async (req, res) => {
     res.json({
       success: true,
       data: {
-        provinces: provinceRows.map((row) => ({ value: row.province, label: row.province })),
+        provinces: provinceRows.map((row) => ({ value: row.province_norm, label: row.province_norm })),
         product_types: getProductTypeOptions((productTypeRows || []).map((row) => row.product_type)),
         source_types: [
           { value: 'announcement', label: '抽检通告' },
@@ -511,13 +526,17 @@ router.get('/filter-options', async (req, res) => {
   try {
     await ensureCompaniesSamplingSchema(pool);
 
+    const pnorm = sqlProvinceBaseName('province');
     const [[provinceRows], [productCategoryRows]] = await Promise.all([
-      pool.query(`
-        SELECT DISTINCT province
+      pool.query(
+        `
+        SELECT DISTINCT ${pnorm} AS province_norm
         FROM companies
         WHERE province IS NOT NULL AND TRIM(province) != ''
-        ORDER BY province ASC
-      `),
+          AND ${pnorm} != ''
+        ORDER BY province_norm ASC
+      `
+      ),
       pool.query(`
         SELECT DISTINCT product_category
         FROM companies
@@ -529,7 +548,7 @@ router.get('/filter-options', async (req, res) => {
     res.json({
       success: true,
       data: {
-        provinces: provinceRows.map((row) => ({ value: row.province, label: row.province })),
+        provinces: provinceRows.map((row) => ({ value: row.province_norm, label: row.province_norm })),
         product_categories: productCategoryRows.map((row) => ({ value: row.product_category, label: row.product_category }))
       }
     });
@@ -540,8 +559,11 @@ router.get('/filter-options', async (req, res) => {
 });
 
 /**
- * 批量写入统一社会信用代码：按企业 id 或精确企业名称匹配；默认仅填充当前为空的记录
- * body: { items: [{ id?: number, name?: string, credit_code: string }], overwrite?: boolean }
+ * 批量导入企业 + 信用代码（三步）：
+ * 1）按信用代码命中库中已有企业 → 不新建；若导入名称与库内不一致则记入 pending_name_changes，不自动改库内名称，需前端确认后单独接口更新并写 company_name_history；
+ * 2）信用代码未命中 → 按企业名称精确匹配唯一老企业且无信用代码 → 补上信用代码；
+ * 3）仍无匹配 → 新建企业（名称 + 信用代码）。
+ * body: { items: [{ name?: string, credit_code: string }] }
  */
 router.post('/bulk-credit-codes', requireCompanyManagers(), async (req, res) => {
   try {
@@ -549,7 +571,6 @@ router.post('/bulk-credit-codes', requireCompanyManagers(), async (req, res) => 
 
     const body = req.body || {};
     const items = Array.isArray(body.items) ? body.items : [];
-    const overwrite = body.overwrite === true || body.overwrite === 'true' || body.overwrite === '1';
 
     if (items.length === 0) {
       return res.status(400).json({ success: false, message: '请提供 items 数组' });
@@ -561,103 +582,275 @@ router.post('/bulk-credit-codes', requireCompanyManagers(), async (req, res) => 
     }
 
     const updated = [];
-    const skipped = [];
+    const name_updates = [];
+    const created = [];
     const failed = [];
+    const pending_name_changes = [];
 
-    // 防重复：同一批内同一信用代码不可对应多家企业
+    /** 本批次内已占用该信用代码的企业 id（防同一批重复绑定） */
     const codeToTarget = new Map();
+    /** 同批待确认更名：每家企业只出现一次 */
+    const pendingRenameCompanyIds = new Set();
+
     for (let i = 0; i < items.length; i += 1) {
       const row = items[i] || {};
+      const nameRaw = typeof row.name === 'string' ? row.name.trim() : '';
+
       const codeNorm = normalizeStandaloneCreditCode(row.credit_code);
       if (codeNorm.error) {
-        failed.push({ index: i, key: row.id ?? row.name, message: codeNorm.error });
-        continue;
-      }
-      const code = codeNorm.value;
-      let companyRow = null;
-
-      if (row.id !== undefined && row.id !== null && row.id !== '') {
-        const idNum = Number.parseInt(String(row.id), 10);
-        if (!idNum || idNum < 1) {
-          failed.push({ index: i, key: row.id, message: '无效的企业 id' });
-          continue;
-        }
-        const [r0] = await pool.query(
-          'SELECT id, name, credit_code FROM companies WHERE id = ? LIMIT 1',
-          [idNum]
-        );
-        if (!r0.length) {
-          failed.push({ index: i, key: idNum, message: '企业不存在' });
-          continue;
-        }
-        companyRow = r0[0];
-      } else if (row.name !== undefined && row.name !== null && String(row.name).trim()) {
-        const nm = String(row.name).trim();
-        const [r1] = await pool.query(
-          'SELECT id, name, credit_code FROM companies WHERE name = ? ORDER BY id ASC',
-          [nm]
-        );
-        if (!r1.length) {
-          failed.push({ index: i, key: nm, message: '未找到同名企业' });
-          continue;
-        }
-        if (r1.length > 1) {
-          failed.push({ index: i, key: nm, message: `企业名称重复（${r1.length} 条），请改用 id` });
-          continue;
-        }
-        companyRow = r1[0];
-      } else {
-        failed.push({ index: i, key: null, message: '每条需提供 id 或 name' });
-        continue;
-      }
-
-      const companyId = companyRow.id;
-      const matchLabel = companyRow.name ? `${companyRow.name}(id:${companyId})` : String(companyId);
-
-      const prevId = codeToTarget.get(code);
-      if (prevId !== undefined && prevId !== companyId) {
         failed.push({
           index: i,
-          key: matchLabel,
-          message: '本批次内该信用代码已对应其他企业'
+          key: row.credit_code ?? null,
+          message: codeNorm.error
         });
         continue;
       }
-      codeToTarget.set(code, companyId);
+      const code = codeNorm.value;
 
-      const existingVal = companyRow.credit_code;
-      const hasExisting =
-        existingVal != null && String(existingVal).replace(/\s/g, '') !== '';
-      if (hasExisting && !overwrite) {
-        skipped.push({
-          id: companyId,
-          name: companyRow.name || '',
-          credit_code: code,
-          reason: '已有信用代码'
+      /** 第一步：按信用代码匹配 */
+      const [byCodeRows] = await pool.query(
+        'SELECT id, name, credit_code FROM companies WHERE credit_code = ? LIMIT 2',
+        [code]
+      );
+      if (byCodeRows.length > 1) {
+        failed.push({
+          index: i,
+          key: code,
+          message: '库内该信用代码对应多条记录，数据异常'
+        });
+        continue;
+      }
+      if (byCodeRows.length === 1) {
+        const cr = byCodeRows[0];
+        const curName = String(cr.name || '').trim();
+        if (nameRaw && nameRaw !== curName && !pendingRenameCompanyIds.has(cr.id)) {
+          pendingRenameCompanyIds.add(cr.id);
+          pending_name_changes.push({
+            company_id: cr.id,
+            company_name: curName,
+            import_name: nameRaw,
+            existing_credit_code: code,
+            attempted_credit_code: code
+          });
+        }
+        codeToTarget.set(code, cr.id);
+        continue;
+      }
+
+      /** 第二步 / 第三步需企业名称 */
+      if (!nameRaw) {
+        failed.push({
+          index: i,
+          key: code,
+          message: '库中无此信用代码，且未提供企业名称：无法按名称补全或新建'
+        });
+        continue;
+      }
+
+      /** 第二步：按企业名称精确匹配 */
+      const [byNameRows] = await pool.query(
+        'SELECT id, name, credit_code FROM companies WHERE name = ? ORDER BY id ASC',
+        [nameRaw]
+      );
+      if (byNameRows.length > 1) {
+        failed.push({
+          index: i,
+          key: nameRaw,
+          message: `企业名称重复（${byNameRows.length} 条），请先合并后再导入`
+        });
+        continue;
+      }
+      if (byNameRows.length === 1) {
+        const cr = byNameRows[0];
+        const existingCred = normalizeCreditCodeValue(cr.credit_code);
+        if (existingCred) {
+          failed.push({
+            index: i,
+            key: nameRaw,
+            message: '名称已匹配到企业，但该记录已有信用代码且与本次导入不一致'
+          });
+          continue;
+        }
+
+        const prevId = codeToTarget.get(code);
+        if (prevId !== undefined && prevId !== cr.id) {
+          failed.push({
+            index: i,
+            key: nameRaw,
+            message: '本批次内该信用代码已对应其他企业'
+          });
+          continue;
+        }
+
+        try {
+          await pool.query('UPDATE companies SET credit_code = ? WHERE id = ?', [code, cr.id]);
+          codeToTarget.set(code, cr.id);
+          updated.push({ id: cr.id, name: nameRaw, credit_code: code });
+        } catch (err) {
+          if (err.code === 'ER_DUP_ENTRY') {
+            let holder_company_id = null;
+            let holder_company_name = '';
+            try {
+              const [holders] = await pool.query(
+                'SELECT id, name FROM companies WHERE credit_code = ? AND id != ? LIMIT 1',
+                [code, cr.id]
+              );
+              if (holders.length) {
+                holder_company_id = holders[0].id;
+                holder_company_name = holders[0].name || '';
+              }
+            } catch (_) {
+              /* ignore */
+            }
+            failed.push({
+              index: i,
+              key: nameRaw,
+              message: '该信用代码已被其他企业占用',
+              conflict: true,
+              company_id: cr.id,
+              company_name: nameRaw,
+              credit_code: code,
+              holder_company_id,
+              holder_company_name
+            });
+          } else {
+            failed.push({ index: i, key: nameRaw, message: err.message || '更新信用代码失败' });
+          }
+        }
+        continue;
+      }
+
+      /** 第三步：新建企业 */
+      const prevNew = codeToTarget.get(code);
+      if (prevNew !== undefined) {
+        failed.push({
+          index: i,
+          key: code,
+          message: '本批次内该信用代码已用于匹配其他企业'
         });
         continue;
       }
 
       try {
-        await pool.query('UPDATE companies SET credit_code = ? WHERE id = ?', [code, companyId]);
-        updated.push({ id: companyId, name: companyRow.name || '', credit_code: code });
+        const [result] = await pool.query(
+          `
+          INSERT INTO companies (
+            name,
+            brand,
+            credit_code,
+            type,
+            address,
+            province,
+            city,
+            product_category,
+            sampled_count,
+            last_sampled_at
+          )
+          VALUES (?, NULL, ?, 'manufacturer', NULL, NULL, NULL, NULL, 0, NULL)
+        `,
+          [nameRaw, code]
+        );
+        const newId = result.insertId;
+        codeToTarget.set(code, newId);
+        created.push({ id: newId, name: nameRaw, credit_code: code });
       } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
-          failed.push({ index: i, key: matchLabel, message: '该信用代码已被其他企业占用' });
+          failed.push({
+            index: i,
+            key: nameRaw,
+            message: '该统一社会信用代码已被其他企业占用'
+          });
         } else {
-          failed.push({ index: i, key: matchLabel, message: err.message || '更新失败' });
+          failed.push({ index: i, key: nameRaw, message: err.message || '创建企业失败' });
         }
       }
     }
 
+    const succeeded = items.length - failed.length;
     res.json({
       success: true,
-      message: `完成：成功 ${updated.length}，跳过 ${skipped.length}，失败 ${failed.length}`,
-      data: { updated, skipped, failed }
+      message: `完成：处理 ${succeeded} 条（待确认更名 ${pending_name_changes.length}，补全代码 ${updated.length}，新建 ${created.length}），失败 ${failed.length}`,
+      data: {
+        updated,
+        name_updates,
+        created,
+        pending_name_changes,
+        failed
+      }
     });
   } catch (error) {
     console.error('批量导入信用代码失败:', error);
     res.status(500).json({ success: false, message: '批量导入信用代码失败' });
+  }
+});
+
+/**
+ * 批量导入后：用户确认将企业名称改为新值，并写入 company_name_history（变更前名称 + 当时信用代码）。
+ * body: { company_id: number, new_name: string }
+ */
+router.post('/confirm-import-name-change', requireCompanyManagers(), async (req, res) => {
+  try {
+    await ensureCompaniesSamplingSchema(pool);
+
+    const body = req.body || {};
+    const companyId = Number(body.company_id);
+    const newName = typeof body.new_name === 'string' ? body.new_name.trim() : '';
+
+    if (!Number.isFinite(companyId) || companyId < 1) {
+      return res.status(400).json({ success: false, message: '无效的企业 ID' });
+    }
+    if (!newName) {
+      return res.status(400).json({ success: false, message: '企业名称不能为空' });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [rows] = await conn.query(
+        'SELECT id, name, credit_code FROM companies WHERE id = ? FOR UPDATE',
+        [companyId]
+      );
+      if (!rows.length) {
+        await conn.rollback();
+        return res.status(404).json({ success: false, message: '企业不存在' });
+      }
+      const row = rows[0];
+      const curName = String(row.name || '').trim();
+      if (newName === curName) {
+        await conn.commit();
+        return res.json({ success: true, message: '名称未变化', data: { skipped: true } });
+      }
+
+      const codeNorm = normalizeCreditCodeValue(row.credit_code);
+      const codeStr = codeNorm == null ? null : String(codeNorm);
+
+      await conn.query(
+        `
+        INSERT INTO company_name_history (company_id, name_before, existing_credit_code, attempted_credit_code)
+        VALUES (?, ?, ?, ?)
+      `,
+        [companyId, curName, codeStr, codeStr]
+      );
+
+      await conn.query('UPDATE companies SET name = ? WHERE id = ?', [newName, companyId]);
+
+      await conn.commit();
+
+      const [updatedRows] = await pool.query(
+        'SELECT *, COALESCE(sampled_count, 0) AS sampled_count FROM companies WHERE id = ? LIMIT 1',
+        [companyId]
+      );
+
+      res.json({ success: true, message: '企业名称已更新', data: updatedRows[0] });
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    console.error('确认导入更名失败:', error);
+    res.status(500).json({ success: false, message: '确认导入更名失败' });
   }
 });
 

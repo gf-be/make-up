@@ -1,6 +1,10 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { clearAuthSession, getAuthToken } from './auth'
+import router from '@/router'
+
+/** 避免并行 401 重复弹出提示与多次 replace */
+let scheduled401LoginRedirect = false
 
 // const apiBaseURL = (
 //   import.meta.env.VITE_API_BASE_URL || 'http://47.106.104.48:3003/api'
@@ -49,6 +53,22 @@ request.interceptors.response.use(
     }
     if (error?.response?.status === 401) {
       clearAuthSession()
+      const msg = error?.response?.data?.message || error.message || '请先登录'
+      if (!scheduled401LoginRedirect) {
+        scheduled401LoginRedirect = true
+        ElMessage.error({
+          message: msg,
+          duration: 2200,
+          onClose: () => {
+            scheduled401LoginRedirect = false
+            const path = router.currentRoute?.value?.path ?? ''
+            if (path !== '/login') {
+              router.replace({ path: '/login' }).catch(() => {})
+            }
+          }
+        })
+      }
+      return Promise.reject(error)
     }
     ElMessage.error(error?.response?.data?.message || error.message || '网络错误')
     return Promise.reject(error)

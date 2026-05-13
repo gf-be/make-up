@@ -1,5 +1,15 @@
 <template>
-  <div class="companies">
+  <!-- <div v-if="isCompaniesListBlockedForNormalUser" class="companies companies--restricted">
+    <el-card>
+      <el-result icon="info" title="企业列表未开放" sub-title="普通用户可从「产品文案」进入关联企业的详情页。">
+        <template #extra>
+          <el-button type="primary" @click="$router.push('/unqualified-products')">前往产品文案</el-button>
+        </template>
+      </el-result>
+    </el-card>
+  </div> -->
+  <!-- <div v-else class="companies"> -->
+  <div  class="companies">
     <el-card>
       <template #header>
         <div class="card-header">
@@ -81,11 +91,15 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getCompanies, getCompanyFilterOptions, getCompanyStats } from '@/api/index'
+import { currentUser } from '@/utils/auth'
 
 const router = useRouter()
+
+/** 普通用户可访问 /companies 路由但不展示企业列表模块（仍可访问 /companies/:id） */
+// const isCompaniesListBlockedForNormalUser = computed(() => currentUser.value?.role === 'normal_user')
 const loading = ref(false)
 const tableData = ref([])
 const companyStats = ref({})
@@ -172,6 +186,7 @@ const getTypeText = (type) => {
 }
 
 onMounted(() => {
+  if (isCompaniesListBlockedForNormalUser.value) return
   loadStats()
   loadFilterOptions()
   loadData()
@@ -182,6 +197,10 @@ onMounted(() => {
 .companies {
   max-width: 1400px;
   margin: 0 auto;
+}
+
+.companies--restricted :deep(.el-result) {
+  padding: 24px 16px;
 }
 /* 全局表格最高优先级样式 */
 .table-height {

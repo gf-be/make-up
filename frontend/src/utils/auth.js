@@ -9,11 +9,11 @@ export const ROLE_LABELS = {
 
 export const MODULE_PERMISSIONS = {
   system_admin: ['profile', 'admin-users'],
-  developer: ['home', 'unqualified-products', 'products-manage', 'pivot-analysis', 'sampling-search', 'announcement-staging', 'announcements', 'inspections', 'companies', 'companies-manage', 'unqualified-companies', 'supervisions'],
+  developer: ['home', 'unqualified-products', 'products-manage', 'pivot-analysis', 'sampling-search', 'announcement-staging', 'announcements', 'inspections', 'companies', 'companies-manage', 'category-manage', 'unqualified-companies', 'supervisions'],
   // data_admin: ['home', 'announcement-staging', 'announcements', 'companies', 'unqualified-companies'],
-  data_admin: ['announcement-staging', 'announcements', 'companies-manage', 'products-manage'],
+  data_admin: ['announcement-staging', 'companies-manage', 'category-manage'],
   // normal_user: ['home', 'unqualified-products', 'inspections', 'companies','supervisions']
-  normal_user: ['unqualified-products']
+  normal_user: ['unqualified-products', 'companies']
 }
 
 const AUTH_STORAGE_KEY = 'cosmetics_current_user'
@@ -185,8 +185,8 @@ export function getRoleDefaultPath(role) {
     'announcements',
     'companies-manage',
     'products-manage',
-    'companies',
     'unqualified-products',
+    'companies',
     'inspections',
     'supervisions',
     'unqualified-companies',

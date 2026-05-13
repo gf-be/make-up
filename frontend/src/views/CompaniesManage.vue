@@ -21,12 +21,24 @@
                 
               />
             </el-form-item>
+            <el-form-item label="省份">
+              <el-select
+                v-model="filters.province"
+                placeholder="全部省份"
+                clearable
+                filterable
+                style="width: 180px"
+                @change="onProvinceFilterChange"
+              >
+                <el-option v-for="item in filterOptions.provinces" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
             <el-form-item label="信用代码">
               <el-input
                 v-model="filters.credit_code"
-                placeholder="模糊"
+                placeholder="统一社会信用代码"
                 clearable
-                style="width: 118px"
+                style="width: 160px"
                 @keyup.enter="loadList"
               />
             </el-form-item>
@@ -36,6 +48,7 @@
             <el-form-item>
               <el-button type="primary" size="small" @click="loadList">检索</el-button>
               <el-button size="small" @click="resetListFilters">重置</el-button>
+              <el-button size="small" :loading="exportListing" @click="exportList">导出公司列表</el-button>
             </el-form-item>
           </el-form>
           <el-table
@@ -52,7 +65,7 @@
             <el-table-column prop="credit_code" label="信用代码" min-width="110" show-overflow-tooltip>
               <template #default="{ row }">{{ row.credit_code || '—' }}</template>
             </el-table-column>
-            <el-table-column prop="province" label="省" width="64" show-overflow-tooltip/>
+            <el-table-column prop="province" label="省"  show-overflow-tooltip/>
             <el-table-column prop="sampled_count" label="抽查" width="48" align="center" />
           </el-table>
           <el-pagination
@@ -229,15 +242,11 @@
       @closed="resetImportDialog"
     >
       <div class="import-tips">
-        按<strong>企业 ID</strong>（整行首列纯数字）或<strong>与库完全一致的企业名称</strong>匹配；
-        默认仅填充当前信用代码为空的企业；打开「允许覆盖」可改写已有代码。
+        <strong>① 优先按统一社会信用代码匹配</strong>：库中已有该代码则视为同一家企业，<strong>不新建</strong>；若导入名称与库内不一致则<strong>不自动改名</strong>，将弹出确认框，确认后更新并记入名称沿革。<br />
+        <strong>② 代码未命中时按企业名称精确匹配</strong>：匹配到<strong>尚无信用代码</strong>的老企业则<strong>补上信用代码</strong>，不重复建档。<br />
+        <strong>③ 均未命中</strong>：按本行名称 + 代码<strong>新建企业</strong>。<br />
+        粘贴/表格列为「企业名称」+「信用代码」；亦可仅填信用代码（用于第①类命中后只同步名称或占位）。
       </div>
-      <el-form label-width="100px" class="import-form-row">
-        <el-form-item label="允许覆盖">
-          <el-switch v-model="importOverwrite" />
-          <span class="import-switch-hint">关闭时将跳过已有信用代码的记录</span>
-        </el-form-item>
-      </el-form>
 
       <el-tabs v-model="importActiveTab" class="import-tabs">
         <el-tab-pane label="键值对粘贴" name="paste">
@@ -245,7 +254,7 @@
             v-model="pasteImportText"
             type="textarea"
             :rows="9"
-            placeholder="每行一条，Tab 或 英文逗号/分号分隔：&#10;152	91110000MA0123456X &#10;某化妆品有限公司	91110000MA0123456X &#10;152,91110000MA0123456X"
+            placeholder="每行：企业名称 + Tab + 信用代码&#10;某化妆品有限公司	91110000MA0123456X&#10;亦可单独一行有效信用代码（名称留空）"
           />
           <div class="import-parse-row">
             <el-button size="small" type="primary" plain @click="parsePasteImport">解析预览</el-button>
@@ -253,7 +262,7 @@
         </el-tab-pane>
         <el-tab-pane label="Excel" name="excel">
           <p class="excel-hint">
-            推荐表头含「统一社会信用代码」及「企业ID」或「企业名称」。无匹配表头时按 A 列键、B 列代码读取全部行。
+            推荐表头含「企业名称」与「统一社会信用代码」。仅一列信用代码时，按该列导入（名称空，走第①②步规则）。无表头时默认 A 列名称、B 列代码。
           </p>
           <input ref="excelInputRef" type="file" accept=".xlsx,.xls" class="hidden-file-input" @change="onExcelImportChange" />
           <el-button size="small" @click="triggerExcelPick">选择 Excel…</el-button>
@@ -263,13 +272,10 @@
       <template v-if="importPreview.length">
         <div class="preview-caption">待提交 {{ importPreview.length }} 条</div>
         <el-table :data="importPreview.slice(0, 150)" border stripe size="small" max-height="240">
-          <el-table-column label="匹配方式" width="88">
-            <template #default="{ row }">{{ row.id != null ? 'ID' : '名称' }}</template>
+          <el-table-column label="企业名称" min-width="160" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.name || '（空，可仅匹配代码）' }}</template>
           </el-table-column>
-          <el-table-column label="匹配键" min-width="140" show-overflow-tooltip>
-            <template #default="{ row }">{{ row.id != null ? row.id : row.name }}</template>
-          </el-table-column>
-          <el-table-column prop="credit_code" label="信用代码" min-width="130" show-overflow-tooltip />
+          <el-table-column prop="credit_code" label="统一社会信用代码" min-width="160" show-overflow-tooltip />
         </el-table>
         <p v-if="importPreview.length > 150" class="preview-more">表格仅预览前 150 条；提交仍会处理全部条目（单次最多 3000 条）。</p>
       </template>
@@ -280,15 +286,70 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="existingCreditRenameVisible"
+      title="确认最新企业名称"
+      width="520px"
+      append-to-body
+      :close-on-click-modal="false"
+      destroy-on-close
+      class="credit-import-dialog"
+      @closed="onExistingCreditRenameDialogClosed"
+    >
+      <template v-if="existingCreditRenameItem">
+        <el-alert type="info" :closable="false" show-icon class="mb-12">
+          已存在该信用代码的企业记录，选择企业最新名称
+        </el-alert>
+        <div class="existing-credit-meta">
+          <div><span class="existing-credit-k">企业 ID</span>{{ existingCreditRenameItem.company_id }}</div>
+          <div><span class="existing-credit-k">库内当前名称</span>{{ existingCreditRenameItem.company_name }}</div>
+          <div v-if="existingCreditRenameItem.import_name" class="existing-credit-import-name">
+            <span class="existing-credit-k">本次导入名称</span>{{ existingCreditRenameItem.import_name }}
+          </div>
+          <div><span class="existing-credit-k">统一社会信用代码</span>{{ existingCreditRenameItem.existing_credit_code }}</div>
+        </div>
+        <el-form label-width="96px" class="mt-12">
+          <el-form-item label="选用名称">
+            <el-select
+              v-model="existingCreditRenameForm.name"
+              placeholder="请选择要保留的名称"
+              filterable
+              class="credit-rename-select"
+            >
+              <el-option
+                v-for="opt in existingCreditRenameNameOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </template>
+      <template #footer>
+        <el-button :disabled="existingCreditRenameSaving" @click="existingCreditRenameVisible = false">不修改</el-button>
+        <el-button type="primary" :loading="existingCreditRenameSaving" @click="onExistingCreditRenameConfirm">
+          保存名称
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import * as XLSX from 'xlsx'
-import { getCompanies, getCompanyDetail, updateCompany, bulkImportCompanyCreditCodes } from '@/api/index'
+import {
+  getCompanies,
+  getCompanyDetail,
+  getCompanyFilterOptions,
+  updateCompany,
+  bulkImportCompanyCreditCodes,
+  confirmImportCompanyNameChange
+} from '@/api/index'
 import { currentUser, MODULE_PERMISSIONS } from '@/utils/auth'
 
 const router = useRouter()
@@ -315,17 +376,46 @@ const formRef = ref(null)
 
 const filters = reactive({
   name: '',
+  province: '',
   credit_code: '',
   credit_code_empty: false
+})
+
+/** 与 /companies/filter-options 一致：库内已有省份 */
+const filterOptions = ref({
+  provinces: [],
+  product_categories: []
 })
 
 const importDialogVisible = ref(false)
 const importActiveTab = ref('paste')
 const pasteImportText = ref('')
-const importOverwrite = ref(false)
 const importPreview = ref([])
 const importSubmitting = ref(false)
 const excelInputRef = ref(null)
+
+/** 已有信用代码：沿革记录后的更名弹窗 */
+const existingCreditRenameVisible = ref(false)
+const existingCreditRenameItem = ref(null)
+const existingCreditRenameForm = reactive({ name: '' })
+const existingCreditRenameSaving = ref(false)
+/** @type {(() => void) | null} */
+let existingCreditRenameWaitResolve = null
+/** 更名弹窗：可选名称列表（库内 vs 导入） */
+const existingCreditRenameNameOptions = computed(() => {
+  const item = existingCreditRenameItem.value
+  if (!item) return []
+  const db = String(item.company_name || '').trim()
+  const imp = String(item.import_name || '').trim()
+  /** @type {{ label: string, value: string }[]} */
+  const out = []
+  if (db) out.push({ label: `库内当前：${db}`, value: db })
+  if (imp && imp !== db) out.push({ label: `本次导入：${imp}`, value: imp })
+  return out.length ? out : db ? [{ label: db, value: db }] : []
+})
+/** 导出 Excel（与当前检索条件一致，不限当前页） */
+const exportListing = ref(false)
+const EXPORT_LIST_CAP = 20000
 
 const USCC_RE = /^[0-9A-HJ-NPQRTUWXY]{18}$/i
 /** 日本 法人番号（13 位数字） */
@@ -340,33 +430,39 @@ function creditCodeAcceptedMessage() {
   return '须为中国 18 位统一社会信用代码、日本 13 位法人番号、或美国 9 位 EIN（可含连字符）'
 }
 
+function looksLikeSingleCreditToken(s) {
+  const t = String(s || '').replace(/\s/g, '')
+  if (!t) return false
+  if (USCC_RE.test(t)) return true
+  if (JP_CORP_NUM_RE.test(t)) return true
+  return Boolean(normalizeUsEinDigits(t))
+}
+
 function parseKeyValuePasteText(text) {
   const out = []
   const lines = String(text).split(/\r?\n/)
   for (const lineRaw of lines) {
     const line = lineRaw.trim()
     if (!line) continue
-    let key
-    let codePart
     if (line.includes('\t')) {
       const p = line.split('\t').map((s) => s.trim())
-      key = p[0]
-      codePart = p.slice(1).join('').replace(/\s/g, '')
-    } else if (/[,，;；|｜]/.test(line)) {
-      const parts = line.split(/[,，;；|｜]/).map((s) => s.trim()).filter(Boolean)
-      if (parts.length < 2) continue
-      key = parts[0]
-      codePart = parts.slice(1).join('').replace(/\s/g, '')
-    } else {
+      const namePart = p[0] || ''
+      const codePart = p.slice(1).join('').replace(/\s/g, '')
+      if (codePart) out.push({ name: namePart, credit_code: codePart })
       continue
     }
-    if (!key || !codePart) continue
-    const keyStr = String(key).trim()
-    const idTry = Number.parseInt(keyStr, 10)
-    if (Number.isFinite(idTry) && idTry > 0 && String(idTry) === keyStr) {
-      out.push({ id: idTry, credit_code: codePart })
-    } else {
-      out.push({ name: keyStr, credit_code: codePart })
+    if (/[,，;；|｜]/.test(line)) {
+      const parts = line.split(/[,，;；|｜]/).map((s) => s.trim()).filter(Boolean)
+      if (parts.length >= 2) {
+        const codeJoined = parts.slice(1).join('').replace(/\s/g, '')
+        if (codeJoined) out.push({ name: parts[0], credit_code: codeJoined })
+      } else if (parts.length === 1 && looksLikeSingleCreditToken(parts[0])) {
+        out.push({ name: '', credit_code: parts[0].replace(/\s/g, '') })
+      }
+      continue
+    }
+    if (looksLikeSingleCreditToken(line)) {
+      out.push({ name: '', credit_code: line.replace(/\s/g, '') })
     }
   }
   return out
@@ -379,56 +475,63 @@ function matrixToImportItems(matrix) {
   const firstRow = (matrix[0] || []).map((c) => String(c ?? '').trim())
   const looksHeader = firstRow.some((cell) => /企业|名称|信用|代码|统一|^id$/i.test(cell))
 
+  function pushPair(nameCell, codeCell) {
+    const namePart = String(nameCell ?? '').trim()
+    const codePart = String(codeCell ?? '').trim().replace(/\s/g, '')
+    if (!codePart) return
+    items.push({ name: namePart, credit_code: codePart })
+  }
+
   if (!looksHeader) {
     for (let r = 0; r < matrix.length; r += 1) {
       const row = matrix[r] || []
       const a = String(row[0] ?? '').trim()
-      const code = String(row[1] ?? '').trim().replace(/\s/g, '')
-      if (!code) continue
-      const idNum = Number.parseInt(a, 10)
-      if (Number.isFinite(idNum) && idNum > 0 && String(idNum) === a) {
-        items.push({ id: idNum, credit_code: code })
-      } else if (a) {
-        items.push({ name: a, credit_code: code })
+      const b = String(row[1] ?? '').trim().replace(/\s/g, '')
+      if (b) {
+        pushPair(row[0], row[1])
+      } else if (a && looksLikeSingleCreditToken(a)) {
+        items.push({ name: '', credit_code: a.replace(/\s/g, '') })
       }
     }
     return items
   }
 
-  let idCol = -1
   let nameCol = -1
   let codeCol = -1
   firstRow.forEach((h, idx) => {
-    if (/^(企业)?id$/i.test(h) || /^id$/i.test(h)) idCol = idx
-    else if (
-      (/企业名称|公司名称/.test(h) || (h.includes('名称') && !/信用|代码/.test(h))) &&
+    const hi = String(h)
+    if (/统一社会信用|社会信用代码/.test(hi)) {
+      codeCol = idx
+    } else if (/信用代码/.test(hi) && codeCol < 0) {
+      codeCol = idx
+    } else if (
+      (/企业名称|公司名称/.test(hi) || (hi.includes('名称') && !/信用|代码/.test(hi))) &&
       nameCol < 0
     ) {
       nameCol = idx
-    } else if (/统一社会信用|社会信用代码|信用代码/.test(h)) codeCol = idx
+    }
   })
   if (codeCol < 0) {
-    codeCol = firstRow.length > 1 ? 1 : -1
+    codeCol = firstRow.length > 1 ? 1 : 0
   }
-  if (codeCol < 0) return items
-  if (idCol < 0 && nameCol < 0) nameCol = 0
+  if (nameCol < 0 && codeCol > 0) {
+    nameCol = 0
+  }
+
+  if (nameCol < 0) {
+    for (let r = 1; r < matrix.length; r += 1) {
+      const row = matrix[r] || []
+      const c = String(row[codeCol] ?? '').trim()
+      if (c && looksLikeSingleCreditToken(c)) {
+        items.push({ name: '', credit_code: c.replace(/\s/g, '') })
+      }
+    }
+    return items
+  }
 
   for (let r = 1; r < matrix.length; r += 1) {
     const row = matrix[r] || []
-    const codeRaw = String(row[codeCol] ?? '').trim().replace(/\s/g, '')
-    if (!codeRaw) continue
-    if (idCol >= 0) {
-      const idStr = String(row[idCol] ?? '').trim()
-      const idNum = Number.parseInt(idStr, 10)
-      if (Number.isFinite(idNum) && idNum > 0) {
-        items.push({ id: idNum, credit_code: codeRaw })
-        continue
-      }
-    }
-    if (nameCol >= 0) {
-      const nm = String(row[nameCol] ?? '').trim()
-      if (nm) items.push({ name: nm, credit_code: codeRaw })
-    }
+    pushPair(row[nameCol], row[codeCol])
   }
   return items
 }
@@ -436,7 +539,7 @@ function matrixToImportItems(matrix) {
 function parsePasteImport() {
   importPreview.value = parseKeyValuePasteText(pasteImportText.value)
   if (!importPreview.value.length) {
-    ElMessage.warning('未解析到有效行，请使用 Tab 或逗号分隔键与信用代码')
+    ElMessage.warning('未解析到有效行：请使用「企业名称 + Tab + 信用代码」两列，或单独一行有效信用代码')
   } else {
     ElMessage.success(`已解析 ${importPreview.value.length} 条，请核对后提交`)
   }
@@ -447,9 +550,14 @@ function openImportDialog() {
 }
 
 function resetImportDialog() {
+  existingCreditRenameWaitResolve?.()
+  existingCreditRenameWaitResolve = null
+  existingCreditRenameVisible.value = false
+  existingCreditRenameItem.value = null
+  existingCreditRenameSaving.value = false
+  existingCreditRenameForm.name = ''
   pasteImportText.value = ''
   importPreview.value = []
-  importOverwrite.value = false
   importActiveTab.value = 'paste'
   importSubmitting.value = false
 }
@@ -478,40 +586,133 @@ async function onExcelImportChange(ev) {
   }
 }
 
+/**
+ * 批量导入 → POST /companies/bulk-credit-codes；代码命中且名称不一致 → pending_name_changes，
+ * 确认后 POST /companies/confirm-import-name-change（沿革 + 更新名称）。
+ */
 async function submitCreditImport() {
   if (!importPreview.value.length) return
   importSubmitting.value = true
   try {
     const res = await bulkImportCompanyCreditCodes({
-      items: importPreview.value,
-      overwrite: importOverwrite.value
+      items: importPreview.value
     })
-    
-    const { updated = [], skipped = [], failed = [] } = res?.data || {}
+
+    const {
+      updated = [],
+      name_updates = [],
+      created = [],
+      pending_name_changes = [],
+      failed = []
+    } = res?.data || {}
     const summary =
       typeof res?.message === 'string'
         ? res.message
-        : `成功 ${updated.length}，跳过 ${skipped.length}，失败 ${failed.length}`
-    ElMessage.success(summary)
-    if (failed.length) {
-      ElMessage.warning(
-        `失败 ${failed.length} 条，尝试使用手动输入`
-      )
+        : `完成：补全 ${updated.length}，新建 ${created.length}，待确认更名 ${pending_name_changes.length}，失败 ${failed.length}`
+
+    const hasUpdated = updated.length > 0
+    const hasNameUpdates = name_updates.length > 0
+    const hasCreated = created.length > 0
+    const hasPending = pending_name_changes.length > 0
+    const hasFailed = failed.length > 0
+    const hasSuccess = hasUpdated || hasNameUpdates || hasCreated || hasPending
+
+    if (hasFailed && !hasSuccess) {
+      ElMessage.warning(`${summary}。预览已保留，请修正后再次提交。`)
+    } else if (hasFailed) {
+      ElMessage.success(summary)
+      ElMessage.warning(`另有 ${failed.length} 条失败，预览已保留，可修正后再次提交。`)
+    } else if (hasSuccess) {
+      ElMessage.success(summary)
+    } else {
+      ElMessage.info(summary)
     }
-    importPreview.value = []
-    pasteImportText.value = ''
-    importDialogVisible.value = false
+
+    if (hasPending) {
+      ElMessage.info({
+        message: `有 ${pending_name_changes.length} 家企业需确认是否采用导入名称（沿革在确认后写入）。`,
+        duration: 6500
+      })
+    }
+
+    if (hasFailed && failed.length <= 5) {
+      const dupHints = failed
+        .filter((f) => f.conflict && f.holder_company_name)
+        .map((f) => `代码占用方：${f.holder_company_name}(id:${f.holder_company_id})`)
+      if (dupHints.length) {
+        ElMessage.info({ message: dupHints.join('；'), duration: 6000 })
+      }
+    }
+
     pagination.page = 1
     await loadList()
     if (selectedId.value) await reloadDetail()
+
+    if (hasPending) {
+      await runExistingCreditRenameDialogs(pending_name_changes)
+      await loadList()
+      if (selectedId.value) await reloadDetail()
+    }
+
+    if (!hasFailed) {
+      importPreview.value = []
+      pasteImportText.value = ''
+      importDialogVisible.value = false
+    }
   } catch (e) {
-    console.log(e);
-    
+    console.log(e)
+
     const msg = e?.response?.data?.message || e?.message || '导入失败'
     ElMessage.error(msg)
-
   } finally {
     importSubmitting.value = false
+  }
+}
+
+function onExistingCreditRenameDialogClosed() {
+  existingCreditRenameWaitResolve?.()
+  existingCreditRenameWaitResolve = null
+  existingCreditRenameItem.value = null
+}
+
+function runExistingCreditRenameDialogs(items) {
+  const list = Array.isArray(items) ? items : []
+  return list.reduce(
+    (chain, item) =>
+      chain.then(
+        () =>
+          new Promise((resolve) => {
+            existingCreditRenameItem.value = item
+            existingCreditRenameForm.name = String(item.import_name ?? item.company_name ?? '').trim()
+            existingCreditRenameWaitResolve = resolve
+            existingCreditRenameVisible.value = true
+          })
+      ),
+    Promise.resolve()
+  )
+}
+
+async function onExistingCreditRenameConfirm() {
+  const item = existingCreditRenameItem.value
+  if (!item?.company_id) {
+    existingCreditRenameVisible.value = false
+    return
+  }
+  const nm = String(existingCreditRenameForm.name || '').trim()
+  if (!nm) {
+    ElMessage.warning('请选择企业名称')
+    return
+  }
+  existingCreditRenameSaving.value = true
+  try {
+    await confirmImportCompanyNameChange({ company_id: item.company_id, new_name: nm })
+    ElMessage.success('企业名称已更新')
+    existingCreditRenameVisible.value = false
+  } catch (e) {
+    const msg = e?.response?.data?.message || e?.message || '保存失败'
+    ElMessage.error(msg)
+  } finally {
+    existingCreditRenameSaving.value = false
   }
 }
 
@@ -594,11 +795,53 @@ function normalizeListRes(res) {
   return { rows, total }
 }
 
+/** 去掉全角/半角括号及其中内容，与后端 `sqlProvinceBaseName` 语义一致 */
+function provinceDisplayBaseName(raw) {
+  let s = String(raw ?? '').trim()
+  if (!s) return ''
+  let prev = ''
+  while (s !== prev) {
+    prev = s
+    s = s.replace(/\s*[\(（][^)）]*[\)）]\s*/g, '').trim()
+  }
+  return s
+}
+
+/** 省份下拉：主名去重（如「河南」「河南（豫）」合并为一项） */
+function normalizeProvinceSelectOptions(list) {
+  const map = new Map()
+  for (const item of list || []) {
+    const base = provinceDisplayBaseName(item?.value ?? item?.label ?? '')
+    if (!base) continue
+    if (!map.has(base)) map.set(base, { value: base, label: base })
+  }
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'))
+}
+
+async function loadFilterOptions() {
+  try {
+    const res = await getCompanyFilterOptions()
+    const data = res?.data || { provinces: [], product_categories: [] }
+    filterOptions.value = {
+      provinces: normalizeProvinceSelectOptions(data.provinces),
+      product_categories: Array.isArray(data.product_categories) ? data.product_categories : []
+    }
+  } catch {
+    filterOptions.value = { provinces: [], product_categories: [] }
+  }
+}
+
+function onProvinceFilterChange() {
+  pagination.page = 1
+  loadList()
+}
+
 async function loadList() {
   listLoading.value = true
   try {
     const res = await getCompanies({
       name: filters.name || undefined,
+      province: filters.province?.trim() || undefined,
       credit_code: filters.credit_code?.trim() || undefined,
       credit_code_empty: filters.credit_code_empty ? 'true' : undefined,
       page: pagination.page,
@@ -625,10 +868,73 @@ function onPageChange(p) {
 
 function resetListFilters() {
   filters.name = ''
+  filters.province = ''
   filters.credit_code = ''
   filters.credit_code_empty = false
   pagination.page = 1
   loadList()
+}
+
+/** 导出当前检索条件下的企业列表为 Excel（列与左侧表格一致；量大时自动请求整页数据） */
+async function exportList() {
+  const pageRows = listRows.value || []
+  const totalHint = Number(pagination.total) || 0
+
+  if (!pageRows.length && totalHint === 0) {
+    ElMessage.warning('当前列表为空，无法导出')
+    return
+  }
+
+  exportListing.value = true
+  try {
+    const fetchLimit = Math.min(totalHint > 0 ? totalHint : pageRows.length, EXPORT_LIST_CAP)
+    let rows = pageRows
+
+    const needFetch = totalHint > 0 && (pageRows.length === 0 || pageRows.length < fetchLimit)
+
+    if (needFetch) {
+      const res = await getCompanies({
+        name: filters.name || undefined,
+        province: filters.province?.trim() || undefined,
+        credit_code: filters.credit_code?.trim() || undefined,
+        credit_code_empty: filters.credit_code_empty ? 'true' : undefined,
+        page: 1,
+        limit: fetchLimit
+      })
+      rows = normalizeListRes(res).rows
+    }
+
+    if (!rows.length) {
+      ElMessage.warning('当前列表为空，无法导出')
+      return
+    }
+
+    if (totalHint > EXPORT_LIST_CAP) {
+      ElMessage.warning(
+        `符合条件约 ${totalHint} 条，已超过单次导出上限 ${EXPORT_LIST_CAP}，已导出前 ${rows.length} 条`
+      )
+    }
+
+    const sheetRows = rows.map((r) => ({
+      企业名称: r.name ?? '',
+      信用代码: r.credit_code ?? '',
+      // 省份: r.province ?? '',
+      // 抽查次数: r.sampled_count ?? ''
+    }))
+    const ws = XLSX.utils.json_to_sheet(sheetRows)
+    ws['!cols'] = [{ wch: 42 }, { wch: 22 }, { wch: 10 }, { wch: 10 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '企业列表')
+    const day = new Date().toISOString().slice(0, 10)
+    const fname = `企业列表_${rows.length}条_${day}.xlsx`
+    XLSX.writeFile(wb, fname)
+    ElMessage.success(`已导出 ${rows.length} 条`)
+  } catch (e) {
+    const msg = e?.response?.data?.message || e?.message || '导出失败'
+    ElMessage.error(msg)
+  } finally {
+    exportListing.value = false
+  }
 }
 
 async function loadDetail(id) {
@@ -739,6 +1045,7 @@ function openSource(row) {
   else if (row.source_type === 'supervision') router.push(`/supervisions/${id}`)
 }
 
+loadFilterOptions()
 loadList()
 </script>
 
@@ -877,5 +1184,34 @@ loadList()
 .muted-text {
   font-size: 12px;
   color: #c0c4cc;
+}
+
+.mb-12 {
+  margin-bottom: 12px;
+}
+
+.mt-12 {
+  margin-top: 12px;
+}
+
+.existing-credit-meta {
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--el-text-color-regular);
+}
+
+.existing-credit-meta > div + div {
+  margin-top: 6px;
+}
+
+.existing-credit-k {
+  display: inline-block;
+  min-width: 112px;
+  color: var(--el-text-color-secondary);
+  margin-right: 8px;
+}
+
+.credit-rename-select {
+  width: 100%;
 }
 </style>

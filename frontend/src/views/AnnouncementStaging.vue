@@ -136,6 +136,22 @@
                         :value="opt.value" />
                     </el-select>
                   </el-form-item>
+                  <el-form-item label="状态">
+                    <el-select
+                      v-model="filters.status"
+                      clearable
+                      placeholder="全部状态"
+                      style="width: 138px"
+                      @change="applyFilters"
+                    >
+                      <el-option
+                        v-for="opt in statusOptions"
+                        :key="opt.value"
+                        :label="opt.label"
+                        :value="opt.value"
+                      />
+                    </el-select>
+                  </el-form-item>
                   <el-form-item style="margin-bottom: 0px;">
                     <el-button type="primary" @click="applyFilters">检索</el-button>
                     <el-button @click="resetFilters">重置</el-button>
@@ -147,7 +163,7 @@
                   </el-form-item>
                 </el-form>
 
-                <el-table class="batch-table" :data="batchListRows" row-key="id" :max-height="batchReviewTableMaxHeight"
+                <el-table class="batch-table " :data="batchListRows" row-key="id" :max-height="batchReviewTableMaxHeight"
                   size="small" stripe 
                   :row-class-name="batchRowClassName" @row-click="handleBatchRowClick" >
                   <el-table-column label="通告标题" min-width="190" show-overflow-tooltip>
@@ -180,7 +196,7 @@
                   <div class="panel-header panel-header-wrap">
                     <div>
                       <div class="panel-title">{{ currentBatch ? currentBatch.title : '批次详情工作区' }}</div>
-                      <div class="panel-subtitle">{{ currentBatchSubtitle }}</div>
+                      <!-- <div class="panel-subtitle">{{ currentBatchSubtitle }}</div> -->
                     </div>
                     <div v-if="currentBatch" class="panel-actions">
                       <el-button type="primary" plain :loading="stagingDraftSaving"
@@ -205,7 +221,7 @@
                     </div>
                   </div>
                 </template>
-                <template v-if="currentBatch">
+                <template v-if="currentBatch" >
                   <el-tabs v-model="activeDetailTab" class="detail-tabs">
                     <el-tab-pane label="通告正文" name="body">
 
@@ -341,13 +357,13 @@
                             </el-table>
 
                             <el-table v-else :data="attachment.filtered_rows" size="small" stripe
-                              :max-height="attachmentTableMaxHeight"
+                              :max-height="attachmentTableMaxHeight" class="table-height"
                               :row-key="(row) => stagingSamplingTableRowKey(attachment, row)">
-                              <el-table-column type="expand" width="50">
+                              <el-table-column type="expand" width="40">
                                 <template #default="{ row }">
                                   <el-descriptions :column="2" border size="small" class="detail-expanded">
                                     <el-descriptions-item label="注册人/备案人等名称">
-                                      <el-input v-model="row.company_names" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+                                      <el-input v-model="row.company_names"  :autosize="{ minRows: 2, maxRows: 6 }"
                                         size="small" placeholder="注册人/备案人等名称" />
                                     </el-descriptions-item>
                                     <el-descriptions-item label="注册人/备案人等地址">
@@ -395,24 +411,36 @@
                                   </el-descriptions>
                                 </template>
                               </el-table-column>
-                              <el-table-column prop="sequence_no" label="序号" width="70" align="center" />
-                              <el-table-column prop="product_name" label="产品名称" min-width="220" show-overflow-tooltip />
+                              <!-- <el-table-column prop="sequence_no" label="序号" width="70" align="center" /> -->
+                              <el-table-column label="产品名称" width="250" show-overflow-tooltip >
+                                <template #default="{ row }">
+                                  <el-input v-model="row.product_name" size="small" />
+                                </template>
+                              </el-table-column>
+                              <!-- <el-table-column prop="product_category" label="产品分类" min-width="220" show-overflow-tooltip /> -->
                               <!-- <el-table-column prop="company_names" label="注册人/备案人等名称" min-width="240" 
                                 show-overflow-tooltip />-->
-                              <!-- <el-table-column prop="sample_unit_name" label="被抽样单位" min-width="220"
-                                show-overflow-tooltip /> -->
-                              <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="220"
-                                show-overflow-tooltip />
+                              <el-table-column prop="sample_unit_name" label="被抽样单位" width="250"
+                                show-overflow-tooltip ><template #default="{ row }">
+                                  <el-input v-model="row.sample_unit_name" size="small" />
+                                </template>
+                              </el-table-column>
+                              <el-table-column prop="unqualified_items" label="不符合规定项目" width="394"
+                                show-overflow-tooltip ><template #default="{ row }">
+                                  <el-input v-model="row.unqualified_items" size="small" />
+                                </template>
+                              </el-table-column>
+                                
                               <!-- <el-table-column prop="remarks" label="备注" min-width="180" show-overflow-tooltip /> -->
-                              <el-table-column label="操作" width="120" fixed="right" align="center">
+                              <!-- <el-table-column label="操作" width="120" fixed="right" align="center">
                                 <template #default="{ row }">
                                   <el-button link type="primary" :loading="isSavingStagingRow(row)"
                                     @click="handleSaveStagingRow(row)">
-                                    保存
+                                    暂存
                                   </el-button>
                                   <el-button link type="danger" @click="handleDeleteStagingItem(row)">删除</el-button>
                                 </template>
-                              </el-table-column>
+                              </el-table-column> -->
                             </el-table>
                           </template>
                           <el-empty v-else :description="detailFilters.keyword ? '当前筛选条件下没有匹配结果' : '当前附件暂无可展示的解析明细'" />
@@ -697,11 +725,14 @@ let workspaceSaveTimer = null
 const preloadingBatchIds = new Set()
 
 
-/** 左侧通告列表固定只拉取待确认批次（与正式库已导入区分） */
-const STAGING_BATCH_LIST_STATUS = 'pending'
+/** 左侧批次列表状态：`announcement_staging_batches.status` ENUM（与后端一致） */
+const STAGING_BATCH_STATUS_OPTIONS = [
+  { value: 'pending', label: '待确认' },
+  { value: 'confirmed', label: '已入库' }
+]
 
 const filters = reactive({
-  status: STAGING_BATCH_LIST_STATUS,
+  status: '',
   product_type: '',
   announcement_type: '',
   keyword: '',
@@ -717,6 +748,8 @@ const yearOptions = computed(() => [
     label: `${y}年`
   }))
 ])
+
+const statusOptions = STAGING_BATCH_STATUS_OPTIONS
 
 const detailFilters = reactive({
   keyword: '',
@@ -1374,7 +1407,7 @@ function buildWorkspacePayload() {
 
 function applyWorkspacePayload(payload = {}) {
   const nextFilters = payload.filters || {}
-  filters.status = STAGING_BATCH_LIST_STATUS
+  filters.status = nextFilters.status ?? ''
   filters.product_type = nextFilters.product_type ?? ''
   filters.announcement_type = nextFilters.announcement_type ?? ''
   filters.keyword = nextFilters.keyword ?? ''
@@ -1828,7 +1861,8 @@ async function focusBatchById(batchId, options = {}) {
     return
   }
 
-  filters.status = STAGING_BATCH_LIST_STATUS
+  // filters.status = STAGING_BATCH_LIST_STATUS
+  filters.status = ''
   filters.product_type = ''
   filters.announcement_type = ''
   filters.keyword = ''
@@ -2280,7 +2314,8 @@ const applyFilters = async () => {
 }
 
 const resetFilters = async () => {
-  filters.status = STAGING_BATCH_LIST_STATUS
+  // filters.status = STAGING_BATCH_LIST_STATUS
+  filters.status = ''
   filters.product_type = ''
   filters.announcement_type = ''
   filters.keyword = ''
@@ -2600,7 +2635,7 @@ onBeforeUnmount(() => {
 }
 
 .staging-main-tabs :deep(.el-tabs__header) {
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .staging-stats-row {
@@ -2671,6 +2706,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 0px !important;
 }
 .batch-list-card :deep(.el-card__header) {
   padding: 10px 14px;
@@ -3164,6 +3200,7 @@ onBeforeUnmount(() => {
 .detail-expanded :deep(.el-textarea) {
   width: 100%;
 }
+
 
 .attachment-group-list {
   display: grid;

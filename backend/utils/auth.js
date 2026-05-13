@@ -78,6 +78,7 @@ function getSessionUser(req) {
 function authenticate(req, res, next) {
   const user = getSessionUser(req);
   if (!user) {
+    // SPA 前端应在 axios 拦截器中对 401 提示后跳转 /login（见 frontend/src/utils/request.js）
     return res.status(401).json({ success: false, message: '请先登录' });
   }
   req.user = user;

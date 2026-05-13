@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { requireRoles } = require('../utils/auth');
+const { authenticate, requireRoles } = require('../utils/auth');
 const {
   ensureUnqualifiedProductsTable,
   getUnqualifiedProductCategoryOptions,
@@ -2162,6 +2162,121 @@ async function handleUnqualifiedNodeDetails(req, res) {
 
 router.get('/node-details', handleUnqualifiedNodeDetails);
 router.post('/node-details', handleUnqualifiedNodeDetails);
+
+function mergeUsageUserJson(currentJson, entry) {
+  let arr = [];
+  try {
+    if (currentJson) {
+      const parsed = JSON.parse(currentJson);
+      if (Array.isArray(parsed)) {
+        arr = parsed;
+      }
+    }
+  } catch {
+    arr = [];
+  }
+  arr.push({
+    username: entry.username,
+    display_name: entry.display_name,
+    saved_at: entry.saved_at
+  });
+  const max = 100;
+  if (arr.length > max) {
+    arr = arr.slice(-max);
+  }
+  return JSON.stringify(arr);
+}
+
+router.post('/save-copy-text', authenticate, async (req, res) => {
+  try {
+    await ensureUnqualifiedProductsReady();
+
+    const copyText = sanitizeLongText(req.body?.copy_text);
+    if (!copyText) {
+      return res.status(400).json({ success: false, message: '文案内容不能为空' });
+    }
+
+    const rawIds = req.body?.product_ids;
+    const ids = Array.isArray(rawIds)
+      ? [
+          ...new Set(
+            rawIds
+              .map((x) => Number.parseInt(x, 10))
+              .filter((n) => Number.isFinite(n) && n > 0)
+          )
+        ]
+      : [];
+
+    if (ids.length > 500) {
+      return res.status(400).json({ success: false, message: '单次保存关联的产品过多' });
+    }
+
+    const dimensionLabel = sanitizeLongText(req.body?.dimension_label);
+    const rangeLabel = sanitizeLongText(req.body?.range_label);
+
+    const user = req.user;
+    const entry = {
+      username: String(user.username || ''),
+      display_name: String(user.display_name || user.username || ''),
+      saved_at: new Date().toISOString()
+    };
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      await connection.query(
+        `
+          INSERT INTO unqualified_product_copy_records (
+            user_id, username, display_name, copy_text, product_ids, dimension_label, range_label
+          ) VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?)
+        `,
+        [
+          user.id ?? null,
+          entry.username,
+          entry.display_name,
+          copyText,
+          JSON.stringify(ids),
+          dimensionLabel,
+          rangeLabel
+        ]
+      );
+
+      if (ids.length) {
+        const [existingRows] = await connection.query(
+          `SELECT id, usage_user FROM unqualified_products WHERE id IN (${ids.map(() => '?').join(', ')})`,
+          ids
+        );
+        if (existingRows.length !== ids.length) {
+          await connection.rollback();
+          return res.status(400).json({ success: false, message: '存在无效的产品明细 id' });
+        }
+        for (const row of existingRows) {
+          const merged = mergeUsageUserJson(row.usage_user, entry);
+          await connection.query('UPDATE unqualified_products SET usage_user = ? WHERE id = ?', [
+            merged,
+            row.id
+          ]);
+        }
+      }
+
+      await connection.commit();
+      res.json({
+        success: true,
+        message: '保存成功',
+        data: { product_count: ids.length }
+      });
+    } catch (innerError) {
+      await connection.rollback();
+      throw innerError;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('保存不合格产品文案失败:', error);
+    res.status(500).json({ success: false, message: '保存文案失败' });
+  }
+});
 
 router.get('/:id', async (req, res) => {
   try {

@@ -367,7 +367,29 @@ async function ensureForeignKey(connection, tableName, constraintName, definitio
   );
 
   if (rows.length === 0) {
-    await connection.query(`ALTER TABLE ${tableName} ADD CONSTRAINT ${constraintName} ${definitionSql}`);
+    try {
+      await connection.query(`ALTER TABLE ${tableName} ADD CONSTRAINT ${constraintName} ${definitionSql}`);
+    } catch (error) {
+      if (error?.code === 'ER_FK_DUP_NAME' || error?.errno === 1826) {
+        return;
+      }
+      throw error;
+    }
+  }
+}
+
+async function execQueryRetryDeadlock(connection, sql, params = [], attempts = 5) {
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      await connection.query(sql, params);
+      return;
+    } catch (error) {
+      if (error?.code === 'ER_LOCK_DEADLOCK' && i < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50 + i * 40));
+        continue;
+      }
+      throw error;
+    }
   }
 }
 
@@ -391,6 +413,33 @@ async function ensureUnqualifiedProductIssueItemsTable(connection) {
   `);
 
   await ensureIndex(connection, 'unqualified_product_issue_items', 'idx_upii_issue_item_announcement', 'INDEX idx_upii_issue_item_announcement (issue_item, announcement_id)');
+}
+
+async function ensureUnqualifiedProductCopyRecordsTable(connection) {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS unqualified_product_copy_records (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NULL,
+      username VARCHAR(191) NOT NULL DEFAULT '',
+      display_name VARCHAR(255) NULL,
+      copy_text LONGTEXT NOT NULL,
+      product_ids JSON NOT NULL,
+      dimension_label VARCHAR(512) NULL,
+      range_label VARCHAR(512) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_upcr_user_id (user_id),
+      INDEX idx_upcr_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  if (await tableExists(connection, 'users')) {
+    await ensureForeignKey(
+      connection,
+      'unqualified_product_copy_records',
+      'fk_upcr_user',
+      'FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL'
+    );
+  }
 }
 
 function normalizeCategoryValue(value) {
@@ -418,6 +467,54 @@ async function ensureUnqualifiedProductCategoryItemsTable(connection) {
   `);
 
   await ensureIndex(connection, 'unqualified_product_category_items', 'idx_upci_category_announcement', 'INDEX idx_upci_category_announcement (product_category, announcement_id)');
+}
+
+/** 数据管理员维护：按产品类型管理可选「产品分类」词条（并从明细拆分表 / 主表回填初始数据） */
+async function ensureUnqualifiedProductCategoryCatalogTable(connection) {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS unqualified_product_category_catalog (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+      category_name VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_upccc_type_category (product_type, category_name),
+      INDEX idx_upccc_product_type (product_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await execQueryRetryDeadlock(
+    connection,
+    `
+    INSERT IGNORE INTO unqualified_product_category_catalog (product_type, category_name)
+    SELECT DISTINCT up.product_type, TRIM(upci.product_category)
+    FROM unqualified_product_category_items upci
+    INNER JOIN unqualified_products up ON up.id = upci.unqualified_product_id
+    WHERE TRIM(upci.product_category) <> ''
+  `
+  );
+
+  await execQueryRetryDeadlock(
+    connection,
+    `
+    INSERT IGNORE INTO unqualified_product_category_catalog (product_type, category_name)
+    SELECT DISTINCT up.product_type, TRIM(up.product_category)
+    FROM unqualified_products up
+    WHERE up.product_category IS NOT NULL AND TRIM(up.product_category) <> ''
+  `
+  );
+}
+
+/** 分类管理页：自定义产品类型（键值存入明细 product_type 时应与此一致） */
+async function ensureUnqualifiedProductTypeCatalogTable(connection) {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS unqualified_product_type_catalog (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      product_type VARCHAR(50) NOT NULL,
+      display_label VARCHAR(100) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_uptc_product_type (product_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
 }
 
 function buildSourceCondition(filter = {}, params = []) {
@@ -883,6 +980,11 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'supervision_id', 'INT NULL AFTER announcement_detail_id');
   await ensureColumn(connection, 'supervision_detail_id', 'INT NULL AFTER supervision_id');
   await ensureColumn(connection, 'is_counterfeit', 'TINYINT(1) DEFAULT 0 AFTER supervision_detail_id');
+  await ensureColumn(
+    connection,
+    'usage_user',
+    "TEXT NULL COMMENT '使用用户（保存文案时追加 JSON 记录）' AFTER is_counterfeit"
+  );
   await ensureColumn(connection, 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
   await ensureColumn(connection, 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
 
@@ -957,7 +1059,12 @@ async function ensureUnqualifiedProductsTable(connection) {
 
   await ensureUnqualifiedProductCategoryItemsTable(connection);
 
+  await ensureUnqualifiedProductCategoryCatalogTable(connection);
+
+  await ensureUnqualifiedProductTypeCatalogTable(connection);
+
   await ensureUnqualifiedProductIssueItemsTable(connection);
+  await ensureUnqualifiedProductCopyRecordsTable(connection);
   await ensureUnqualifiedProductTreeRollupTable(connection);
   await backfillDerivedFields(connection);
   await backfillSearchHotFields(connection);
