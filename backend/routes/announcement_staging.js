@@ -782,8 +782,8 @@ router.post('/:id/confirm', async (req, res) => {
     res.json({
       success: true,
       message: result.published_target === 'supervisions'
-        ? '待确认批次已发布到飞行检查正式库，并写入备用快照'
-        : '待确认批次已发布到抽检正式库，并写入备用快照',
+        ? '待确认批次已发布到飞行检查正式库，已写入备用快照并清理临时区'
+        : '待确认批次已发布到抽检正式库，已写入备用快照并清理临时区',
       data: result
     });
   } catch (error) {

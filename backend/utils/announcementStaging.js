@@ -763,6 +763,25 @@ async function ensureForeignKey(connection, tableName, constraintName, definitio
   }
 }
 
+async function dropForeignKeyIfDeleteRuleMismatch(connection, tableName, constraintName, expectedDeleteRule) {
+  const [rows] = await connection.query(
+    `
+      SELECT DELETE_RULE
+      FROM information_schema.REFERENTIAL_CONSTRAINTS
+      WHERE CONSTRAINT_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND CONSTRAINT_NAME = ?
+      LIMIT 1
+    `,
+    [tableName, constraintName]
+  );
+
+  const deleteRule = rows[0]?.DELETE_RULE ? String(rows[0].DELETE_RULE).toUpperCase() : '';
+  if (deleteRule && deleteRule !== String(expectedDeleteRule || '').toUpperCase()) {
+    await connection.query(`ALTER TABLE ${tableName} DROP FOREIGN KEY ${constraintName}`);
+  }
+}
+
 async function ensureAnnouncementTablePublishColumns(connection) {
   await ensureColumnExists(connection, 'announcements', 'product_type', "VARCHAR(50) NOT NULL DEFAULT 'cosmetics' AFTER attachment_name");
   await ensureColumnExists(connection, 'announcements', 'announcement_type', "VARCHAR(50) NOT NULL DEFAULT 'sampling' AFTER product_type");
@@ -880,11 +899,21 @@ async function ensureAnnouncementPublishBackupColumns(connection) {
   await ensureIndexExists(connection, 'announcement_publish_backups', 'idx_publish_backup_supervision', 'ALTER TABLE announcement_publish_backups ADD INDEX idx_publish_backup_supervision (supervision_id)');
 
 
+  await dropForeignKeyIfDeleteRuleMismatch(
+    connection,
+    'announcement_publish_backups',
+    'fk_publish_backup_stage',
+    'SET NULL'
+  );
+  const [stagingBatchIdColumns] = await connection.query("SHOW COLUMNS FROM announcement_publish_backups LIKE 'staging_batch_id'");
+  if (stagingBatchIdColumns[0]?.Null === 'NO') {
+    await connection.query('ALTER TABLE announcement_publish_backups MODIFY COLUMN staging_batch_id INT NULL');
+  }
   await ensureForeignKey(
     connection,
     'announcement_publish_backups',
     'fk_publish_backup_stage',
-    'FOREIGN KEY (staging_batch_id) REFERENCES announcement_staging_batches(id) ON DELETE CASCADE'
+    'FOREIGN KEY (staging_batch_id) REFERENCES announcement_staging_batches(id) ON DELETE SET NULL'
   );
   await ensureForeignKey(
     connection,
@@ -2706,6 +2735,8 @@ async function publishSamplingStagingBatch(connection, detail) {
     [announcementId, batch.id]
   );
 
+  const stagingCleanupResult = await deletePublishedStagingTemporaryRows(connection, batch.id);
+
   return {
     staging_batch_id: Number(batch.id),
     announcement_id: Number(announcementId),
@@ -2717,7 +2748,8 @@ async function publishSamplingStagingBatch(connection, detail) {
     detail_count: items.length,
     product_type: typeInfo.product_type,
     announcement_type: typeInfo.announcement_type,
-    published_target: 'announcements'
+    published_target: 'announcements',
+    ...stagingCleanupResult
   };
 }
 
@@ -2920,6 +2952,8 @@ async function publishFlightInspectionStagingBatch(connection, detail) {
     [supervisionId, batch.id]
   );
 
+  const stagingCleanupResult = await deletePublishedStagingTemporaryRows(connection, batch.id);
+
   return {
     staging_batch_id: Number(batch.id),
     announcement_id: null,
@@ -2931,7 +2965,8 @@ async function publishFlightInspectionStagingBatch(connection, detail) {
     detail_count: items.length,
     product_type: typeInfo.product_type,
     announcement_type: typeInfo.announcement_type,
-    published_target: 'supervisions'
+    published_target: 'supervisions',
+    ...stagingCleanupResult
   };
 }
 
@@ -2949,6 +2984,22 @@ async function publishAnnouncementStagingBatch(connection, stagingBatchId) {
   }
 
   return publishSamplingStagingBatch(connection, detail);
+}
+
+async function deletePublishedStagingTemporaryRows(connection, stagingBatchId) {
+  const [itemDeleteResult] = await connection.query(
+    'DELETE FROM announcement_staging_items WHERE staging_batch_id = ?',
+    [stagingBatchId]
+  );
+  const [batchDeleteResult] = await connection.query(
+    'DELETE FROM announcement_staging_batches WHERE id = ? LIMIT 1',
+    [stagingBatchId]
+  );
+
+  return {
+    deleted_staging_batch_count: Number(batchDeleteResult?.affectedRows || 0),
+    deleted_staging_item_count: Number(itemDeleteResult?.affectedRows || 0)
+  };
 }
 
 async function deleteAnnouncementStagingBatch(connection, stagingBatchId) {

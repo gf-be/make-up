@@ -11,7 +11,7 @@ export const MODULE_PERMISSIONS = {
   system_admin: ['profile', 'admin-users'],
   developer: ['home', 'unqualified-products', 'products-manage', 'pivot-analysis', 'sampling-search', 'announcement-staging', 'announcements', 'inspections', 'companies', 'companies-manage', 'category-manage', 'unqualified-companies', 'supervisions'],
   // data_admin: ['home', 'announcement-staging', 'announcements', 'companies', 'unqualified-companies'],
-  data_admin: ['announcement-staging', 'companies-manage', 'category-manage'],
+  data_admin: ['announcement-staging', 'companies-manage', 'category-manage','announcements'],
   // normal_user: ['home', 'unqualified-products', 'inspections', 'companies','supervisions']
   normal_user: ['unqualified-products', 'companies']
 }

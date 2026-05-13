@@ -156,7 +156,7 @@
                     <el-button type="primary" @click="applyFilters">检索</el-button>
                     <el-button @click="resetFilters">重置</el-button>
                     <el-button type="success" plain :disabled="!overview.pending_batch_count" :loading="bulkConfirming"
-                    style="margin: 12px 0px !important;"
+                    style="margin: 12px 10px !important;"
                       @click="handleConfirmAll">
                       一键入库全部待确认（{{ overview.pending_batch_count || 0 }}）
                     </el-button>
@@ -2232,7 +2232,7 @@ async function handleConfirmAll() {
 
   try {
     await ElMessageBox.confirm(
-      `确认将当前 ${overview.pending_batch_count} 个待确认批次一键导入正式库吗？系统会按通告类型自动写入抽检库或飞检库，并同步企业、不合格产品和备用快照。`,
+      `确认将当前 ${overview.pending_batch_count} 个待确认批次一键导入正式库吗？系统会按通告类型自动写入抽检库或飞检库，同步企业、不合格产品和备用快照，并清理临时区数据。`,
       '一键导入正式库',
       {
         type: 'warning',
@@ -2271,7 +2271,7 @@ async function handleConfirm(row) {
 
   try {
     await ElMessageBox.confirm(
-      `确认将“${row.title || '该批次'}”导入${targetLabel}吗？系统会同步写入正式内容、企业、不合格产品，并生成备用快照。`,
+      `确认将“${row.title || '该批次'}”导入${targetLabel}吗？系统会同步写入正式内容、企业、不合格产品，生成备用快照，并清理该临时批次。`,
       '导入正式库',
       {
         type: 'warning',
@@ -2281,11 +2281,16 @@ async function handleConfirm(row) {
     )
 
     confirmingId.value = row.id
+    const currentIndex = batchListRows.value.findIndex((item) => Number(item.id) === Number(row.id))
+    const fallbackBatch = currentIndex >= 0
+      ? (batchListRows.value[currentIndex + 1] || batchListRows.value[currentIndex - 1] || null)
+      : null
     const res = await confirmAnnouncementStaging(row.id)
     const data = res.data || {}
-    ElMessage.success(`导入成功：已同步 ${data.detail_count || 0} 条内容明细到${data.published_target === 'supervisions' ? '飞检库' : '抽检库'}`)
+    const cleanupText = data.deleted_staging_batch_count ? '，并已清理临时区数据' : ''
+    ElMessage.success(`导入成功：已同步 ${data.detail_count || 0} 条内容明细到${data.published_target === 'supervisions' ? '飞检库' : '抽检库'}${cleanupText}`)
 
-    await refreshAll({ preferredKey: `body:${row.id}`, force: true })
+    await refreshAll({ preferredKey: fallbackBatch?.id ? `body:${fallbackBatch.id}` : '', force: true })
   } catch (error) {
     if (error === 'cancel' || error === 'close') {
       return
