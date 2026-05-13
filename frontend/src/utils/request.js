@@ -6,13 +6,13 @@ import router from '@/router'
 /** 避免并行 401 重复弹出提示与多次 replace */
 let scheduled401LoginRedirect = false
 
-// const apiBaseURL = (
-//   import.meta.env.VITE_API_BASE_URL || 'http://47.106.104.48:3003/api'
-// ).replace(/\/$/, '')
+const apiBaseURL = (
+  import.meta.env.VITE_API_BASE_URL || 'http://47.106.104.48:3003/api'
+).replace(/\/$/, '')
 
 const request = axios.create({
-  baseURL: '/api',
-  // baseURL: apiBaseURL,
+  // baseURL: '/api',
+  baseURL: apiBaseURL,
   timeout: 30000
 })
 

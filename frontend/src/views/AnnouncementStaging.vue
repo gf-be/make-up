@@ -5,20 +5,19 @@
         <div class="card-header">
           <div>
             <div class="title">数据导入</div>
-            <!-- <div class="subtitle">顶部三个页签：「批量 JSON 工作台」「临时批次核验」「异常倒溯」。</div> -->
           </div>
           <div class="header-actions">
             <input ref="folderInputRef" type="file" class="hidden-file-input" multiple webkitdirectory
               accept=".json,application/json" @change="handleUploadInputChange">
             <input ref="fileInputRef" type="file" class="hidden-file-input" multiple accept=".json,application/json"
               @change="handleUploadInputChange">
-            <el-button type="primary" :loading="importing" @click="selectUploadFolder">
+            <!-- <el-button type="primary" :loading="importing" @click="selectUploadFolder">
               <el-icon>
                 <Upload />
               </el-icon>
               上传文件夹
-            </el-button>
-            <el-button :disabled="importing" @click="selectUploadFiles">上传 JSON</el-button>
+            </el-button> -->
+            <el-button type="primary" :disabled="importing" @click="selectUploadFiles">上传文件</el-button>
             <el-button v-if="uploadFileRows.length" plain @click="uploadPreviewDialogVisible = true">
               已选 {{ uploadFileRows.length }} 个文件
             </el-button>
@@ -120,7 +119,7 @@
           <div class="workspace-layout workspace-layout-simple">
             <div class="batch-list-pane">
               <el-card shadow="never" class="batch-list-card" v-loading="loading">
-             
+
 
                 <el-form :model="filters" inline class="filter-form-batch">
                   <el-form-item label="年份">
@@ -137,48 +136,37 @@
                     </el-select>
                   </el-form-item>
                   <el-form-item label="状态">
-                    <el-select
-                      v-model="filters.status"
-                      clearable
-                      placeholder="全部状态"
-                      style="width: 138px"
-                      @change="applyFilters"
-                    >
-                      <el-option
-                        v-for="opt in statusOptions"
-                        :key="opt.value"
-                        :label="opt.label"
-                        :value="opt.value"
-                      />
+                    <el-select v-model="filters.status" clearable placeholder="全部状态" style="width: 138px"
+                      @change="applyFilters">
+                      <el-option v-for="opt in statusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
                     </el-select>
                   </el-form-item>
                   <el-form-item style="margin-bottom: 0px;">
                     <el-button type="primary" @click="applyFilters">检索</el-button>
                     <el-button @click="resetFilters">重置</el-button>
                     <el-button type="success" plain :disabled="!overview.pending_batch_count" :loading="bulkConfirming"
-                    style="margin: 12px 10px !important;"
-                      @click="handleConfirmAll">
-                      一键入库全部待确认（{{ overview.pending_batch_count || 0 }}）
+                      style="margin: 12px 10px !important;" @click="handleConfirmAll">
+                      一键入库（{{ overview.pending_batch_count || 0 }}）
                     </el-button>
                   </el-form-item>
                 </el-form>
 
-                <el-table class="batch-table " :data="batchListRows" row-key="id" :max-height="batchReviewTableMaxHeight"
-                  size="small" stripe 
-                  :row-class-name="batchRowClassName" @row-click="handleBatchRowClick" >
+                <el-table class="batch-table " :data="batchListRows" row-key="id"
+                  :max-height="batchReviewTableMaxHeight" size="small" stripe :row-class-name="batchRowClassName"
+                  @row-click="handleBatchRowClick">
                   <el-table-column label="通告标题" min-width="190" show-overflow-tooltip>
                     <template #default="{ row }">{{ row.title || '（无标题）' }}</template>
                   </el-table-column>
-                  <el-table-column prop="announcement_no" label="年号" width="90" align="center" show-overflow-tooltip/>
+                  <!-- <el-table-column prop="announcement_no" label="年号" width="90" align="center" show-overflow-tooltip/> -->
                   <!-- <el-table-column label="状态" width="82" align="center">
                     <template #default="{ row }">
                       <el-tag size="small" :type="getStatusTagType(row.status)">{{ getStatusLabel(row.status)
                         }}</el-tag>
                     </template>
                   </el-table-column> -->
-                  <el-table-column label="上传人" width="88" show-overflow-tooltip>
+                  <!-- <el-table-column label="上传人" width="88" show-overflow-tooltip>
                     <template #default="{ row }">{{ getSourceUserLabel(row) }}</template>
-                  </el-table-column>
+                  </el-table-column> -->
                   <!-- <el-table-column label="来源文件" min-width="140" show-overflow-tooltip>
                     <template #default="{ row }">{{ getStagingSourceFileLabel(row) }}</template>
                   </el-table-column> -->
@@ -195,24 +183,17 @@
                 <template #header>
                   <div class="panel-header panel-header-wrap">
                     <div>
-                      <div class="panel-title">{{ currentBatch ? currentBatch.title : '批次详情工作区' }}</div>
-                      <!-- <div class="panel-subtitle">{{ currentBatchSubtitle }}</div> -->
+                      <div class="panel-title">{{ currentBatch ? currentBatch.title : '详细信息' }}</div>
                     </div>
                     <div v-if="currentBatch" class="panel-actions">
-                      <el-button type="primary" plain :loading="stagingDraftSaving"
-                        @click="handleStagingDraftSave">
+                      <el-button type="primary" plain :loading="stagingDraftSaving" @click="handleStagingDraftSave">
                         暂存
                       </el-button>
                       <el-button v-if="nextBatch" type="primary" plain :loading="switchingBatchId === nextBatch.id"
                         @click="handleGoNextBatch()">
                         下一个通告
                       </el-button>
-                      <!-- <el-button
-                        v-if="currentBatch && (currentBatch.status === 'pending' || currentBatch.status === 'confirmed')"
-                        type="warning" plain :loading="retreatingTracebackId === currentBatch.id"
-                        @click="handleRetreatToTraceback(currentBatch)">
-                        打回
-                      </el-button> -->
+
 
                       <el-button type="success" :loading="confirmingId === currentBatch.id"
                         @click="handleConfirm(currentBatch)">
@@ -221,20 +202,22 @@
                     </div>
                   </div>
                 </template>
-                <template v-if="currentBatch" >
+                <template v-if="currentBatch">
                   <el-tabs v-model="activeDetailTab" class="detail-tabs">
                     <el-tab-pane label="通告正文" name="body">
-
-                      <div class="section-toolbar">
-                        <div>
-                          <!-- <div class="section-title">{{ currentBatch ? currentBatch.title : '批次详情工作区' }}</div> -->
-                          <!-- <div class="panel-tip">支持先在临时批次修订正文再决定是否导入正式库；若该通告已导入正式库，保存时会同步更新正式库正文。</div> -->
+                      <div class="section-toolbar section-toolbar-wrap">
+                        <div class="attachment-table-edit-actions">
+                          <el-button v-if="!bodyTabEditing" link @click="enterBodyTabEdit">
+                            编辑
+                          </el-button>
+                          <el-button v-else @click="saveBodyTabEdit" link>
+                            保存
+                          </el-button>
                         </div>
                       </div>
-
                       <div v-if="currentBatch" class="content-scroll-panel">
-                        <el-form ref="infoEditFormRef" :model="infoEditForm" :rules="infoEditRules"
-                          class="inline-staging-info-form">
+                        <el-form v-show="bodyTabEditing" ref="infoEditFormRef" :model="infoEditForm"
+                          :rules="infoEditRules" class="inline-staging-info-form">
                           <el-descriptions :column="2" border>
                             <el-descriptions-item label="列表期号展示">{{ getBatchPeriodLabel(currentBatch) || '-'
                             }}</el-descriptions-item>
@@ -248,11 +231,11 @@
                             </el-descriptions-item>
                             <el-descriptions-item label="发布日期">
                               <el-date-picker v-model="infoEditForm.publish_date" type="date" value-format="YYYY-MM-DD"
-                                placeholder="选择日期" style="width: 100%" size="small" />
+                                placeholder="选择日期" size="small" />
                             </el-descriptions-item>
                             <el-descriptions-item label="产品类型">
                               <el-form-item class="nested-form-item">
-                                <el-select v-model="infoEditForm.product_type" placeholder="请选择" style="width: 100%"
+                                <el-select v-model="infoEditForm.product_type" placeholder="请选择" 
                                   size="small">
                                   <el-option v-for="opt in productTypeOptions" :key="opt.value" :label="opt.label"
                                     :value="opt.value" />
@@ -262,7 +245,7 @@
                             <el-descriptions-item label="通告类型">
                               <el-form-item class="nested-form-item">
                                 <el-select v-model="infoEditForm.announcement_type" placeholder="请选择"
-                                  style="width: 100%" size="small">
+                                   size="small">
                                   <el-option v-for="opt in announcementTypeOptions" :key="opt.value" :label="opt.label"
                                     :value="opt.value" />
                                 </el-select>
@@ -271,14 +254,10 @@
                             <el-descriptions-item label="检验/检查单位">
                               <el-input v-model="infoEditForm.inspection_unit" size="small" />
                             </el-descriptions-item>
-                            <!-- <el-descriptions-item label="主附件">
-                              <el-input v-model="infoEditForm.primary_attachment_name" size="small" />
-                            </el-descriptions-item> -->
-                            <el-descriptions-item label="来源用户" :span="2">{{ getSourceUserLabel(currentBatch)
-                            }}</el-descriptions-item>
-                            <!-- <el-descriptions-item label="主附件路径" :span="2">
-                              <el-input v-model="infoEditForm.primary_attachment_path" size="small" />
-                            </el-descriptions-item> -->
+
+                            <!-- <el-descriptions-item label="来源用户" :span="2">{{ getSourceUserLabel(currentBatch)
+                              }}</el-descriptions-item> -->
+
                             <el-descriptions-item label="通告网址" :span="2">
                               <el-input v-model="infoEditForm.source_detail_url" size="small" />
                             </el-descriptions-item>
@@ -287,62 +266,58 @@
                             </el-descriptions-item>
                           </el-descriptions>
                         </el-form>
-                        <div class="content-body-text content-body-editor-wrap">
-                          <el-input v-model="bodyEditForm.content" type="textarea" :rows="18" resize="vertical"
+                        <div v-show="bodyTabEditing" class="content-body-text content-body-editor-wrap">
+                          <el-input v-model="bodyEditForm.content" type="textarea" :rows="16" resize="vertical"
                             maxlength="30000" show-word-limit class="content-body-editor-input"
                             placeholder="通告正文（可在此直接编辑）" />
+                        </div>
+                        <el-descriptions v-show="!bodyTabEditing" :column="2" border>
+                          <el-descriptions-item label="列表期号展示">{{ getBatchPeriodLabel(currentBatch) || '-'
+                          }}</el-descriptions-item>
+                          <el-descriptions-item label="通告标题">{{ infoEditForm.title || '—' }}</el-descriptions-item>
+                          <el-descriptions-item label="公告编号">{{ infoEditForm.announcement_no || '—'
+                            }}</el-descriptions-item>
+                          <el-descriptions-item label="发布日期">{{ infoEditForm.publish_date || '—'
+                            }}</el-descriptions-item>
+                          <el-descriptions-item label="产品类型">{{ getStagingProductTypeLabel(infoEditForm.product_type)
+                          }}</el-descriptions-item>
+                          <el-descriptions-item label="通告类型">{{
+                            getStagingAnnouncementTypeLabel(infoEditForm.announcement_type) }}</el-descriptions-item>
+                          <el-descriptions-item label="检验/检查单位">{{ infoEditForm.inspection_unit || '—'
+                          }}</el-descriptions-item>
+                          <el-descriptions-item label="通告网址" :span="2">{{ infoEditForm.source_detail_url || '—'
+                          }}</el-descriptions-item>
+                          <el-descriptions-item label="来源页" :span="2">{{ infoEditForm.source_page || '—'
+                          }}</el-descriptions-item>
+                        </el-descriptions>
+                        <div v-show="!bodyTabEditing"
+                          class="content-body-text content-body-editor-wrap content-body-readonly">
+                          {{ bodyEditForm.content || '—' }}
                         </div>
                       </div>
                     </el-tab-pane>
 
                     <el-tab-pane label="附件解析产品列表" name="attachments">
                       <div class="section-toolbar section-toolbar-wrap">
-                        <!-- <div>
-                          <div class="section-title">附件解析产品列表</div>
-                          <div class="panel-tip">支持按附件切换查看解析结果，也可结合“下一个通告”连续快速核验。</div>
-                        </div> -->
-                        <!-- <div class="detail-filter-actions">
-                          <el-input v-model="detailFilters.keyword" clearable placeholder="搜索产品名 / 企业名 / 问题项 / 检查问题"
-                            style="width: 320px" />
-                        </div> -->
+                        <div v-if="hasAttachmentSamplingEditableTable" class="attachment-table-edit-actions">
+                          <el-button v-if="!attachmentsListEditing" link @click="enterAttachmentsTableEdit">
+                            编辑
+                          </el-button>
+                          <el-button v-else @click="saveAttachmentsTableEdit" link>
+                            保存
+                          </el-button>
+                        </div>
                       </div>
 
                       <el-alert v-if="currentParseNotice" :type="currentParseNotice.type" :closable="false" show-icon
                         class="mb-16" :title="currentParseNotice.title" />
 
-                      <!-- <div v-if="currentBatchAttachments.length" class="attachment-filter-bar">
-                        <el-button size="small" :type="selectedAttachmentIndex === null ? 'primary' : undefined"
-                          @click="selectAttachmentFilter(null)">
-                          全部附件
-                        </el-button>
-                        <el-button v-for="attachment in currentBatchAttachments" :key="attachment.index" size="small"
-                          :type="selectedAttachmentIndex === attachment.index ? 'primary' : undefined"
-                          @click="selectAttachmentFilter(attachment.index)">
-                          {{ attachment.attachment_name || `附件${attachment.index}` }}
-                        </el-button>
-                      </div> -->
 
                       <div v-if="currentAttachmentGroups.length" class="attachment-group-list">
                         <div v-for="attachment in currentAttachmentGroups" :key="attachment.index"
                           class="attachment-group-card">
-                          <!-- <div class="attachment-group-header"> -->
-                            <!-- <div>
-                              <div class="tree-title">{{ attachment.attachment_name || `附件${attachment.index}` }}</div>
-                              <div class="tree-subtitle">{{ attachment.parse_message || '已进入附件解析产品列表' }}</div>
-                            </div> -->
-                            <!-- <div class="inline-tags end">
-                              <el-tag>{{ attachment.attachment_type || 'unknown' }}</el-tag>
-                              <el-tag type="success">解析 {{ attachment.parsed_count || 0 }} 条</el-tag>
-                              <el-tag v-if="!isFlightBatch" :type="attachment.counterfeit_count ? 'danger' : 'info'">涉假
-                                {{ attachment.counterfeit_count || 0 }}</el-tag>
-                              <el-button v-if="!isFlightBatch" link type="primary" size="small"
-                                @click="openCreateStagingItem(attachment)">
-                                新增产品
-                              </el-button>
-                            </div> -->
-                          <!-- </div> -->
 
-                          <template v-if="attachment.filtered_rows.length"  >
+                          <template v-if="attachment.filtered_rows.length">
                             <el-table v-if="isFlightBatch" :data="attachment.filtered_rows" size="small" stripe
                               :max-height="attachmentTableMaxHeight" class="table-height">
                               <el-table-column prop="sequence_no" label="序号" width="70" align="center" />
@@ -361,86 +336,122 @@
                               :row-key="(row) => stagingSamplingTableRowKey(attachment, row)">
                               <el-table-column type="expand" width="40">
                                 <template #default="{ row }">
-                                  <el-descriptions :column="2" border size="small" class="detail-expanded">
+                                  <template v-if="attachmentsListEditing">
+                                    <el-descriptions :column="2" border size="small" class="detail-expanded">
+                                      <el-descriptions-item label="注册人/备案人等名称">
+                                        <el-input v-model="row.company_names" :autosize="{ minRows: 2, maxRows: 6 }"
+                                          size="small" placeholder="注册人/备案人等名称" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="注册人/备案人等地址">
+                                        <el-input v-model="row.company_addresses" type="textarea"
+                                          :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="地址" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="被抽样单位名称">
+                                        <el-input v-model="row.sample_unit_name" size="small" placeholder="被抽样单位名称" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="被抽样单位地址">
+                                        <el-input v-model="row.sample_unit_address" type="textarea"
+                                          :autosize="{ minRows: 2, maxRows: 4 }" size="small" placeholder="地址" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="生产日期">
+                                        <el-input v-model="row.production_date" size="small" placeholder="生产日期" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="限期使用日期/保质期">
+                                        <el-input v-model="row.expiry_date" size="small" placeholder="限期使用日期/保质期" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="所在地/进口地区">
+                                        <el-input v-model="row.product_region" size="small" placeholder="所在地/进口地区" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="注册/备案编号">
+                                        <el-input v-model="row.registration_no" size="small" placeholder="注册/备案编号" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="生产许可证号">
+                                        <el-input v-model="row.production_license_no" size="small"
+                                          placeholder="生产许可证号" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="检验结果">
+                                        <el-input v-model="row.inspection_result" type="textarea"
+                                          :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="检验结果" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="规定要求">
+                                        <el-input v-model="row.requirement" type="textarea"
+                                          :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="规定要求" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="备注" :span="2">
+                                        <el-input v-model="row.remarks" type="textarea"
+                                          :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="备注" />
+                                      </el-descriptions-item>
+                                      <el-descriptions-item label="涉嫌假冒">
+                                        <el-switch :model-value="Boolean(Number(row.is_counterfeit))"
+                                          @update:model-value="(v) => { row.is_counterfeit = v ? 1 : 0 }" />
+                                      </el-descriptions-item>
+                                    </el-descriptions>
+                                  </template>
+                                  <el-descriptions v-else :column="2" border size="small" class="detail-expanded">
                                     <el-descriptions-item label="注册人/备案人等名称">
-                                      <el-input v-model="row.company_names"  :autosize="{ minRows: 2, maxRows: 6 }"
-                                        size="small" placeholder="注册人/备案人等名称" />
+                                      <span class="attachment-readonly-block">{{ row.company_names || '—' }}</span>
                                     </el-descriptions-item>
                                     <el-descriptions-item label="注册人/备案人等地址">
-                                      <el-input v-model="row.company_addresses" type="textarea"
-                                        :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="地址" />
+                                      <span class="attachment-readonly-block">{{ row.company_addresses || '—' }}</span>
                                     </el-descriptions-item>
                                     <el-descriptions-item label="被抽样单位名称">
-                                      <el-input v-model="row.sample_unit_name" size="small" placeholder="被抽样单位名称" />
+                                      {{ row.sample_unit_name || '—' }}
                                     </el-descriptions-item>
                                     <el-descriptions-item label="被抽样单位地址">
-                                      <el-input v-model="row.sample_unit_address" type="textarea"
-                                        :autosize="{ minRows: 2, maxRows: 4 }" size="small" placeholder="地址" />
+                                      <span class="attachment-readonly-block">{{ row.sample_unit_address || '—'
+                                        }}</span>
                                     </el-descriptions-item>
                                     <el-descriptions-item label="生产日期">
-                                      <el-input v-model="row.production_date" size="small" placeholder="生产日期" />
+                                      {{ row.production_date || '—' }}
                                     </el-descriptions-item>
                                     <el-descriptions-item label="限期使用日期/保质期">
-                                      <el-input v-model="row.expiry_date" size="small" placeholder="限期使用日期/保质期" />
+                                      {{ row.expiry_date || '—' }}
                                     </el-descriptions-item>
                                     <el-descriptions-item label="所在地/进口地区">
-                                      <el-input v-model="row.product_region" size="small" placeholder="所在地/进口地区" />
+                                      {{ row.product_region || '—' }}
                                     </el-descriptions-item>
                                     <el-descriptions-item label="注册/备案编号">
-                                      <el-input v-model="row.registration_no" size="small" placeholder="注册/备案编号" />
+                                      {{ row.registration_no || '—' }}
                                     </el-descriptions-item>
                                     <el-descriptions-item label="生产许可证号">
-                                      <el-input v-model="row.production_license_no" size="small" placeholder="生产许可证号" />
+                                      {{ row.production_license_no || '—' }}
                                     </el-descriptions-item>
                                     <el-descriptions-item label="检验结果">
-                                      <el-input v-model="row.inspection_result" type="textarea"
-                                        :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="检验结果" />
+                                      <span class="attachment-readonly-block">{{ row.inspection_result || '—' }}</span>
                                     </el-descriptions-item>
                                     <el-descriptions-item label="规定要求">
-                                      <el-input v-model="row.requirement" type="textarea"
-                                        :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="规定要求" />
+                                      <span class="attachment-readonly-block">{{ row.requirement || '—' }}</span>
                                     </el-descriptions-item>
                                     <el-descriptions-item label="备注" :span="2">
-                                      <el-input v-model="row.remarks" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-                                        size="small" placeholder="备注" />
+                                      <span class="attachment-readonly-block">{{ row.remarks || '—' }}</span>
                                     </el-descriptions-item>
                                     <el-descriptions-item label="涉嫌假冒">
-                                      <el-switch :model-value="Boolean(Number(row.is_counterfeit))"
-                                        @update:model-value="(v) => { row.is_counterfeit = v ? 1 : 0 }" />
+                                      {{ Number(row.is_counterfeit) ? '是' : '否' }}
                                     </el-descriptions-item>
                                   </el-descriptions>
                                 </template>
                               </el-table-column>
-                              <!-- <el-table-column prop="sequence_no" label="序号" width="70" align="center" /> -->
-                              <el-table-column label="产品名称" width="250" show-overflow-tooltip >
+                              <el-table-column label="产品名称" show-overflow-tooltip>
                                 <template #default="{ row }">
-                                  <el-input v-model="row.product_name" size="small" />
+                                  <el-input v-if="attachmentsListEditing" v-model="row.product_name" size="small" />
+                                  <span v-else>{{ row.product_name || '—' }}</span>
                                 </template>
                               </el-table-column>
-                              <!-- <el-table-column prop="product_category" label="产品分类" min-width="220" show-overflow-tooltip /> -->
-                              <!-- <el-table-column prop="company_names" label="注册人/备案人等名称" min-width="240" 
-                                show-overflow-tooltip />-->
-                              <el-table-column prop="sample_unit_name" label="被抽样单位" width="250"
-                                show-overflow-tooltip ><template #default="{ row }">
-                                  <el-input v-model="row.sample_unit_name" size="small" />
-                                </template>
-                              </el-table-column>
-                              <el-table-column prop="unqualified_items" label="不符合规定项目" width="394"
-                                show-overflow-tooltip ><template #default="{ row }">
-                                  <el-input v-model="row.unqualified_items" size="small" />
-                                </template>
-                              </el-table-column>
-                                
-                              <!-- <el-table-column prop="remarks" label="备注" min-width="180" show-overflow-tooltip /> -->
-                              <!-- <el-table-column label="操作" width="120" fixed="right" align="center">
+
+                              <el-table-column prop="sample_unit_name" label="被抽样单位" show-overflow-tooltip>
                                 <template #default="{ row }">
-                                  <el-button link type="primary" :loading="isSavingStagingRow(row)"
-                                    @click="handleSaveStagingRow(row)">
-                                    暂存
-                                  </el-button>
-                                  <el-button link type="danger" @click="handleDeleteStagingItem(row)">删除</el-button>
+                                  <el-input v-if="attachmentsListEditing" v-model="row.sample_unit_name" size="small" />
+                                  <span v-else>{{ row.sample_unit_name || '—' }}</span>
                                 </template>
-                              </el-table-column> -->
+                              </el-table-column>
+                              <el-table-column prop="unqualified_items" label="不符合规定项目" show-overflow-tooltip>
+                                <template #default="{ row }">
+                                  <el-input v-if="attachmentsListEditing" v-model="row.unqualified_items"
+                                    size="small" />
+                                  <span v-else>{{ row.unqualified_items || '—' }}</span>
+                                </template>
+                              </el-table-column>
+
                             </el-table>
                           </template>
                           <el-empty v-else :description="detailFilters.keyword ? '当前筛选条件下没有匹配结果' : '当前附件暂无可展示的解析明细'" />
@@ -581,7 +592,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="uploadPreviewDialogVisible" width="720px" :title="`待上传 JSON（${uploadFileRows.length}）`"
+    <el-dialog v-model="uploadPreviewDialogVisible" width="720px" :title="`待上传文件（${uploadFileRows.length}）`"
       :close-on-click-modal="false">
       <p class="panel-tip mb-16">确认后上传到服务器写入临时批次，并记录当前用户与时间。</p>
       <el-table :data="uploadFileRows" size="small" max-height="360">
@@ -612,7 +623,7 @@ import {
   getAnnouncementStagingFilterYears,
   getAnnouncementStagingDetail,
   createAnnouncementStagingItem,
-  updateAnnouncementStagingItem,
+  // updateAnnouncementStagingItem,
   deleteAnnouncementStagingItem,
   getAnnouncementStagingWorkspaceCache,
   saveAnnouncementStagingWorkspaceCache,
@@ -622,7 +633,7 @@ import {
   updateAnnouncementStagingInfo,
   updateAnnouncementStagingProductType,
   syncAnnouncementStagingItems,
-  retreatAnnouncementStagingToTraceback,
+  // retreatAnnouncementStagingToTraceback,
 
   confirmAllAnnouncementStaging
 } from '@/api/index'
@@ -643,6 +654,16 @@ const announcementTypeOptions = [
   { label: '抽检通告', value: 'sampling' },
   { label: '飞行检查', value: 'flight_inspection' }
 ]
+
+function getStagingProductTypeLabel(value) {
+  const opt = productTypeOptions.find((o) => o.value === value)
+  return opt?.label || (value ? String(value) : '—')
+}
+
+function getStagingAnnouncementTypeLabel(value) {
+  const opt = announcementTypeOptions.find((o) => o.value === value)
+  return opt?.label || (value ? String(value) : '—')
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -668,12 +689,12 @@ function syncBatchReviewViewportHeights() {
   attachmentTableMaxHeight.value = Math.max(280, Math.min(680, Math.round(h * 0.52)))
 }
 
-const retreatingTracebackId = ref(null)
+// const retreatingTracebackId = ref(null)
 const switchingBatchId = ref(null)
 const treeRows = ref([])
 const detailMap = ref({})
 
-const folderInputRef = ref(null)
+// const folderInputRef = ref(null)
 const fileInputRef = ref(null)
 const selectedUploadFiles = ref([])
 const uploadPreviewDialogVisible = ref(false)
@@ -682,6 +703,10 @@ const lastImportResult = ref(null)
 const selectedBatchId = ref(null)
 const selectedTreeKey = ref('')
 const activeDetailTab = ref('body')
+/** 附件解析产品列表（抽检表格）： false 为只读展示，true 为单元格可编辑 */
+const attachmentsListEditing = ref(false)
+/** 通告正文页签：默认只读，点击「编辑」后显示表单与正文编辑器 */
+const bodyTabEditing = ref(false)
 const selectedAttachmentIndex = ref(null)
 const workspaceCacheReady = ref(false)
 const bodyEditForm = reactive({
@@ -835,59 +860,6 @@ function getStagingRowSaveKey(row = {}) {
 
 const savingStagingRowKey = ref('')
 
-function isSavingStagingRow(row = {}) {
-  return savingStagingRowKey.value === getStagingRowSaveKey(row)
-}
-
-async function handleSaveStagingRow(row = {}) {
-  if (!currentBatch.value?.id || isFlightBatch.value) {
-    if (isFlightBatch.value) {
-      ElMessage.warning('飞行检查批次暂不支持在此编辑产品明细')
-    }
-    return
-  }
-
-  const productName = String(row.product_name || '').trim()
-  const companyNames = String(row.company_names || '').trim()
-  const unqualified = String(row.unqualified_items || '').trim()
-  if (!productName) {
-    ElMessage.warning('请输入产品名称（主表「产品名称」列）')
-    return
-  }
-  if (!companyNames) {
-    ElMessage.warning('请输入注册人/备案人等名称')
-    return
-  }
-  if (!unqualified) {
-    ElMessage.warning('请输入不符合规定项目（主表「不符合规定项目」列）')
-    return
-  }
-
-  const key = getStagingRowSaveKey(row)
-  if (savingStagingRowKey.value) {
-    return
-  }
-
-  savingStagingRowKey.value = key
-  try {
-    const payload = buildStagingItemPayloadFromRow(row)
-    const res = await updateAnnouncementStagingItem(currentBatch.value.id, {
-      locator: {
-        attachment_index: row.__attachment_index || 1,
-        row_index: row.__row_index,
-        sequence_no: row.sequence_no
-      },
-      item: payload
-    })
-    updateCurrentBatchDetail(res.data)
-    ElMessage.success('已保存至临时明细表')
-  } catch (error) {
-    console.error('保存临时产品明细失败:', error)
-    ElMessage.error(error?.response?.data?.message || '保存产品明细失败')
-  } finally {
-    savingStagingRowKey.value = ''
-  }
-}
 
 function buildStagingItemPayload() {
   return {
@@ -926,9 +898,6 @@ const uploadFileRows = computed(() => {
   }))
 })
 
-function selectUploadFolder() {
-  folderInputRef.value?.click()
-}
 
 function selectUploadFiles() {
   fileInputRef.value?.click()
@@ -1049,10 +1018,6 @@ function onMainTabChange(name) {
   })
 }
 
-function getStagingSourceFileLabel(row = {}) {
-  const name = row.source_file_name || row.source_relative_path || row.source_json_file
-  return String(name || '').trim() || '—'
-}
 
 function batchRowClassName({ row }) {
   return Number(row.id) === Number(selectedBatchId.value || 0) ? 'is-active-batch' : ''
@@ -1476,7 +1441,6 @@ const currentBatch = computed(() => getBatchById(currentBatchId.value))
 const currentBatchDetail = computed(() => getCachedDetail(currentBatchId.value))
 const currentTypeInfo = computed(() => getTypeInfo(currentBatch.value || {}))
 const isFlightBatch = computed(() => currentTypeInfo.value.announcement_type === 'flight_inspection')
-const currentPublishedId = computed(() => getPublishedId(currentBatch.value || {}))
 const currentBatchBodyText = computed(() => currentBatch.value?.content || currentBatchDetail.value?.batch?.content || '')
 
 const currentBatchAttachments = computed(() => {
@@ -1520,24 +1484,6 @@ const currentBatchSummary = computed(() => {
   }
 })
 
-// const currentCompanyPreviewList = computed(() => {
-//   const keyword = String(detailFilters.companyKeyword || '').trim().toLowerCase()
-//   const rows = Array.isArray(currentBatchDetail.value?.company_preview) ? currentBatchDetail.value.company_preview : []
-
-//   if (!keyword) {
-//     return rows
-//   }
-
-//   return rows.filter((item) => {
-//     const text = [
-//       item.company_name,
-//       item.company_address,
-//       item.province,
-//       item.product_names
-//     ].filter(Boolean).join(' ').toLowerCase()
-//     return text.includes(keyword)
-//   })
-// })
 
 const currentAttachmentGroups = computed(() => {
   const sourceAttachments = Array.isArray(currentBatchAttachments.value) ? currentBatchAttachments.value : []
@@ -1550,6 +1496,28 @@ const currentAttachmentGroups = computed(() => {
     filtered_rows: filterAttachmentRows(attachment.rows || [], detailFilters.keyword)
   }))
 })
+
+/** 当前是否存在可切换编辑模式的抽检附件表格（非飞行检查且有过滤后行） */
+const hasAttachmentSamplingEditableTable = computed(() => {
+  if (isFlightBatch.value) return false
+  return currentAttachmentGroups.value.some((g) => (g.filtered_rows || []).length > 0)
+})
+
+function enterAttachmentsTableEdit() {
+  attachmentsListEditing.value = true
+}
+
+function saveAttachmentsTableEdit() {
+  attachmentsListEditing.value = false
+}
+
+function enterBodyTabEdit() {
+  bodyTabEditing.value = true
+}
+
+function saveBodyTabEdit() {
+  bodyTabEditing.value = false
+}
 
 const currentParseNotice = computed(() => {
   const validation = currentParseValidation.value || {}
@@ -1574,23 +1542,6 @@ const currentParseNotice = computed(() => {
 
 const detailBusy = computed(() => Boolean(currentBatchId.value && detailLoadingId.value === currentBatchId.value))
 
-const currentBatchSubtitle = computed(() => {
-  if (!currentBatch.value) {
-    return '请先在上表中选择批次'
-  }
-
-  if (detailBusy.value) {
-    return '正在加载当前通告的正文、附件解析产品列表与企业预览'
-  }
-
-  const periodLabel = getBatchPeriodLabel(currentBatch.value)
-  return [
-    // currentBatchPositionText.value,
-    periodLabel || getStatusLabel(currentBatch.value.status),
-    `${currentTypeInfo.value.product_type_label} / ${currentTypeInfo.value.announcement_type_label}`,
-    `${currentBatchSummary.value.detail_count} 条内容`
-  ].filter(Boolean).join(' · ')
-})
 
 const batchListRows = computed(() => sortRowsByDisplayOrder([...treeRows.value]))
 
@@ -1598,18 +1549,6 @@ const currentBatchIndex = computed(() => {
   return batchListRows.value.findIndex((row) => Number(row.id) === Number(currentBatchId.value || 0))
 })
 
-const currentBatchPositionText = computed(() => {
-  const totalCount = batchListRows.value.length
-  if (!totalCount) {
-    return '当前筛选下列表为空'
-  }
-
-  if (currentBatchIndex.value < 0) {
-    return `列表中共 ${totalCount} 条批次`
-  }
-
-  return `当前第 ${currentBatchIndex.value + 1} / ${totalCount} 条`
-})
 
 const nextBatch = computed(() => {
   if (currentBatchIndex.value < 0) {
@@ -1699,7 +1638,6 @@ async function preloadNextBatchDetail(batchId) {
   })
 }
 
-// function ensureDirectorySelection() { }
 
 async function selectFirstVisibleBatch(options = {}) {
   if (!batchListRows.value.length) {
@@ -1961,14 +1899,7 @@ async function handleStagingDraftSave() {
   }
 }
 
-// function openProductTypeEditor() {
-//   if (!currentBatch.value) {
-//     return
-//   }
 
-//   productTypeEditForm.product_type = currentBatch.value.product_type || 'unknown'
-//   productTypeEditDialogVisible.value = true
-// }
 
 async function handleSaveProductType() {
   if (!currentBatch.value?.id || savingProductTypeId.value) {
@@ -2012,30 +1943,15 @@ function updateCurrentBatchDetail(nextDetail) {
   treeRows.value = treeRows.value.map((row) => (
     Number(row.id) === Number(batchId)
       ? {
-          ...row,
-          ...nextBatch,
-          parsed_detail_count: Number(summary.detail_count ?? nextBatch.parsed_detail_count ?? row.parsed_detail_count ?? 0),
-          inspection_count: Number(summary.detail_count ?? nextBatch.inspection_count ?? row.inspection_count ?? 0),
-          counterfeit_count: Number(summary.counterfeit_count ?? nextBatch.counterfeit_count ?? row.counterfeit_count ?? 0),
-          attachment_count: Number(summary.attachment_count ?? nextBatch.attachment_count ?? row.attachment_count ?? 0)
-        }
+        ...row,
+        ...nextBatch,
+        parsed_detail_count: Number(summary.detail_count ?? nextBatch.parsed_detail_count ?? row.parsed_detail_count ?? 0),
+        inspection_count: Number(summary.detail_count ?? nextBatch.inspection_count ?? row.inspection_count ?? 0),
+        counterfeit_count: Number(summary.counterfeit_count ?? nextBatch.counterfeit_count ?? row.counterfeit_count ?? 0),
+        attachment_count: Number(summary.attachment_count ?? nextBatch.attachment_count ?? row.attachment_count ?? 0)
+      }
       : row
   ))
-}
-
-function openCreateStagingItem(attachment = {}) {
-  if (isFlightBatch.value) {
-    ElMessage.warning('飞行检查批次暂不支持在此编辑产品明细')
-    return
-  }
-  stagingItemLocator.value = {
-    attachment_index: attachment.__attachment_index || attachment.index || 1
-  }
-  applyStagingItemToForm({
-    sequence_no: Number(currentBatchSummary.value.detail_count || 0) + 1
-  })
-  stagingItemDialogVisible.value = true
-  nextTick(() => stagingItemFormRef.value?.clearValidate?.())
 }
 
 function closeStagingItemDialog() {
@@ -2126,104 +2042,6 @@ async function handleGoNextBatch() {
   }
 }
 
-async function handleRetreatToTraceback(row) {
-  if (!row?.id || retreatingTracebackId.value) {
-    return
-  }
-
-  const isConfirmed = row.status === 'confirmed'
-  const currentVisibleRows = [...batchListRows.value]
-  const currentIndex = currentVisibleRows.findIndex((item) => Number(item.id) === Number(row.id))
-  const fallbackBatch = currentVisibleRows[currentIndex + 1] || currentVisibleRows[currentIndex - 1] || null
-
-  try {
-    const { value } = await ElMessageBox.prompt(
-      isConfirmed
-        ? `请填写「${row.title || '该批次'}」从正式库退回的原因，系统将删除对应正式稿并把该通告记入倒溯，临时批次恢复为待确认。`
-        : `请填写「${row.title || '该批次'}」核验打回的原因（不通过核验），系统将记入倒溯并从临时区移除此通告。`,
-      isConfirmed ? '退回正式库录入' : '核验打回',
-      {
-        type: 'warning',
-        confirmButtonText: '确认打回',
-        cancelButtonText: '取消',
-        inputPlaceholder: isConfirmed
-          ? '例如：正文有误、需在倒溯中心修正后再导入'
-          : '例如：附件解析不完整、内容与官网不一致',
-        inputValue: isConfirmed
-          ? '已导入正式库后发现通告内容有误，需要退回倒溯视图人工处理'
-          : '人工核验未通过，需要退回倒溯处理'
-      }
-    )
-
-    retreatingTracebackId.value = row.id
-    const res = await retreatAnnouncementStagingToTraceback(row.id, {
-      reason: value
-    })
-    const data = res.data || {}
-
-    if (isConfirmed) {
-      detailMap.value = {
-        ...detailMap.value,
-        [row.id]: {
-          ...(detailMap.value[row.id] || createEmptyDetail()),
-          batch: {
-            ...(detailMap.value[row.id]?.batch || {}),
-            status: 'pending',
-            published_announcement_id: null,
-            published_supervision_id: null,
-            confirmed_at: null
-          }
-        }
-      }
-      ElMessage.success(res.message || '已退回正式库并完成倒溯关联，请在「倒溯处理」查看')
-      await refreshAll({ preferredKey: `body:${row.id}`, force: true })
-    } else {
-      const nextDetailMap = { ...detailMap.value }
-      delete nextDetailMap[row.id]
-      detailMap.value = nextDetailMap
-      ElMessage.success(res.message || '核验打回已记入倒溯，临时区已移除该批次')
-      await refreshAll({ preferredKey: fallbackBatch?.id ? `body:${fallbackBatch.id}` : '', force: true })
-    }
-
-    goTracebackCenter({
-      traceback_id: data.traceback_id,
-      title: row.title,
-      source_detail_url: row.source_detail_url
-    })
-  } catch (error) {
-    if (error === 'cancel' || error === 'close') {
-      return
-    }
-    console.error('打回 / 退回倒溯失败:', error)
-  } finally {
-    if (retreatingTracebackId.value === row?.id) {
-      retreatingTracebackId.value = null
-    }
-  }
-}
-
-async function handleBatchPickerChange(batchId) {
-  const targetId = Number(batchId || 0)
-  if (!targetId || targetId === Number(currentBatchId.value || 0)) {
-    return
-  }
-
-  const targetRow = batchListRows.value.find((row) => Number(row.id) === targetId)
-  if (!targetRow) {
-    return
-  }
-
-  await selectBatch(targetRow, {
-    force: false,
-    tab: activeDetailTab.value === 'attachments' ? 'attachments' : 'body'
-  })
-}
-
-function selectAttachmentFilter(index = null) {
-
-  selectedAttachmentIndex.value = index === null ? null : Number(index)
-  activeDetailTab.value = 'attachments'
-}
 
 async function handleConfirmAll() {
   if (bulkConfirming.value || !overview.pending_batch_count) {
@@ -2303,14 +2121,6 @@ async function handleConfirm(row) {
   }
 }
 
-
-
-const goPublished = (id) => {
-
-  if (!id) return
-  router.push(isFlightBatch.value ? `/supervisions/${id}` : `/announcements/${id}`)
-}
-
 const applyFilters = async () => {
   await Promise.all([
     loadStagingFilterYears(),
@@ -2334,6 +2144,8 @@ const resetFilters = async () => {
 watch(
   [activeDetailTab, currentBatchId],
   () => {
+    attachmentsListEditing.value = false
+    bodyTabEditing.value = false
     if (!currentBatchId.value) {
       return
     }
@@ -2436,9 +2248,11 @@ onBeforeUnmount(() => {
   max-width: 1760px;
   margin: 0 auto;
 }
-.el-card__body{
-    padding: 16px!important;
-  }
+
+.el-card__body {
+  padding: 16px !important;
+}
+
 .page-card,
 .tree-panel,
 .traceback-panel,
@@ -2465,6 +2279,10 @@ onBeforeUnmount(() => {
 .panel-header-wrap,
 .section-toolbar-wrap {
   flex-wrap: wrap;
+}
+
+.attachment-table-edit-actions {
+  margin-left: auto;
 }
 
 .title {
@@ -2640,7 +2458,7 @@ onBeforeUnmount(() => {
 }
 
 .staging-main-tabs :deep(.el-tabs__header) {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .staging-stats-row {
@@ -2713,6 +2531,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   padding: 0px !important;
 }
+
 .batch-list-card :deep(.el-card__header) {
   padding: 10px 14px;
   /* width: 20vw; */
@@ -3150,7 +2969,7 @@ onBeforeUnmount(() => {
 }
 
 .detail-tabs :deep(.el-tabs__nav-wrap) {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .content-scroll-panel,
@@ -3180,6 +2999,10 @@ onBeforeUnmount(() => {
   margin-top: 12px;
 }
 
+.content-body-readonly {
+  min-height: 320px;
+}
+
 .content-body-editor-input :deep(textarea.el-textarea__inner) {
   min-height: 320px;
   line-height: 1.9;
@@ -3204,6 +3027,12 @@ onBeforeUnmount(() => {
 .detail-expanded :deep(.el-input),
 .detail-expanded :deep(.el-textarea) {
   width: 100%;
+}
+
+.attachment-readonly-block {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
 }
 
 

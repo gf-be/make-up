@@ -58,22 +58,27 @@
 
           <el-table-column prop="product_name" label="产品名称" min-width="150" show-overflow-tooltip />
           <!-- <el-table-column prop="brand" label="品牌" width="120" /> -->
-
-          <el-table-column prop="inspection_date" label="检查日期" width="110" />
-          <el-table-column prop="level" label="级别" width="80">
+          <!-- {{ formatDate(currentRow.publish_date) || '-' }} -->
+          <el-table-column prop="inspection_date" label="检查日期" width="110" >
+            <!-- {{ formatDate(currentRow.publish_date) || '-' }} -->
+            <template #default="{ row }">
+              {{ formatDate(row.inspection_date) || '-' }}
+            </template>
+          </el-table-column>
+          <!-- <el-table-column prop="level" label="级别" width="80">
             <template #default="{ row }">
               <el-tag :type="getLevelType(row.level)" size="small">
                 {{ getLevelText(row.level) }}
               </el-tag>
             </template>
-          </el-table-column>
-          <el-table-column prop="inspection_result" label="检查结果" width="90">
+          </el-table-column> -->
+          <!-- <el-table-column prop="inspection_result" label="检查结果" width="90">
             <template #default="{ row }">
               <el-tag :type="getResultType(row.inspection_result)" size="small">
                 {{ getResultText(row.inspection_result) }}
               </el-tag>
             </template>
-          </el-table-column>
+          </el-table-column> -->
           <el-table-column prop="unqualified_items" label="不合格项目" min-width="150" show-overflow-tooltip />
         </el-table>
       </div>
@@ -90,17 +95,20 @@ const route = useRoute()
 const loading = ref(false)
 const detail = ref(null)
 
+
 const loadData = async () => {
   loading.value = true
   try {
     const res = await getCompanyDetail(route.params.id, { history_limit: 10000 })
     detail.value = res.data
+    console.log(detail.value);
   } catch (error) {
     console.error('加载详情失败:', error)
   } finally {
     loading.value = false
   }
 }
+
 
 const getTypeType = (type) => {
   const map = { manufacturer: 'primary', distributor: 'success', seller: 'info' }
@@ -137,16 +145,13 @@ const getSourceTypeText = (sourceType) => {
   return map[sourceType] || sourceType || '-'
 }
 
-const getLevelType = (level) => {
-
-  const map = { national: 'danger', provincial: 'warning', municipal: 'info' }
-  return map[level] || 'info'
-}
-
-const getLevelText = (level) => {
-console.log(level);
-  const map = { national: '国家级', provincial: '省级', municipal: '市级' }
-  return map[level] || level
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 onMounted(() => {

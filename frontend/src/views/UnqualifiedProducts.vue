@@ -4,12 +4,12 @@
 
       <!-- 筛选框 -->
       <el-form :model="filters" class="filter-form" label-width="96px">
-        <el-row :gutter="16">
+        <el-row :gutter="32">
 
-          <el-col :span="6">
+          <el-col :span="5">
             <el-form-item label="企业关键词">
               <el-input v-model="filters.company_keyword" placeholder="搜索企业或被抽样单位" clearable
-                @keyup.enter="handleSearch" />
+                @keyup.enter="handleSearch" width="80%"/>
             </el-form-item>
           </el-col>
           <el-col :span="4">
@@ -29,8 +29,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="5">
-            <el-form-item label="生产省份">
-              <el-select v-model="filters.manufacturer_province" clearable filterable placeholder="全部生产省份"
+            <el-form-item label="生产企业省份">
+              <el-select v-model="filters.manufacturer_province" clearable filterable placeholder="全部"
                 style="width: 100%">
                 <el-option v-for="item in filterOptions.manufacturer_provinces" :key="item.value" :label="item.label"
                   :value="item.value" />
@@ -38,8 +38,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="5">
-            <el-form-item label="样品省份">
-              <el-select v-model="filters.sampled_province" clearable filterable placeholder="全部样品省份"
+            <el-form-item label="抽检企业省份">
+              <el-select v-model="filters.sampled_province" clearable filterable placeholder="全部"
                 style="width: 100%">
                 <el-option v-for="item in filterOptions.sampled_provinces" :key="item.value" :label="item.label"
                   :value="item.value" />
@@ -47,8 +47,8 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row :gutter="16">
-          <el-col :span="8">
+        <el-row :gutter="32">
+          <el-col :span="5">
             <el-form-item label="不符合项目">
               <el-select v-model="filters.issue_items" multiple filterable collapse-tags collapse-tags-tooltip clearable
                 placeholder="选择一个或多个项目" style="width: 100%">
@@ -147,7 +147,7 @@
                 <div v-if="currentNode" class="detail-card-header-actions">
                   <el-tag type="success">共{{ pagination.total }}/已选中{{ detailTableSelectedCount }} 条</el-tag>
                   <el-button type="success" plain size="small" @click="detailChartDialogVisible = true">
-                    绘图
+                    统计图
                   </el-button>
                   <el-button type="primary" plain size="small" :loading="exportingNodeDetails"
                     :disabled="!nodeDetailsCanExport" @click="exportNodeDetailsExcel">
@@ -169,7 +169,7 @@
                     <el-descriptions :column="2" border>
                       <el-descriptions-item label="来源标题">{{ row.source_title || row.batch_title || '-'
                       }}</el-descriptions-item>
-                      <el-descriptions-item label="来源日期">{{ row.source_publish_date || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="来源日期">{{ formatDate(row.source_publish_date) || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="产品类型">{{ row.product_type_label || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="通告类型">{{ row.announcement_type_label || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="生产企业名称">{{ row.manufacturer_name || row.company_names || '-'
@@ -187,10 +187,10 @@
                       <el-descriptions-item label="标示生产日期">{{ row.production_date || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="限期使用日期/保质期">{{ row.expiry_date || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="所在地/进口地区">{{ row.product_region || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="生产企业省市">{{ [row.manufacturer_province,
-                      row.manufacturer_city].filter(Boolean).join(' / ') || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="样品省市">{{ [row.sampled_province,
-                      row.sampled_city].filter(Boolean).join(' / ') || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="生产企业省市">{{ formatProvinceCityDisplay(row.manufacturer_province,
+                        row.manufacturer_city) }}</el-descriptions-item>
+                      <el-descriptions-item label="样品省市">{{ formatProvinceCityDisplay(row.sampled_province,
+                        row.sampled_city) }}</el-descriptions-item>
                       <el-descriptions-item label="注册/备案编号">{{ row.registration_no || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="生产许可证号">{{ row.production_license_no || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="问题类型">{{ row.issue_category || '-' }}</el-descriptions-item>
@@ -408,13 +408,13 @@ const detailTableSelectedCount = computed(() => detailTableSelectedIds.value.siz
 const NODE_DETAIL_CHART_FIELDS = [
   { key: 'source_publish_date', label: '日期' },
   { key: 'source_title', label: '来源通告' },
-  { key: 'product_name', label: '问题对象/标题' },
+  { key: 'product_name', label: '产品名称' },
   { key: 'manufacturer_name', label: '生产企业' },
   { key: 'operator_name', label: '经营企业' },
   { key: 'manufacturer_province', label: '生产省份' },
   { key: 'manufacturer_city', label: '生产城市' },
-  { key: 'sampled_province', label: '样品省份' },
-  { key: 'sampled_city', label: '样品城市' },
+  { key: 'sampled_province', label: '抽检省份' },
+  { key: 'sampled_city', label: '抽检城市' },
   { key: 'unqualified_items', label: '不符合规定项目' },
   { key: 'product_type_label', label: '产品类型' },
   { key: 'announcement_type_label', label: '通告类型' },
@@ -437,6 +437,14 @@ const videoCopyProductIds = ref([])
 const generatingVideoCopy = ref(false)
 const savingVideoCopy = ref(false)
 
+function formatDate(dateStr) {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
 function formatDetailChartCategoryValue(raw) {
   if (raw == null || raw === '') return '(空)'
   if (typeof raw === 'object') {
@@ -452,8 +460,14 @@ function formatDetailChartCategoryValue(raw) {
 
 function aggregateDetailTableForChart(rows, dimensionKey) {
   const map = new Map()
+  const provinceKeys = new Set(['manufacturer_province', 'sampled_province', 'province'])
   for (const row of rows || []) {
-    const label = formatDetailChartCategoryValue(row?.[dimensionKey])
+    let raw = row?.[dimensionKey]
+    if (provinceKeys.has(dimensionKey)) {
+      const n = normalizeProvinceToStandard(raw)
+      raw = n !== '' ? n : raw
+    }
+    const label = formatDetailChartCategoryValue(raw)
     map.set(label, (map.get(label) || 0) + 1)
   }
   return [...map.entries()].map(([name, value]) => ({ name, value }))
@@ -1108,8 +1122,8 @@ function applyRouteFilters() {
     product_type: String(route.query.product_type || ''),
     announcement_type: String(route.query.announcement_type || ''),
     province: String(route.query.province || ''),
-    manufacturer_province: String(route.query.manufacturer_province || ''),
-    sampled_province: String(route.query.sampled_province || ''),
+    manufacturer_province: normalizeProvinceToStandard(route.query.manufacturer_province ?? '') || '',
+    sampled_province: normalizeProvinceToStandard(route.query.sampled_province ?? '') || '',
     year_start: String(route.query.year_start || fallbackYear || ''),
     year_end: String(route.query.year_end || fallbackYear || ''),
     announcement_id: String(route.query.announcement_id || ''),
@@ -1202,9 +1216,145 @@ function uniqueCopyValues(values) {
   return out
 }
 
+/**
+ * 中国全部省级行政区标准全称（含直辖市、自治区、特别行政区；台湾省按惯例列出便于数据归一）。
+ * 用于将库内各类写法归并为统一展示名。
+ */
+const STANDARD_CN_PROVINCES = Object.freeze([
+  '北京市',
+  '天津市',
+  '上海市',
+  '重庆市',
+  '河北省',
+  '山西省',
+  '辽宁省',
+  '吉林省',
+  '黑龙江省',
+  '江苏省',
+  '浙江省',
+  '安徽省',
+  '福建省',
+  '江西省',
+  '山东省',
+  '河南省',
+  '湖北省',
+  '湖南省',
+  '广东省',
+  '海南省',
+  '四川省',
+  '贵州省',
+  '云南省',
+  '陕西省',
+  '甘肃省',
+  '青海省',
+  '台湾省',
+  '内蒙古自治区',
+  '广西壮族自治区',
+  '西藏自治区',
+  '宁夏回族自治区',
+  '新疆维吾尔自治区',
+  '香港特别行政区',
+  '澳门特别行政区'
+])
+
+const STANDARD_CN_PROVINCE_SET = new Set(STANDARD_CN_PROVINCES)
+/** 优先匹配长名称，避免「黑龙江」误套「黑」等极端情况；本省名互相区分靠全称长度 */
+const STANDARD_CN_PROVINCES_BY_LENGTH = [...STANDARD_CN_PROVINCES].sort((a, b) => b.length - a.length)
+
+function buildProvinceAliasToCanonical() {
+  const m = new Map()
+  for (const p of STANDARD_CN_PROVINCES) {
+    m.set(p, p)
+  }
+  for (const p of STANDARD_CN_PROVINCES) {
+    if (p.endsWith('特别行政区')) {
+      m.set(p.replace(/特别行政区$/, ''), p)
+    } else if (p.endsWith('自治区')) {
+      const short = p
+        .replace(/壮族自治区$/, '')
+        .replace(/维吾尔自治区$/, '')
+        .replace(/回族自治区$/, '')
+        .replace(/自治区$/, '')
+      if (short) {
+        m.set(short, p)
+      }
+    } else if (p.endsWith('省')) {
+      m.set(p.slice(0, -1), p)
+    } else if (p.endsWith('市')) {
+      m.set(p.slice(0, -1), p)
+    }
+  }
+  const extras = [
+    ['内蒙', '内蒙古自治区'],
+    ['广西省', '广西壮族自治区'],
+    ['新疆自治区', '新疆维吾尔自治区'],
+    ['中国香港', '香港特别行政区'],
+    ['中国澳门', '澳门特别行政区'],
+    ['中国台湾', '台湾省'],
+    ['台湾地区', '台湾省']
+  ]
+  for (const [alias, canonical] of extras) {
+    if (!m.has(alias)) {
+      m.set(alias, canonical)
+    }
+  }
+  return m
+}
+
+const PROVINCE_ALIAS_TO_CANONICAL = buildProvinceAliasToCanonical()
+
+/** 去掉字段里常见前缀噪音，便于匹配标准省名 */
+function stripProvinceFieldNoise(raw) {
+  return copyTextValue(raw)
+    .replace(/^(注册人|备案人|境内责任人|标称生产企业)[：:]\s*/, '')
+    .replace(/^(生产企业|生产地|产地)[：:]\s*/u, '')
+    .trim()
+}
+
+/**
+ * 将库内省份字符串归并为 STANDARD_CN_PROVINCES 中的标准全称；无法识别时返回去前缀后的原文。
+ */
+function normalizeProvinceToStandard(raw) {
+  const text = stripProvinceFieldNoise(raw)
+  if (!text) return ''
+  if (STANDARD_CN_PROVINCE_SET.has(text)) return text
+  const collapsed = text.replace(/\s+/g, '')
+  if (STANDARD_CN_PROVINCE_SET.has(collapsed)) return collapsed
+  const mapped = PROVINCE_ALIAS_TO_CANONICAL.get(text) || PROVINCE_ALIAS_TO_CANONICAL.get(collapsed)
+  if (mapped) return mapped
+  for (const p of STANDARD_CN_PROVINCES_BY_LENGTH) {
+    if (text.includes(p) || collapsed.includes(p)) {
+      return p
+    }
+  }
+  return text
+}
+
+function formatProvinceCityDisplay(provinceRaw, cityRaw) {
+  const p = normalizeProvinceToStandard(provinceRaw)
+  const c = copyTextValue(cityRaw)
+  const parts = [p, c].filter(Boolean)
+  return parts.length ? parts.join(' / ') : '-'
+}
+
+/** 省份筛选项：接口中的各类写法合并为标准全称，下拉 label/value 均为标准省名 */
+function mergeProvinceSelectOptions(items = []) {
+  const byCanon = new Map()
+  for (const item of items) {
+    const raw = copyTextValue(item?.value ?? item?.label ?? '')
+    if (!raw) continue
+    const canon = normalizeProvinceToStandard(raw)
+    if (!canon) continue
+    if (!byCanon.has(canon)) {
+      byCanon.set(canon, { value: canon, label: canon })
+    }
+  }
+  return Array.from(byCanon.values()).sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'))
+}
+
+/** 图表统计、文案等：省份统一为标准全称，合并「广东」「广东省」等写法 */
 function cleanProvinceLabel(raw) {
-  console.log(raw)
-  return copyTextValue(raw).replace(/^(注册人|备案人|境内责任人|标称生产企业)[：:]\s*/, '').trim()
+  return normalizeProvinceToStandard(raw)
 }
 
 function formatCopyList(items, max = 6) {
@@ -1563,7 +1713,13 @@ async function loadStats() {
 async function loadFilterOptions() {
   try {
     const res = await getUnqualifiedProductFilterOptions()
-    filterOptions.value = res.data || filterOptions.value
+    const data = res.data || {}
+    filterOptions.value = {
+      ...filterOptions.value,
+      ...data,
+      manufacturer_provinces: mergeProvinceSelectOptions(data.manufacturer_provinces),
+      sampled_provinces: mergeProvinceSelectOptions(data.sampled_provinces)
+    }
   } catch (error) {
     console.error('加载筛选项失败:', error)
   }

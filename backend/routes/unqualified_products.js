@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const {
+  normalizeProvinceToStandard,
+  appendProvinceColumnPredicate
+} = require('../utils/chinaProvinces');
 const { authenticate, requireRoles } = require('../utils/auth');
 const {
   ensureUnqualifiedProductsTable,
@@ -1142,18 +1146,29 @@ function appendUnqualifiedProductFilters(conditions, params, filters = {}) {
   }
 
   if (normalizedProvince) {
-    conditions.push('(up.manufacturer_province = ? OR up.sampled_province = ? OR up.province_display = ?)');
-    params.push(normalizedProvince, normalizedProvince, normalizedProvince);
+    const canonProvince = normalizeProvinceToStandard(normalizedProvince);
+    if (canonProvince) {
+      const mProv = appendProvinceColumnPredicate('up.manufacturer_province', canonProvince, params);
+      const sProv = appendProvinceColumnPredicate('up.sampled_province', canonProvince, params);
+      const pDisp = appendProvinceColumnPredicate('up.province_display', canonProvince, params);
+      conditions.push(`(${mProv} OR ${sProv} OR ${pDisp})`);
+    }
   }
 
-  if (normalizeOptionalText(filters.manufacturer_province)) {
-    conditions.push('up.manufacturer_province = ?');
-    params.push(normalizeOptionalText(filters.manufacturer_province));
+  const manufacturerProvinceFilter = normalizeOptionalText(filters.manufacturer_province);
+  if (manufacturerProvinceFilter) {
+    const canonM = normalizeProvinceToStandard(manufacturerProvinceFilter);
+    if (canonM) {
+      conditions.push(appendProvinceColumnPredicate('up.manufacturer_province', canonM, params));
+    }
   }
 
-  if (normalizeOptionalText(filters.sampled_province)) {
-    conditions.push('up.sampled_province = ?');
-    params.push(normalizeOptionalText(filters.sampled_province));
+  const sampledProvinceFilter = normalizeOptionalText(filters.sampled_province);
+  if (sampledProvinceFilter) {
+    const canonS = normalizeProvinceToStandard(sampledProvinceFilter);
+    if (canonS) {
+      conditions.push(appendProvinceColumnPredicate('up.sampled_province', canonS, params));
+    }
   }
 
   if (normalizedProductCategory) {
