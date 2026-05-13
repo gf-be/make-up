@@ -122,7 +122,7 @@
             <el-button v-if="row.source_detail_url" link type="primary" @click="openSourceUrl(row.source_detail_url)">查看网址</el-button>
             <el-button v-if="row.existing_batch_id" link type="primary" @click="goToStagingBatch(row.existing_batch_id)">定位批次</el-button>
             <el-button v-if="row.existing_announcement_id || row.existing_supervision_id" link type="success" @click="goToPublished(row)">查看正式稿</el-button>
-            <el-button v-if="row.handled_status !== 'resolved'" link type="warning" @click="handleResolveTraceback(row)">标记已处理</el-button>
+            <!-- <el-button v-if="row.handled_status !== 'resolved'" link type="warning" @click="handleResolveTraceback(row)">标记已处理</el-button> -->
             <el-button link type="danger" @click="handleDeleteTraceback(row)">删除</el-button>
           </div>
         </template>

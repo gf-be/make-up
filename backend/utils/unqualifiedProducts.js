@@ -4,6 +4,7 @@ const DEFAULT_PRODUCT_TYPE = 'cosmetics';
 const DEFAULT_ANNOUNCEMENT_TYPE = 'sampling';
 const {
   extractIssueItems,
+  COSMETICS_PRODUCT_CATEGORIES,
   buildDerivedAnalyticsFields
 } = require('./dataAnalysisHelpers');
 const {
@@ -447,6 +448,31 @@ function normalizeCategoryValue(value) {
   return normalized || '其他';
 }
 
+async function syncDefaultCosmeticsProductCategoryCatalog(connection) {
+  if (!COSMETICS_PRODUCT_CATEGORIES.length) return;
+
+  const keepPlaceholders = COSMETICS_PRODUCT_CATEGORIES.map(() => '?').join(', ');
+  await execQueryRetryDeadlock(
+    connection,
+    `
+    DELETE FROM unqualified_product_category_catalog
+    WHERE product_type = ?
+      AND category_name NOT IN (${keepPlaceholders})
+  `,
+    [DEFAULT_PRODUCT_TYPE, ...COSMETICS_PRODUCT_CATEGORIES]
+  );
+
+  const insertValues = COSMETICS_PRODUCT_CATEGORIES.map((category) => [DEFAULT_PRODUCT_TYPE, category]);
+  await execQueryRetryDeadlock(
+    connection,
+    `
+    INSERT IGNORE INTO unqualified_product_category_catalog (product_type, category_name)
+    VALUES ${insertValues.map(() => '(?, ?)').join(', ')}
+  `,
+    insertValues.flat()
+  );
+}
+
 async function ensureUnqualifiedProductCategoryItemsTable(connection) {
   await connection.query(`
     CREATE TABLE IF NOT EXISTS unqualified_product_category_items (
@@ -489,8 +515,10 @@ async function ensureUnqualifiedProductCategoryCatalogTable(connection) {
     SELECT DISTINCT up.product_type, TRIM(upci.product_category)
     FROM unqualified_product_category_items upci
     INNER JOIN unqualified_products up ON up.id = upci.unqualified_product_id
-    WHERE TRIM(upci.product_category) <> ''
-  `
+    WHERE up.product_type <> ?
+      AND TRIM(upci.product_category) <> ''
+  `,
+    [DEFAULT_PRODUCT_TYPE]
   );
 
   await execQueryRetryDeadlock(
@@ -499,9 +527,14 @@ async function ensureUnqualifiedProductCategoryCatalogTable(connection) {
     INSERT IGNORE INTO unqualified_product_category_catalog (product_type, category_name)
     SELECT DISTINCT up.product_type, TRIM(up.product_category)
     FROM unqualified_products up
-    WHERE up.product_category IS NOT NULL AND TRIM(up.product_category) <> ''
-  `
+    WHERE up.product_type <> ?
+      AND up.product_category IS NOT NULL
+      AND TRIM(up.product_category) <> ''
+  `,
+    [DEFAULT_PRODUCT_TYPE]
   );
+
+  await syncDefaultCosmeticsProductCategoryCatalog(connection);
 }
 
 /** 分类管理页：自定义产品类型（键值存入明细 product_type 时应与此一致） */

@@ -118,7 +118,8 @@
                   size="small"
                   class="company-master-block"
                 >
-                  <el-descriptions-item label="企业名称" :span="2">{{ detail.company.name || '-' }}</el-descriptions-item>
+                  <el-descriptions-item label="企业名称" >{{ detail.company.name || '-' }}</el-descriptions-item>
+                  <el-descriptions-item label="曾用名">{{ detail.company.previous_names || '-' }}</el-descriptions-item>
                   <el-descriptions-item label="统一社会信用代码" :span="2">
                     {{ detail.company.credit_code || '-' }}
                   </el-descriptions-item>
@@ -241,12 +242,7 @@
       class="credit-import-dialog"
       @closed="resetImportDialog"
     >
-      <div class="import-tips">
-        <strong>① 优先按统一社会信用代码匹配</strong>：库中已有该代码则视为同一家企业，<strong>不新建</strong>；若导入名称与库内不一致则<strong>不自动改名</strong>，将弹出确认框，确认后更新并记入名称沿革。<br />
-        <strong>② 代码未命中时按企业名称精确匹配</strong>：匹配到<strong>尚无信用代码</strong>的老企业则<strong>补上信用代码</strong>，不重复建档。<br />
-        <strong>③ 均未命中</strong>：按本行名称 + 代码<strong>新建企业</strong>。<br />
-        粘贴/表格列为「企业名称」+「信用代码」；亦可仅填信用代码（用于第①类命中后只同步名称或占位）。
-      </div>
+      
 
       <el-tabs v-model="importActiveTab" class="import-tabs">
         <el-tab-pane label="键值对粘贴" name="paste">
@@ -254,16 +250,14 @@
             v-model="pasteImportText"
             type="textarea"
             :rows="9"
-            placeholder="每行：企业名称 + Tab + 信用代码&#10;某化妆品有限公司	91110000MA0123456X&#10;亦可单独一行有效信用代码（名称留空）"
+            placeholder="企业名称,信用代码"
           />
           <div class="import-parse-row">
             <el-button size="small" type="primary" plain @click="parsePasteImport">解析预览</el-button>
           </div>
         </el-tab-pane>
         <el-tab-pane label="Excel" name="excel">
-          <p class="excel-hint">
-            推荐表头含「企业名称」与「统一社会信用代码」。仅一列信用代码时，按该列导入（名称空，走第①②步规则）。无表头时默认 A 列名称、B 列代码。
-          </p>
+         
           <input ref="excelInputRef" type="file" accept=".xlsx,.xls" class="hidden-file-input" @change="onExcelImportChange" />
           <el-button size="small" @click="triggerExcelPick">选择 Excel…</el-button>
         </el-tab-pane>
@@ -328,7 +322,7 @@
         </el-form>
       </template>
       <template #footer>
-        <el-button :disabled="existingCreditRenameSaving" @click="existingCreditRenameVisible = false">不修改</el-button>
+        <el-button :disabled="existingCreditRenameSaving" @click="existingCreditRenameVisible = false">直接导入</el-button>
         <el-button type="primary" :loading="existingCreditRenameSaving" @click="onExistingCreditRenameConfirm">
           保存名称
         </el-button>

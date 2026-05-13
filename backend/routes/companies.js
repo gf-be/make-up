@@ -76,6 +76,70 @@ function normalizeOptionalText(value) {
   return normalized || '';
 }
 
+async function getTableColumnMap(connection, tableName) {
+  const [columns] = await connection.query(`SHOW COLUMNS FROM ${tableName}`);
+  return new Map(columns.map((column) => [column.Field, column]));
+}
+
+function addHistoryValueIfColumn(columnMap, fields, values, fieldName, value) {
+  if (!columnMap.has(fieldName)) return;
+  fields.push(fieldName);
+  values.push(value);
+}
+
+async function insertCompanyNameHistory(connection, payload) {
+  const columnMap = await getTableColumnMap(connection, 'company_name_history');
+  const fields = [];
+  const values = [];
+  const {
+    companyId,
+    nameBefore,
+    newName,
+    creditCode,
+    targetCompanyId = companyId,
+    occupierCompanyId = companyId
+  } = payload;
+
+  addHistoryValueIfColumn(columnMap, fields, values, 'company_id', companyId);
+  addHistoryValueIfColumn(columnMap, fields, values, 'name_before', nameBefore);
+  addHistoryValueIfColumn(columnMap, fields, values, 'existing_credit_code', creditCode);
+  addHistoryValueIfColumn(columnMap, fields, values, 'attempted_credit_code', creditCode);
+
+  addHistoryValueIfColumn(columnMap, fields, values, 'target_company_id', targetCompanyId);
+  addHistoryValueIfColumn(columnMap, fields, values, 'target_name_before', nameBefore);
+  addHistoryValueIfColumn(columnMap, fields, values, 'import_match_name', newName);
+  addHistoryValueIfColumn(columnMap, fields, values, 'credit_code', creditCode);
+  addHistoryValueIfColumn(columnMap, fields, values, 'occupier_company_id', occupierCompanyId);
+  addHistoryValueIfColumn(columnMap, fields, values, 'occupier_name_before', nameBefore);
+  addHistoryValueIfColumn(columnMap, fields, values, 'chosen_name', newName);
+  addHistoryValueIfColumn(columnMap, fields, values, 'resolved_at', new Date());
+
+  const requiredMissing = [];
+  for (const [fieldName, column] of columnMap.entries()) {
+    if (
+      fieldName !== 'id' &&
+      fieldName !== 'created_at' &&
+      column.Null === 'NO' &&
+      column.Default === null &&
+      !String(column.Extra || '').includes('auto_increment') &&
+      !fields.includes(fieldName)
+    ) {
+      requiredMissing.push(fieldName);
+    }
+  }
+  if (requiredMissing.length) {
+    const error = new Error(`company_name_history 缺少必填字段映射：${requiredMissing.join(', ')}`);
+    error.statusCode = 500;
+    throw error;
+  }
+
+  const placeholders = fields.map(() => '?').join(', ');
+  await connection.query(
+    `INSERT INTO company_name_history (${fields.join(', ')}) VALUES (${placeholders})`,
+    values
+  );
+}
+
 function buildUnqualifiedCompanySourceSql() {
   return `
     SELECT
@@ -821,16 +885,27 @@ router.post('/confirm-import-name-change', requireCompanyManagers(), async (req,
         return res.json({ success: true, message: '名称未变化', data: { skipped: true } });
       }
 
+      const [nameConflictRows] = await conn.query(
+        'SELECT id, name FROM companies WHERE name = ? AND id != ? LIMIT 1',
+        [newName, companyId]
+      );
+      if (nameConflictRows.length) {
+        await conn.rollback();
+        return res.status(409).json({
+          success: false,
+          message: `企业名称已存在（ID: ${nameConflictRows[0].id}），不能重复写入`
+        });
+      }
+
       const codeNorm = normalizeCreditCodeValue(row.credit_code);
       const codeStr = codeNorm == null ? null : String(codeNorm);
 
-      await conn.query(
-        `
-        INSERT INTO company_name_history (company_id, name_before, existing_credit_code, attempted_credit_code)
-        VALUES (?, ?, ?, ?)
-      `,
-        [companyId, curName, codeStr, codeStr]
-      );
+      await insertCompanyNameHistory(conn, {
+        companyId,
+        nameBefore: curName,
+        newName,
+        creditCode: codeStr
+      });
 
       await conn.query('UPDATE companies SET name = ? WHERE id = ?', [newName, companyId]);
 
@@ -849,6 +924,9 @@ router.post('/confirm-import-name-change', requireCompanyManagers(), async (req,
       conn.release();
     }
   } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ success: false, message: '企业名称已存在，不能重复写入' });
+    }
     console.error('确认导入更名失败:', error);
     res.status(500).json({ success: false, message: '确认导入更名失败' });
   }
@@ -862,7 +940,21 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
 
     const [companyRows] = await pool.query(
-      'SELECT *, COALESCE(sampled_count, 0) AS sampled_count FROM companies WHERE id = ?',
+      `
+      SELECT
+        c.*,
+        COALESCE(c.sampled_count, 0) AS sampled_count,
+        (
+          SELECT GROUP_CONCAT(DISTINCT TRIM(h.name_before) ORDER BY h.created_at DESC)
+          FROM company_name_history h
+          WHERE h.company_id = c.id
+            AND h.name_before IS NOT NULL
+            AND TRIM(h.name_before) != ''
+            AND TRIM(h.name_before) != TRIM(c.name)
+        ) AS previous_names
+      FROM companies c
+      WHERE c.id = ?
+      `,
       [id]
     );
     if (companyRows.length === 0) {

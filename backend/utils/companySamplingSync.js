@@ -99,6 +99,15 @@ async function ensureCompaniesSamplingSchema(connection) {
       CONSTRAINT fk_company_name_history_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  await ensureColumnExists(connection, 'company_name_history', 'name_before', 'VARCHAR(200) NOT NULL AFTER company_id');
+  await ensureColumnExists(connection, 'company_name_history', 'existing_credit_code', 'VARCHAR(64) NULL AFTER name_before');
+  await ensureColumnExists(connection, 'company_name_history', 'attempted_credit_code', 'VARCHAR(64) NULL AFTER existing_credit_code');
+  await ensureIndexExists(
+    connection,
+    'company_name_history',
+    'idx_company_name_history_company',
+    'INDEX idx_company_name_history_company (company_id)'
+  );
 
 
   await connection.query(`

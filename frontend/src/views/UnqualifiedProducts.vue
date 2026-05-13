@@ -117,7 +117,7 @@
 
             <div class="tree-card-body-inner">
               <div class="tree-scroll-area">
-                <el-empty v-if="treeIsEmpty" description="暂无树形结果" />
+                <el-empty v-if="treeIsEmpty" description="暂无数据" />
 
                 <el-tree v-else-if="treeListFetched && treeRootCount > 0" :key="`dim-tree-${treeRerenderKey}`"
                   ref="treeRef" :data="treeData" lazy :load="loadTreeNode" :props="treeProps" node-key="key"
