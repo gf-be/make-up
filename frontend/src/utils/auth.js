@@ -9,9 +9,9 @@ export const ROLE_LABELS = {
 
 export const MODULE_PERMISSIONS = {
   system_admin: ['profile', 'admin-users'],
-  developer: ['home', 'unqualified-products', 'products-manage', 'pivot-analysis', 'sampling-search', 'announcement-staging', 'announcements', 'inspections', 'companies', 'companies-manage', 'category-manage', 'unqualified-companies', 'supervisions'],
+  developer: ['home', 'unqualified-products', 'products-manage', 'pivot-analysis', 'sampling-search', 'announcement-staging', 'announcements', 'announcements-manage', 'inspections', 'companies', 'companies-manage', 'category-manage', 'unqualified-companies', 'supervisions'],
   // data_admin: ['home', 'announcement-staging', 'announcements', 'companies', 'unqualified-companies'],
-  data_admin: ['announcement-staging', 'companies-manage', 'category-manage','announcements'],
+  data_admin: ['announcement-staging', 'companies-manage', 'category-manage','announcements-manage'],
   // normal_user: ['home', 'unqualified-products', 'inspections', 'companies','supervisions']
   normal_user: ['unqualified-products', 'companies']
 }
@@ -164,6 +164,7 @@ const MODULE_ROUTE_PATHS = {
   'sampling-search': '/sampling-search',
   'announcement-staging': '/announcement-staging',
   announcements: '/announcements',
+  'announcements-manage': '/announcements-manage',
   inspections: '/inspections',
   companies: '/companies',
   'companies-manage': '/companies-manage',
@@ -183,6 +184,7 @@ export function getRoleDefaultPath(role) {
     'home',
     'announcement-staging',
     'announcements',
+    'announcements-manage',
     'companies-manage',
     'products-manage',
     'unqualified-products',

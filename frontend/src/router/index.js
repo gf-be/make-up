@@ -41,6 +41,12 @@ const routes = [
     meta: { module: 'announcements' }
   },
   {
+    path: '/announcements-manage',
+    name: 'AnnouncementsManage',
+    component: () => import('../views/AnnouncementsManage.vue'),
+    meta: { module: 'announcements-manage' }
+  },
+  {
     path: '/announcement-staging',
     name: 'AnnouncementStaging',
     component: () => import('../views/AnnouncementStaging.vue'),
@@ -111,6 +117,12 @@ const routes = [
     path: '/unqualified-products',
     name: 'UnqualifiedProducts',
     component: () => import('../views/UnqualifiedProducts.vue'),
+    meta: { module: 'unqualified-products' }
+  },
+  {
+    path: '/unqualified-products/:id/usage',
+    name: 'UnqualifiedProductUsageRecords',
+    component: () => import('../views/UnqualifiedProductUsageRecords.vue'),
     meta: { module: 'unqualified-products' }
   },
   {

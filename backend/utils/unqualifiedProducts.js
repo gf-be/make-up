@@ -341,6 +341,70 @@ async function ensureColumn(connection, columnName, definition) {
   await ensureTableColumn(connection, 'unqualified_products', columnName, definition);
 }
 
+function normalizeUsageUserJsonValue(raw) {
+  if (raw == null || raw === '') {
+    return null;
+  }
+
+  if (Array.isArray(raw)) {
+    return raw;
+  }
+
+  if (typeof raw === 'object') {
+    return [raw];
+  }
+
+  const text = String(raw || '').trim();
+  if (!text) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+    if (parsed && typeof parsed === 'object') {
+      return [parsed];
+    }
+  } catch {
+    // Legacy plain-text values are migrated below into a JSON array.
+  }
+
+  return text
+    .split(/[;,；、\n]+/)
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => ({
+      username: name,
+      display_name: name,
+      saved_at: null
+    }));
+}
+
+async function ensureUsageUserJsonColumn(connection) {
+  await ensureColumn(
+    connection,
+    'usage_user',
+    "JSON NULL COMMENT '使用用户（保存文案时追加 JSON 记录：username/display_name/saved_at）' AFTER is_counterfeit"
+  );
+
+  const [rows] = await connection.query(
+    'SELECT id, usage_user FROM unqualified_products WHERE usage_user IS NOT NULL'
+  );
+  for (const row of rows) {
+    const normalized = normalizeUsageUserJsonValue(row.usage_user);
+    await connection.query('UPDATE unqualified_products SET usage_user = ? WHERE id = ?', [
+      normalized && normalized.length ? JSON.stringify(normalized) : null,
+      row.id
+    ]);
+  }
+
+  await connection.query(
+    "ALTER TABLE unqualified_products MODIFY COLUMN usage_user JSON NULL COMMENT '使用用户（保存文案时追加 JSON 记录：username/display_name/saved_at）' AFTER is_counterfeit"
+  );
+}
+
 async function ensureIndex(connection, tableName, indexName, definitionSql) {
   const [rows] = await connection.query(`SHOW INDEX FROM ${tableName} WHERE Key_name = ?`, [indexName]);
   if (rows.length === 0) {
@@ -441,6 +505,110 @@ async function ensureUnqualifiedProductCopyRecordsTable(connection) {
       'FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL'
     );
   }
+}
+
+async function ensureUnqualifiedProductUsageRecordsTable(connection) {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS unqualified_product_usage_records (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      unqualified_product_id INT NOT NULL,
+      user_id INT NULL,
+      username VARCHAR(191) NOT NULL DEFAULT '',
+      display_name VARCHAR(255) NULL,
+      use_count INT NOT NULL DEFAULT 0,
+      first_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_upur_product_username (unqualified_product_id, username),
+      INDEX idx_upur_product_last_used (unqualified_product_id, last_used_at),
+      INDEX idx_upur_user_id (user_id),
+      CONSTRAINT fk_upur_unqualified_product
+        FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await ensureTableColumn(connection, 'unqualified_product_usage_records', 'unqualified_product_id', 'INT NOT NULL AFTER id');
+  await ensureTableColumn(connection, 'unqualified_product_usage_records', 'user_id', 'INT NULL AFTER unqualified_product_id');
+  await ensureTableColumn(connection, 'unqualified_product_usage_records', 'username', "VARCHAR(191) NOT NULL DEFAULT '' AFTER user_id");
+  await ensureTableColumn(connection, 'unqualified_product_usage_records', 'display_name', 'VARCHAR(255) NULL AFTER username');
+  await ensureTableColumn(connection, 'unqualified_product_usage_records', 'use_count', 'INT NOT NULL DEFAULT 0 AFTER display_name');
+  await ensureTableColumn(connection, 'unqualified_product_usage_records', 'first_used_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER use_count');
+  await ensureTableColumn(connection, 'unqualified_product_usage_records', 'last_used_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER first_used_at');
+  await ensureTableColumn(connection, 'unqualified_product_usage_records', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER last_used_at');
+  await ensureTableColumn(connection, 'unqualified_product_usage_records', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at');
+
+  if (await tableExists(connection, 'users')) {
+    await ensureForeignKey(
+      connection,
+      'unqualified_product_usage_records',
+      'fk_upur_user',
+      'FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL'
+    );
+  }
+}
+
+async function ensureUnqualifiedProductUsageStatsTable(connection) {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS unqualified_product_usage_stats (
+      unqualified_product_id INT NOT NULL PRIMARY KEY,
+      total_usage_count INT NOT NULL DEFAULT 0,
+      user_count INT NOT NULL DEFAULT 0,
+      last_used_at DATETIME NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_upus_unqualified_product
+        FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  const [statCountRows] = await connection.query('SELECT COUNT(*) AS n FROM unqualified_product_usage_stats');
+  const [usageCountRows] = await connection.query('SELECT COUNT(*) AS n FROM unqualified_product_usage_records');
+  if (Number(statCountRows[0]?.n || 0) === 0 && Number(usageCountRows[0]?.n || 0) > 0) {
+    await backfillUnqualifiedProductUsageStats(connection);
+  }
+}
+
+async function backfillUnqualifiedProductUsageStats(connection) {
+  await connection.query(`
+    INSERT INTO unqualified_product_usage_stats (unqualified_product_id, total_usage_count, user_count, last_used_at)
+    SELECT
+      unqualified_product_id,
+      COALESCE(SUM(use_count), 0) AS total_usage_count,
+      COUNT(*) AS user_count,
+      MAX(last_used_at) AS last_used_at
+    FROM unqualified_product_usage_records
+    GROUP BY unqualified_product_id
+    ON DUPLICATE KEY UPDATE
+      total_usage_count = VALUES(total_usage_count),
+      user_count = VALUES(user_count),
+      last_used_at = VALUES(last_used_at)
+  `);
+}
+
+async function syncUnqualifiedProductUsageStatsForIds(connection, productIds = []) {
+  const ids = [...new Set((productIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+  if (!ids.length) {
+    return;
+  }
+  const placeholders = ids.map(() => '?').join(', ');
+  await connection.query(
+    `
+      INSERT INTO unqualified_product_usage_stats (unqualified_product_id, total_usage_count, user_count, last_used_at)
+      SELECT
+        upur.unqualified_product_id,
+        COALESCE(SUM(upur.use_count), 0) AS total_usage_count,
+        COUNT(*) AS user_count,
+        MAX(upur.last_used_at) AS last_used_at
+      FROM unqualified_product_usage_records upur
+      WHERE upur.unqualified_product_id IN (${placeholders})
+      GROUP BY upur.unqualified_product_id
+      ON DUPLICATE KEY UPDATE
+        total_usage_count = VALUES(total_usage_count),
+        user_count = VALUES(user_count),
+        last_used_at = VALUES(last_used_at)
+    `,
+    ids
+  );
 }
 
 function normalizeCategoryValue(value) {
@@ -623,6 +791,10 @@ async function backfillDerivedFields(connection) {
        OR sampled_province IS NULL
        OR sampled_city IS NULL
        OR issue_category IS NULL
+       OR manufacturer_province NOT REGEXP '(省|市|自治区|特别行政区|未标注)$'
+       OR sampled_province NOT REGEXP '(省|市|自治区|特别行政区|未标注)$'
+       OR manufacturer_city NOT REGEXP '(市|自治州|地区|盟|未标注)$'
+       OR sampled_city NOT REGEXP '(市|自治州|地区|盟|未标注)$'
     LIMIT 5000
   `);
 
@@ -1013,11 +1185,7 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'supervision_id', 'INT NULL AFTER announcement_detail_id');
   await ensureColumn(connection, 'supervision_detail_id', 'INT NULL AFTER supervision_id');
   await ensureColumn(connection, 'is_counterfeit', 'TINYINT(1) DEFAULT 0 AFTER supervision_detail_id');
-  await ensureColumn(
-    connection,
-    'usage_user',
-    "TEXT NULL COMMENT '使用用户（保存文案时追加 JSON 记录）' AFTER is_counterfeit"
-  );
+  await ensureUsageUserJsonColumn(connection);
   await ensureColumn(connection, 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
   await ensureColumn(connection, 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
 
@@ -1098,6 +1266,8 @@ async function ensureUnqualifiedProductsTable(connection) {
 
   await ensureUnqualifiedProductIssueItemsTable(connection);
   await ensureUnqualifiedProductCopyRecordsTable(connection);
+  await ensureUnqualifiedProductUsageRecordsTable(connection);
+  await ensureUnqualifiedProductUsageStatsTable(connection);
   await ensureUnqualifiedProductTreeRollupTable(connection);
   await backfillDerivedFields(connection);
   await backfillSearchHotFields(connection);
@@ -1466,6 +1636,7 @@ module.exports = {
   getProductTypeLabel,
   getAnnouncementTypeLabel,
   getProductTypeOptions,
-  getAnnouncementTypeOptions
+  getAnnouncementTypeOptions,
+  syncUnqualifiedProductUsageStatsForIds
 };
 

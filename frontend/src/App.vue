@@ -136,6 +136,7 @@ const menus = [
   { index: '/unqualified-products', key: 'unqualified-products', label: '产品文案', icon: 'Document' },
   { index: '/announcement-staging', key: 'announcement-staging', label: '数据导入', icon: 'DataAnalysis' },
   { index: '/announcements', key: 'announcements', label: '数据管理', icon: 'Bell' },
+  { index: '/announcements-manage', key: 'announcements-manage', label: '通告管理', icon: 'Bell' },
   // { index: '/inspections', key: 'inspections', label: '抽样检查', icon: 'Checked' },
   { index: '/companies', key: 'companies', label: '企业', icon: 'OfficeBuilding' },
   { index: '/companies-manage', key: 'companies-manage', label: '企业管理', icon: 'OfficeBuilding' },
@@ -160,6 +161,7 @@ const MODULE_LABELS = {
   'unqualified-products': '不合格产品',
   'announcement-staging': '导入检查',
   announcements: '抽检通告',
+  'announcements-manage': '通告管理',
   inspections: '抽样检查',
   companies: '企业管理',
   'companies-manage': '企业管理',
@@ -324,6 +326,7 @@ const activeMenu = computed(() => {
   if (route.path.startsWith('/admin/users')) return '/admin/users'
 
   if (route.path.startsWith('/home')) return '/home'
+  if (route.path.startsWith('/announcements-manage')) return '/announcements-manage'
   if (route.path.startsWith('/announcements')) return '/announcements'
   if (route.path.startsWith('/announcement-staging')) return '/announcement-staging'
 

@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const pool = require('../config/database');
 const {
@@ -15,7 +16,8 @@ const {
   getProductTypeOptions,
   getAnnouncementTypeOptions,
   normalizeProductType,
-  normalizeAnnouncementType
+  normalizeAnnouncementType,
+  syncUnqualifiedProductUsageStatsForIds
 } = require('../utils/unqualifiedProducts');
 
 /** 企业管理页同款：开发与数据管理员可操作 unqualified_products 主档（含无主档来源的记录） */
@@ -582,6 +584,7 @@ router.get('/manage/list', requireUnqualifiedProductManagers(), async (req, res)
       `
       SELECT ${getProductSelectSql('up')}
       FROM unqualified_products up
+      ${getProductUsageStatsJoinSql('up')}
       WHERE ${whereClause}
       ORDER BY up.id DESC
       LIMIT ? OFFSET ?
@@ -677,6 +680,7 @@ router.post('/manage', requireUnqualifiedProductManagers(), async (req, res) => 
     await connection.commit();
 
 
+    clearUnqualifiedProductTreeQueryCache();
     res.json({ success: true, data: { id: productId } });
 
   } catch (error) {
@@ -781,6 +785,7 @@ router.put('/manage/:id', requireUnqualifiedProductManagers(), async (req, res) 
     await connection.commit();
 
 
+    clearUnqualifiedProductTreeQueryCache();
     res.json({ success: true });
 
 
@@ -831,6 +836,7 @@ router.delete('/manage/:id', requireUnqualifiedProductManagers(), async (req, re
     if (!affected) {
       return res.status(404).json({ success: false, message: '记录不存在' });
     }
+    clearUnqualifiedProductTreeQueryCache();
     res.json({ success: true });
   } catch (error) {
     console.error('删除不合格产品失败:', error);
@@ -848,9 +854,12 @@ router.get('/manage/record/:id', requireUnqualifiedProductManagers(), async (req
         SELECT
           ${getProductSelectSql('up')},
           a.announcement_no,
+          a.content AS announcement_body,
           s.supervision_unit,
-          s.level AS supervision_level
+          s.level AS supervision_level,
+          s.content AS supervision_body
         FROM unqualified_products up
+        ${getProductUsageStatsJoinSql('up')}
         LEFT JOIN announcements a ON up.announcement_id = a.id
         LEFT JOIN supervisions s ON up.supervision_id = s.id
         WHERE up.id = ?
@@ -1019,8 +1028,80 @@ function buildOptionItems(rows = [], fieldName = 'value') {
     .map((value) => ({ label: value, value }));
 }
 
+/** 进程内只执行一次 schema 就绪检查，避免每个请求重复 SHOW/ALTER */
+let unqualifiedProductsReadyPromise = null;
 async function ensureUnqualifiedProductsReady() {
-  await ensureUnqualifiedProductsTable(pool);
+  if (!unqualifiedProductsReadyPromise) {
+    unqualifiedProductsReadyPromise = ensureUnqualifiedProductsTable(pool).catch((error) => {
+      unqualifiedProductsReadyPromise = null;
+      throw error;
+    });
+  }
+  return unqualifiedProductsReadyPromise;
+}
+
+const TREE_QUERY_CACHE_TTL_MS = 45_000;
+const treeQueryCache = new Map();
+
+function clearUnqualifiedProductTreeQueryCache() {
+  treeQueryCache.clear();
+}
+
+function pickTreeFilterSnapshot(filters = {}) {
+  const keys = [
+    'keyword',
+    'company_keyword',
+    'source_keyword',
+    'unqualified_item',
+    'issue_items',
+    'product_type',
+    'announcement_type',
+    'province',
+    'manufacturer_province',
+    'sampled_province',
+    'product_category',
+    'year',
+    'year_start',
+    'year_end',
+    'announcement_id',
+    'supervision_id',
+    'dimension_preset_id'
+  ];
+  const out = {};
+  keys.forEach((k) => {
+    const v = filters[k];
+    if (v !== undefined && v !== null && v !== '') {
+      out[k] = v;
+    }
+  });
+  return out;
+}
+
+function stableTreeCacheKey(filters, dimensions, parentPath, parentLabels) {
+  const payload = {
+    f: pickTreeFilterSnapshot(filters),
+    d: dimensions,
+    p: normalizeTreePath(parentPath),
+    l: parentLabels && typeof parentLabels === 'object' ? parentLabels : {}
+  };
+  const s = JSON.stringify(payload);
+  return crypto.createHash('sha256').update(s).digest('hex');
+}
+
+function getCachedTreeNodes(cacheKey) {
+  const entry = treeQueryCache.get(cacheKey);
+  if (!entry) {
+    return null;
+  }
+  if (Date.now() - entry.t > TREE_QUERY_CACHE_TTL_MS) {
+    treeQueryCache.delete(cacheKey);
+    return null;
+  }
+  return entry.v;
+}
+
+function setCachedTreeNodes(cacheKey, value) {
+  treeQueryCache.set(cacheKey, { t: Date.now(), v: value });
 }
 
 function buildIssueFilterClause(issueItems, params) {
@@ -1399,8 +1480,21 @@ function buildBaseFilterState(filters = {}) {
   };
 }
 
-function getProductOrderClause(alias = 'up') {
-  return `${alias}.source_publish_date DESC, COALESCE(${alias}.announcement_id, ${alias}.supervision_id) DESC, ${alias}.sequence_no ASC, ${alias}.id ASC`;
+function getProductOrderClause(alias = 'up', sort = {}) {
+  const defaultOrder = `${alias}.source_publish_date DESC, COALESCE(${alias}.announcement_id, ${alias}.supervision_id) DESC, ${alias}.sequence_no ASC, ${alias}.id ASC`;
+  const sortBy = normalizeOptionalText(sort.sort_by || sort.sortBy);
+  const sortOrder = normalizeOptionalText(sort.sort_order || sort.sortOrder).toLowerCase();
+  if (sortBy === 'usage_count' && ['asc', 'ascending', 'desc', 'descending'].includes(sortOrder)) {
+    const direction = sortOrder === 'asc' || sortOrder === 'ascending' ? 'ASC' : 'DESC';
+    return `usage_count ${direction}, ${defaultOrder}`;
+  }
+  return defaultOrder;
+}
+
+function getProductUsageStatsJoinSql(alias = 'up') {
+  return `
+    LEFT JOIN unqualified_product_usage_stats upus ON upus.unqualified_product_id = ${alias}.id
+  `;
 }
 
 function getProductSelectSql(alias = 'up') {
@@ -1410,6 +1504,7 @@ function getProductSelectSql(alias = 'up') {
     ${alias}.source_publish_date,
     ${alias}.source_title,
     ${alias}.company_id,
+    COALESCE(upus.total_usage_count, 0) AS usage_count,
     CASE
       WHEN ${alias}.announcement_id IS NOT NULL THEN 'announcement'
       WHEN ${alias}.supervision_id IS NOT NULL THEN 'supervision'
@@ -1501,6 +1596,12 @@ async function loadTreeNodesByPath(filters = {}, dimensions = DEFAULT_TREE_DIMEN
     return [];
   }
 
+  const treeCacheKey = stableTreeCacheKey(filters, dimensions, normalizedParentPath, parentLabels);
+  const cachedNodes = getCachedTreeNodes(treeCacheKey);
+  if (cachedNodes) {
+    return cachedNodes;
+  }
+
   const { whereClause, params } = buildBaseFilterState(filters);
   const queryParams = [...params];
   const parentConditions = [];
@@ -1549,7 +1650,9 @@ async function loadTreeNodesByPath(filters = {}, dimensions = DEFAULT_TREE_DIMEN
       return acc;
     }, {});
 
-  return (rows || []).map((row) => buildTreeNodeResponse(row, dimensions, normalizedParentPath, normalizedParentLabels, parentDepth + 1));
+  const mapped = (rows || []).map((row) => buildTreeNodeResponse(row, dimensions, normalizedParentPath, normalizedParentLabels, parentDepth + 1));
+  setCachedTreeNodes(treeCacheKey, mapped);
+  return mapped;
 }
 
 async function loadTreeSummary(filters = {}) {
@@ -2145,9 +2248,10 @@ async function handleUnqualifiedNodeDetails(req, res) {
         SELECT
           ${getProductSelectSql('up')}
         FROM unqualified_products up
+        ${getProductUsageStatsJoinSql('up')}
         WHERE ${whereClause}
           AND ${dataPathSql}
-        ORDER BY ${getProductOrderClause('up')}
+        ORDER BY ${getProductOrderClause('up', input)}
         LIMIT ? OFFSET ?
       `,
       [...dataParams, pageSize, offset]
@@ -2178,13 +2282,113 @@ async function handleUnqualifiedNodeDetails(req, res) {
 router.get('/node-details', handleUnqualifiedNodeDetails);
 router.post('/node-details', handleUnqualifiedNodeDetails);
 
+/** 节点详情统计图：服务端聚合，避免拉全量明细到浏览器 */
+const NODE_DETAIL_CHART_BUCKET_SQL = {
+  source_publish_date: "DATE_FORMAT(up.source_publish_date, '%Y-%m-%d')",
+  source_title: "NULLIF(TRIM(COALESCE(up.source_title, '')), '')",
+  product_name: 'NULLIF(TRIM(COALESCE(up.product_name, \'\')), \'\')',
+  manufacturer_name: 'NULLIF(TRIM(COALESCE(up.manufacturer_name, \'\')), \'\')',
+  operator_name: 'NULLIF(TRIM(COALESCE(up.operator_name, \'\')), \'\')',
+  manufacturer_province: 'NULLIF(TRIM(COALESCE(up.manufacturer_province, \'\')), \'\')',
+  manufacturer_city: 'NULLIF(TRIM(COALESCE(up.manufacturer_city, \'\')), \'\')',
+  sampled_province: 'NULLIF(TRIM(COALESCE(up.sampled_province, \'\')), \'\')',
+  sampled_city: 'NULLIF(TRIM(COALESCE(up.sampled_city, \'\')), \'\')',
+  unqualified_items: 'SUBSTRING(NULLIF(TRIM(COALESCE(up.unqualified_items, \'\')), \'\'), 1, 255)',
+  product_type_label: 'NULLIF(TRIM(COALESCE(up.product_type, \'\')), \'\')',
+  announcement_type_label: 'NULLIF(TRIM(COALESCE(up.announcement_type, \'\')), \'\')',
+  product_category: 'NULLIF(TRIM(COALESCE(up.product_category, \'\')), \'\')',
+  issue_category: 'NULLIF(TRIM(COALESCE(up.issue_category, \'\')), \'\')'
+};
+
+function mergeNodeDetailChartBuckets(rows, dimensionKey) {
+  const provinceDims = new Set(['manufacturer_province', 'sampled_province', 'province']);
+  const map = new Map();
+  for (const row of rows || []) {
+    let raw = row.bucket;
+    let label;
+    if (raw == null || raw === '') {
+      label = '(空)';
+    } else {
+      label = String(raw).trim() || '(空)';
+    }
+    if (dimensionKey === 'product_type_label') {
+      label = getProductTypeLabel(String(raw || '').trim() || 'cosmetics');
+    } else if (dimensionKey === 'announcement_type_label') {
+      label = getAnnouncementTypeLabel(String(raw || '').trim() || 'sampling');
+    } else if (provinceDims.has(dimensionKey)) {
+      const canon = normalizeProvinceToStandard(label);
+      label = canon && canon !== '' ? canon : (label || '(空)');
+    }
+    if (!label) {
+      label = '(空)';
+    }
+    const cnt = Number(row.cnt || 0);
+    map.set(label, (map.get(label) || 0) + cnt);
+  }
+  return [...map.entries()].map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+async function handleNodeDetailChart(req, res) {
+  try {
+    await ensureUnqualifiedProductsReady();
+
+    const input = { ...req.query, ...req.body };
+    const dimensionKey = normalizeOptionalText(input.chart_dimension || input.dimension);
+    const bucketExpr = NODE_DETAIL_CHART_BUCKET_SQL[dimensionKey];
+    if (!bucketExpr) {
+      return res.status(400).json({ success: false, message: '无效的统计字段' });
+    }
+
+    const selectedPaths = compactTreePaths(parseTreePaths(input));
+    if (!selectedPaths.length) {
+      return res.json({ success: true, data: [], chart_dimension: dimensionKey });
+    }
+
+    const { whereClause, params } = buildBaseFilterState(input);
+    const queryParams = [...params];
+    const pathSql = buildPathExistsSql(selectedPaths, queryParams, 'up');
+
+    const [aggRows] = await pool.query(
+      `
+        SELECT (${bucketExpr}) AS bucket, COUNT(*) AS cnt
+        FROM unqualified_products up
+        WHERE ${whereClause}
+          AND ${pathSql}
+        GROUP BY (${bucketExpr})
+        ORDER BY cnt DESC
+        LIMIT 500
+      `,
+      queryParams
+    );
+
+    const data = mergeNodeDetailChartBuckets(aggRows, dimensionKey);
+    res.json({
+      success: true,
+      data,
+      chart_dimension: dimensionKey
+    });
+  } catch (error) {
+    console.error('节点详情统计图聚合失败:', error);
+    res.status(500).json({ success: false, message: '节点详情统计图聚合失败' });
+  }
+}
+
+router.post('/node-detail-chart', handleNodeDetailChart);
+
 function mergeUsageUserJson(currentJson, entry) {
   let arr = [];
   try {
-    if (currentJson) {
+    if (Array.isArray(currentJson)) {
+      arr = currentJson;
+    } else if (currentJson && typeof currentJson === 'object') {
+      arr = [currentJson];
+    } else if (currentJson) {
       const parsed = JSON.parse(currentJson);
       if (Array.isArray(parsed)) {
         arr = parsed;
+      } else if (parsed && typeof parsed === 'object') {
+        arr = [parsed];
       }
     }
   } catch {
@@ -2272,7 +2476,22 @@ router.post('/save-copy-text', authenticate, async (req, res) => {
             merged,
             row.id
           ]);
+          await connection.query(
+            `
+              INSERT INTO unqualified_product_usage_records (
+                unqualified_product_id, user_id, username, display_name,
+                use_count, first_used_at, last_used_at
+              ) VALUES (?, ?, ?, ?, 1, NOW(), NOW())
+              ON DUPLICATE KEY UPDATE
+                user_id = VALUES(user_id),
+                display_name = VALUES(display_name),
+                use_count = use_count + 1,
+                last_used_at = VALUES(last_used_at)
+            `,
+            [row.id, user.id ?? null, entry.username, entry.display_name]
+          );
         }
+        await syncUnqualifiedProductUsageStatsForIds(connection, ids);
       }
 
       await connection.commit();
@@ -2293,6 +2512,86 @@ router.post('/save-copy-text', authenticate, async (req, res) => {
   }
 });
 
+router.get('/:id/usage-records', async (req, res) => {
+  try {
+    await ensureUnqualifiedProductsReady();
+
+    const productId = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(productId) || productId <= 0) {
+      return res.status(400).json({ success: false, message: '产品明细 id 无效' });
+    }
+
+    const currentPage = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+    const pageSize = clampPageSize(req.query.limit || 20);
+    const offset = (currentPage - 1) * pageSize;
+
+    const [[productRows], [summaryRows], [countRows], [records]] = await Promise.all([
+      pool.query(
+        `
+          SELECT id, product_name, manufacturer_name, company_names, source_title
+          FROM unqualified_products
+          WHERE id = ?
+          LIMIT 1
+        `,
+        [productId]
+      ),
+      pool.query(
+        `
+          SELECT COALESCE(SUM(use_count), 0) AS total_usage_count, COUNT(*) AS user_count
+          FROM unqualified_product_usage_records
+          WHERE unqualified_product_id = ?
+        `,
+        [productId]
+      ),
+      pool.query(
+        `
+          SELECT COUNT(*) AS total
+          FROM unqualified_product_usage_records
+          WHERE unqualified_product_id = ?
+        `,
+        [productId]
+      ),
+      pool.query(
+        `
+          SELECT
+            id, unqualified_product_id, user_id, username, display_name,
+            use_count, first_used_at, last_used_at, created_at, updated_at
+          FROM unqualified_product_usage_records
+          WHERE unqualified_product_id = ?
+          ORDER BY last_used_at DESC, id DESC
+          LIMIT ? OFFSET ?
+        `,
+        [productId, pageSize, offset]
+      )
+    ]);
+
+    const product = productRows[0] || null;
+    if (!product) {
+      return res.status(404).json({ success: false, message: '问题产品不存在' });
+    }
+
+    const total = Number(countRows[0]?.total || 0);
+    res.json({
+      success: true,
+      data: records,
+      product,
+      summary: {
+        total_usage_count: Number(summaryRows[0]?.total_usage_count || 0),
+        user_count: Number(summaryRows[0]?.user_count || 0)
+      },
+      pagination: {
+        total,
+        page: currentPage,
+        limit: pageSize,
+        pages: Math.ceil(total / pageSize)
+      }
+    });
+  } catch (error) {
+    console.error('获取产品使用记录失败:', error);
+    res.status(500).json({ success: false, message: '获取产品使用记录失败' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     await ensureUnqualifiedProductsReady();
@@ -2303,9 +2602,12 @@ router.get('/:id', async (req, res) => {
         SELECT
           ${getProductSelectSql('up')},
           a.announcement_no,
+          a.content AS announcement_body,
           s.supervision_unit,
-          s.level AS supervision_level
+          s.level AS supervision_level,
+          s.content AS supervision_body
         FROM unqualified_products up
+        ${getProductUsageStatsJoinSql('up')}
         LEFT JOIN announcements a ON up.announcement_id = a.id
         LEFT JOIN supervisions s ON up.supervision_id = s.id
         WHERE up.id = ?
@@ -2413,6 +2715,7 @@ router.get('/', async (req, res) => {
         SELECT
           ${getProductSelectSql('up')}
         FROM unqualified_products up
+        ${getProductUsageStatsJoinSql('up')}
         WHERE ${whereClause}
         ORDER BY ${getProductOrderClause('up')}
         LIMIT ? OFFSET ?

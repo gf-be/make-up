@@ -97,6 +97,8 @@
 
                 </div>
                 <div class="panel-header-actions">
+                  <el-button size="small" :disabled="!treeCanSelectAll" @click="selectAllTreeNodes" type="primary" link>全选</el-button>
+                  <el-button size="small" :disabled="!treeHasCheckedNodes" @click="clearTreeSelection" type="info" link>清空</el-button>
                   <el-button size="small" type="primary" @click="openCategorySettingDialog">设置</el-button>
                   <el-select v-model="themePresetSelectValue" class="theme-preset-select" placeholder="方案主题" clearable
                     filterable size="small" :disabled="!themePresetDropdownEnabled"
@@ -117,13 +119,16 @@
 
             <div class="tree-card-body-inner">
               <div class="tree-scroll-area">
+                
                 <el-empty v-if="treeIsEmpty" description="暂无数据" />
-
+                
                 <el-tree v-else-if="treeListFetched && treeRootCount > 0" :key="`dim-tree-${treeRerenderKey}`"
                   ref="treeRef" :data="treeData" lazy :load="loadTreeNode" :props="treeProps" node-key="key"
                   show-checkbox check-strictly highlight-current :expand-on-click-node="false"
                   @node-click="handleTreeNodeClick" @check="handleTreeCheck">
+                  
                   <template #default="{ node, data }">
+                    
                     <div class="tree-node" @click.stop="onTreeRowContentClick(node, data, $event)">
                       <div class="tree-node-main">
                         <span class="tree-node-label">{{ data.label }}</span>
@@ -163,7 +168,8 @@
             <el-empty v-if="!currentNode" description="请选择左侧树节点查看详情" />
             <template v-else class="unqualified-product-detail-table">
               <el-table ref="detailTableRef" :data="tableData" row-key="id" stripe border v-loading="tableLoading"
-                max-height="1080" @selection-change="onDetailTableSelectionChange" class="table-height ">
+                max-height="1080" @selection-change="onDetailTableSelectionChange" @sort-change="handleDetailSortChange"
+                class="table-height ">
                 <el-table-column type="expand" width="50">
                   <template #default="{ row }">
                     <el-descriptions :column="2" border>
@@ -211,9 +217,6 @@
                   </template>
                 </el-table-column>
                 <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="160" show-overflow-tooltip />
-                <el-table-column prop="usage_user" label="使用记录" min-width="160" show-overflow-tooltip>
-                  <template #default="{ row }">{{ formatUsageUsernamesDisplay(row.usage_user) }}</template>
-                </el-table-column>
                 <el-table-column prop="manufacturer_name" label="生产企业" min-width="220" show-overflow-tooltip>
                   <template #default="{ row }">
                     <span class="manufacturer-nav-cell" :class="{ 'manufacturer-nav-cell--link': row.company_id }"
@@ -222,6 +225,15 @@
                         || '-' }}</span>
                   </template>
                 </el-table-column>
+                <el-table-column prop="usage_count" label="使用次数"  sortable="custom"
+                  :sort-orders="['descending', 'ascending', null]" min-width="110">
+                  <template #default="{ row }">
+                    <span class="usage-count-cell" title="双击查看使用情况" @dblclick="goUsageRecords(row.id)">
+                      {{ formatUsageCount(row) }}
+                    </span>
+                  </template>
+                </el-table-column>
+                
               </el-table>
 
               <el-pagination :page-size="pagination.limit" :current-page="pagination.page" :total="pagination.total"
@@ -250,7 +262,7 @@
             重新加载
           </el-button>
           <span class="detail-chart-hint">
-            包含 {{ detailChartAllRows.length }} 条内容
+            当前范围共 {{ pagination.total || 0 }} 条（图表由服务端聚合）
           </span>
         </div>
         <div ref="detailChartRef" class="detail-chart-canvas detail-chart-canvas--dialog" />
@@ -283,7 +295,7 @@
           <div class="pivot-panel pivot-panel--pool">
             <div class="pivot-panel-head">
               <span class="pivot-panel-title">可选字段</span>
-              <span class="pivot-panel-hint">拖到右侧「行标签」加入层级</span>
+              <span class="pivot-panel-hint">可拖到右侧加入层级</span>
             </div>
             <div class="pivot-fields-pool">
               <div v-for="item in poolDimensions" :key="`pool-${item.key}`" class="pivot-field-chip" draggable="true"
@@ -299,7 +311,7 @@
 
           <div class="pivot-panel pivot-panel--rows">
             <div class="pivot-panel-head">
-              <span class="pivot-panel-title">行标签（最多5级）</span>
+              <span class="pivot-panel-title">（最多5层）</span>
               <el-button type="danger" size="small" @click="resetHierarchy">清空</el-button>
             </div>
             <div class="pivot-rows-drop" :class="{ 'is-drag-over': rowDropZoneActive }"
@@ -362,6 +374,7 @@ import {
   getUnqualifiedProductFilterOptions,
   getUnqualifiedProductCheckedTreeNodes,
   getUnqualifiedProductNodeDetails,
+  getUnqualifiedProductNodeDetailChart,
   getUnqualifiedProductStats,
   getUnqualifiedProductTree,
   getUnqualifiedProductTreeChildren,
@@ -426,8 +439,8 @@ const detailChartDialogVisible = ref(false)
 const detailChartType = ref('pie')
 const detailChartDimension = ref('manufacturer_province')
 const detailChartRef = ref(null)
-/** 图表统计：与导出一致，为当前 path + 筛选下的全部分页明细 */
-const detailChartAllRows = ref([])
+/** 图表统计：服务端聚合后的分桶数据 */
+const detailChartBuckets = ref([])
 const detailChartDataLoading = ref(false)
 let detailChartInstance = null
 const videoCopyDialogVisible = ref(false)
@@ -444,33 +457,6 @@ function formatDate(dateStr) {
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
-}
-function formatDetailChartCategoryValue(raw) {
-  if (raw == null || raw === '') return '(空)'
-  if (typeof raw === 'object') {
-    try {
-      return JSON.stringify(raw)
-    } catch {
-      return String(raw)
-    }
-  }
-  const s = String(raw).trim()
-  return s || '(空)'
-}
-
-function aggregateDetailTableForChart(rows, dimensionKey) {
-  const map = new Map()
-  const provinceKeys = new Set(['manufacturer_province', 'sampled_province', 'province'])
-  for (const row of rows || []) {
-    let raw = row?.[dimensionKey]
-    if (provinceKeys.has(dimensionKey)) {
-      const n = normalizeProvinceToStandard(raw)
-      raw = n !== '' ? n : raw
-    }
-    const label = formatDetailChartCategoryValue(raw)
-    map.set(label, (map.get(label) || 0) + 1)
-  }
-  return [...map.entries()].map(([name, value]) => ({ name, value }))
 }
 
 const DETAIL_CHART_MAX_CATEGORIES = 24
@@ -503,14 +489,23 @@ function resizeDetailChart() {
 }
 
 function buildDetailChartOption() {
-  const rows = detailChartAllRows.value || []
   const dimensionKey = detailChartDimension.value
   const type = detailChartType.value
-  let items = aggregateDetailTableForChart(rows, dimensionKey)
+  let items = (detailChartBuckets.value || []).length
+    ? sortDetailChartItems([...detailChartBuckets.value], dimensionKey)
+    : []
+  if (!items.length) {
+    return {
+      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: '#909399', fontSize: 14 } },
+      xAxis: { show: false },
+      yAxis: { show: false },
+      series: []
+    }
+  }
   if (type === 'pie') {
-    items = trimChartCategories(sortDetailChartItems(items, dimensionKey))
+    items = trimChartCategories(items)
   } else {
-    items = sortDetailChartItems(items, dimensionKey).slice(0, DETAIL_CHART_MAX_CATEGORIES)
+    items = items.slice(0, DETAIL_CHART_MAX_CATEGORIES)
   }
   const names = items.map((x) => x.name)
   const values = items.map((x) => x.value)
@@ -629,8 +624,31 @@ const pagination = ref({
   limit: 10,
   total: 0
 })
+const detailSort = ref({
+  prop: '',
+  order: ''
+})
 let treeRequestController = null
 let detailRequestController = null
+const nodeDetailInflight = new Map()
+let loadNodeDetailsDebounceTimer = null
+
+function getNodeDetailRequestSignature(pathsPayload) {
+  return JSON.stringify({
+    paths: pathsPayload,
+    q: { ...buildTreeRequestParams(), ...buildDetailSortParams() },
+    page: pagination.value.page,
+    limit: pagination.value.limit
+  })
+}
+
+function scheduleLoadNodeDetailsDebounced() {
+  window.clearTimeout(loadNodeDetailsDebounceTimer)
+  loadNodeDetailsDebounceTimer = window.setTimeout(() => {
+    loadNodeDetailsDebounceTimer = null
+    void loadNodeDetails()
+  }, 120)
+}
 
 function clearTreeReloadTimer() {
   if (treeReloadTimer.value) {
@@ -658,6 +676,9 @@ function isAbortError(error) {
 }
 
 const treeIsEmpty = computed(() => treeListFetched.value && treeRootCount.value === 0)
+const treeCanSelectAll = computed(() => treeListFetched.value && pendingRootNodes.value.length > 0)
+const treeCheckedKeyCount = ref(0)
+const treeHasCheckedNodes = computed(() => treeCheckedKeyCount.value > 0)
 
 const dimensionLabelMap = computed(() => {
   const map = {}
@@ -1063,12 +1084,16 @@ function resetDimensionDraft() {
 
 function buildTreeRequestParams() {
   const base = buildBaseParams()
-  return {
+  const out = {
     ...base,
     year_start: String(base.year_start ?? '').trim(),
     year_end: String(base.year_end ?? '').trim(),
     dimension_order: JSON.stringify(dimensionOrder.value)
   }
+  if (themePresetSelectValue.value != null && themePresetSelectValue.value !== '') {
+    out.dimension_preset_id = themePresetSelectValue.value
+  }
+  return out
 }
 
 function buildTreeChildrenRequestParams(parentPath = {}, parentLabels = {}) {
@@ -1076,6 +1101,17 @@ function buildTreeChildrenRequestParams(parentPath = {}, parentLabels = {}) {
     ...buildTreeRequestParams(),
     parent_path: JSON.stringify(parentPath || {}),
     parent_labels: JSON.stringify(parentLabels || {})
+  }
+}
+
+function buildDetailSortParams() {
+  if (detailSort.value.prop !== 'usage_count' || !detailSort.value.order) {
+    return {}
+  }
+
+  return {
+    sort_by: 'usage_count',
+    sort_order: detailSort.value.order === 'ascending' ? 'asc' : 'desc'
   }
 }
 
@@ -1332,9 +1368,31 @@ function normalizeProvinceToStandard(raw) {
 
 function formatProvinceCityDisplay(provinceRaw, cityRaw) {
   const p = normalizeProvinceToStandard(provinceRaw)
-  const c = copyTextValue(cityRaw)
+  const c = normalizeCityToStandard(cityRaw)
   const parts = [p, c].filter(Boolean)
   return parts.length ? parts.join(' / ') : '-'
+}
+
+function normalizeCityToStandard(raw) {
+  const text = copyTextValue(raw)
+  if (!text || text === '未标注' || text === '未标注城市') return ''
+  if (['北京市', '天津市', '上海市', '重庆市'].includes(text)) return text
+  const match = text.match(/([\u4e00-\u9fa5]{2,20}?(?:市|自治州|地区|盟))/)
+  if (match) return match[1]
+  if (/^[\u4e00-\u9fa5]{2,20}$/.test(text)) return `${text}市`
+  return text
+}
+
+function normalizeTreeRegionLabel(item = {}) {
+  const dimension = item.dimension
+  const raw = item.label ?? item.value
+  if (['province', 'manufacturer_province', 'sampled_province'].includes(dimension)) {
+    return normalizeProvinceToStandard(raw) || copyTextValue(raw)
+  }
+  if (['manufacturer_city', 'sampled_city'].includes(dimension)) {
+    return normalizeCityToStandard(raw) || copyTextValue(raw)
+  }
+  return item.label
 }
 
 /** 省份筛选项：接口中的各类写法合并为标准全称，下拉 label/value 均为标准省名 */
@@ -1364,27 +1422,60 @@ function formatCopyList(items, max = 6) {
   return list.length > max ? `${head}等` : head
 }
 
-/** usage_user：后端 JSON 数组 [{ username, display_name, saved_at }] → 去重后的用户名，中文分号分隔 */
-function formatUsageUsernamesDisplay(raw) {
-  if (raw == null || raw === '') return '-'
+function getUsageUserRecords(raw) {
+  if (raw == null || raw === '') return []
   let parsed = raw
   if (typeof raw === 'string') {
     try {
       parsed = JSON.parse(raw)
     } catch {
-      return '-'
+      return []
     }
   }
-  if (!Array.isArray(parsed) || !parsed.length) return '-'
+  if (!Array.isArray(parsed) || !parsed.length) return []
+  return parsed
+    .map((item) => ({
+      username: String(item?.username || '').trim(),
+      display_name: String(item?.display_name || item?.username || '').trim(),
+      saved_at: item?.saved_at || ''
+    }))
+    .filter((item) => item.username)
+}
+
+/** usage_user：后端 JSON 数组 [{ username, display_name, saved_at }] → 去重后的用户名，中文分号分隔 */
+function formatUsageUsernamesDisplay(raw) {
+  const records = getUsageUserRecords(raw)
+  if (!records.length) return '-'
   const seen = new Set()
   const names = []
-  for (const item of parsed) {
-    const u = item && typeof item.username === 'string' ? item.username.trim() : ''
+  for (const item of records) {
+    const u = item.username
     if (!u || seen.has(u)) continue
     seen.add(u)
-    names.push(u)
+    names.push(item.display_name || u)
   }
   return names.length ? names.join('；') : '-'
+}
+
+function formatUsageSavedAt(value) {
+  if (!value) return '时间未记录'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  const s = String(date.getSeconds()).padStart(2, '0')
+  return `${y}-${m}-${d} ${h}:${min}:${s}`
+}
+
+function formatUsageCount(row) {
+  const count = Number(row?.usage_count ?? 0)
+  if (Number.isFinite(count) && count > 0) {
+    return count
+  }
+  return getUsageUserRecords(row?.usage_user).length || 0
 }
 
 function topProvincePhrase(rows, maxShow = 5) {
@@ -1515,19 +1606,22 @@ function pickVideoCopyRows(rows, maxN = VIDEO_COPY_PRODUCT_LIMIT) {
 
 function buildVideoProductLine(row) {
   const product = copyTextValue(row?.product_name)
+  console.log(row)
   const producer = extractProducerForVoice(row?.manufacturer_name || row?.company_names)
+  const sales = extractProducerForVoice(row?.operator_name || row?.manufacturer_name)
   const region = regionForSampling(row?.operator_address)
     || regionForSampling(row?.sample_unit_address)
     || regionForSampling(row?.sampled_province)
     || cleanProvinceLabel(row?.product_region)
   const issues = issuesForVoice(row?.unqualified_items)
 
-  const head = producer && product
-    ? `由${producer}生产的${product}`
+  const head = producer && product && sales
+    ? `由${producer}生产，${sales}经销的${product}`
     : (product || (producer ? `${producer}相关批次产品` : '有关产品'))
-  const middle = region ? `在${region}抽检时` : '在通报所列抽检环节中'
+  // const middle = region ? `在${region}抽检时` : '在通报所列抽检环节中'
+  // const middle = sales ? `${sales}经销的` : '在通报所列抽检环节中'
   const tail = issues ? `检出${issues}不符合要求` : '检出情况见通报原文'
-  return `${head}，${middle}，${tail}。`
+  return `${head}，${tail}。`
 }
 
 function getVideoCopyProductLineRows(rows, fromTableSelection) {
@@ -1687,6 +1781,7 @@ async function saveVideoCopyText() {
       range_label: buildCurrentRangeLabel()
     })
     ElMessage.success('保存成功')
+    await loadNodeDetails()
   } catch {
     /* request 拦截器已提示 */
   } finally {
@@ -1738,8 +1833,14 @@ function flattenTreeNodes(nodes = []) {
 
 function mapTreeItemFromApi(item) {
   if (!item) return item
+  const label = normalizeTreeRegionLabel(item)
+  const pathLabels = item.path_labels && typeof item.path_labels === 'object'
+    ? { ...item.path_labels, [item.dimension]: label }
+    : item.path_labels
   return {
     ...item,
+    label,
+    path_labels: pathLabels,
     is_leaf: Boolean(item.is_leaf)
   }
 }
@@ -1765,6 +1866,7 @@ function syncCheckedKeysAfterLazyChildrenLoaded(parentData, childrenList) {
   syncingTreeCheckCascade.value = true
   try {
     tree.setCheckedKeys([...checked])
+    syncTreeCheckedKeyCount()
   } finally {
     nextTick(() => {
       syncingTreeCheckCascade.value = false
@@ -1790,6 +1892,7 @@ function loadTreeNode(node, resolve) {
       currentNodeKey.value = initial.key
       treeRef.value?.setCurrentKey(initial.key)
       treeRef.value?.setCheckedKeys([])
+      syncTreeCheckedKeyCount()
       pagination.value.page = 1
       await loadNodeDetails()
     })
@@ -1879,6 +1982,7 @@ async function loadTree() {
     console.error('加载树形数据失败:', error)
     pendingRootNodes.value = []
     treeRootCount.value = 0
+    treeCheckedKeyCount.value = 0
     treeRerenderKey.value += 1
     currentNode.value = null
     currentNodeKey.value = ''
@@ -1920,6 +2024,7 @@ async function fetchAllNodeDetailRows(pathsPayload, initialTotal = null) {
   while (allRows.length < total) {
     const res = await getUnqualifiedProductNodeDetails({
       ...buildTreeRequestParams(),
+      ...buildDetailSortParams(),
       page,
       limit: pageSize,
       paths: pathsPayload
@@ -1942,7 +2047,7 @@ async function refreshDetailChartFullData() {
   if (!detailChartDialogVisible.value) return
   const pathsPayload = getNodeDetailsPathsPayload()
   if (!pathsPayload.length || !(pagination.value.total > 0)) {
-    detailChartAllRows.value = []
+    detailChartBuckets.value = []
     detailChartDataLoading.value = false
     await nextTick()
     if (detailChartDialogVisible.value) {
@@ -1953,20 +2058,24 @@ async function refreshDetailChartFullData() {
   }
   detailChartDataLoading.value = true
   try {
-    const rows = await fetchAllNodeDetailRows(pathsPayload)
+    const res = await getUnqualifiedProductNodeDetailChart({
+      ...buildTreeRequestParams(),
+      paths: pathsPayload,
+      chart_dimension: detailChartDimension.value
+    })
     if (!detailChartDialogVisible.value) {
-      detailChartAllRows.value = []
+      detailChartBuckets.value = []
       return
     }
-    detailChartAllRows.value = rows
+    detailChartBuckets.value = res.data || []
   } catch (e) {
-    console.error('加载图表全量明细失败:', e)
+    console.error('加载图表聚合数据失败:', e)
     ElMessage.error(e?.message || '加载图表数据失败')
-    detailChartAllRows.value = []
+    detailChartBuckets.value = []
   } finally {
     detailChartDataLoading.value = false
     if (!detailChartDialogVisible.value) {
-      detailChartAllRows.value = []
+      detailChartBuckets.value = []
       return
     }
     await nextTick()
@@ -1981,11 +2090,20 @@ async function onDetailChartDialogOpened() {
 
 function onDetailChartDialogClosed() {
   disposeDetailChart()
-  detailChartAllRows.value = []
+  detailChartBuckets.value = []
 }
 
 watch(
-  [detailChartDialogVisible, detailChartType, detailChartDimension],
+  () => detailChartDimension.value,
+  () => {
+    if (detailChartDialogVisible.value) {
+      void refreshDetailChartFullData()
+    }
+  }
+)
+
+watch(
+  () => detailChartType.value,
   () => {
     nextTick(() => {
       if (!detailChartDialogVisible.value) {
@@ -1994,15 +2112,14 @@ watch(
       updateDetailChart()
       resizeDetailChart()
     })
-  },
-  { deep: true }
+  }
 )
 
 watch(
   () => pagination.value.total,
   () => {
     if (detailChartDialogVisible.value) {
-      refreshDetailChartFullData()
+      void refreshDetailChartFullData()
     }
   }
 )
@@ -2354,43 +2471,57 @@ async function loadNodeDetails() {
     return
   }
 
-  const scopeKey = getDetailTableSelectionScopeKey(pathsPayload)
-  if (scopeKey !== detailTableSelectionScopeKey.value) {
-    detailTableSelectedIds.value = new Set()
-    detailTableSelectionScopeKey.value = scopeKey
-    nextTick(() => {
-      detailTableRef.value?.clearSelection?.()
-    })
+  const reqSig = getNodeDetailRequestSignature(pathsPayload)
+  if (nodeDetailInflight.has(reqSig)) {
+    return nodeDetailInflight.get(reqSig)
   }
 
-  cancelDetailRequest()
-  detailRequestController = new AbortController()
-  tableLoading.value = true
-  try {
-    const res = await getUnqualifiedProductNodeDetails({
-      ...buildTreeRequestParams(),
-      page: pagination.value.page,
-      limit: pagination.value.limit,
-      paths: pathsPayload
-    }, {
-      signal: detailRequestController.signal
-    })
-    tableData.value = res.data || []
-    pagination.value.total = res.pagination?.total || 0
-    await nextTick()
-    syncDetailTableSelectionToDom()
-  } catch (error) {
-    if (isAbortError(error)) {
-      return
+  const run = (async () => {
+    const scopeKey = getDetailTableSelectionScopeKey(pathsPayload)
+    if (scopeKey !== detailTableSelectionScopeKey.value) {
+      detailTableSelectedIds.value = new Set()
+      detailTableSelectionScopeKey.value = scopeKey
+      nextTick(() => {
+        detailTableRef.value?.clearSelection?.()
+      })
     }
-    console.error('加载节点详情失败:', error)
-    tableData.value = []
-    pagination.value.total = 0
-    resetDetailTableSelection()
-  } finally {
-    detailRequestController = null
-    tableLoading.value = false
-  }
+
+    cancelDetailRequest()
+    detailRequestController = new AbortController()
+    tableLoading.value = true
+    try {
+      const res = await getUnqualifiedProductNodeDetails({
+        ...buildTreeRequestParams(),
+        ...buildDetailSortParams(),
+        page: pagination.value.page,
+        limit: pagination.value.limit,
+        paths: pathsPayload
+      }, {
+        signal: detailRequestController.signal
+      })
+      tableData.value = res.data || []
+      pagination.value.total = res.pagination?.total || 0
+      await nextTick()
+      syncDetailTableSelectionToDom()
+    } catch (error) {
+      if (isAbortError(error)) {
+        return
+      }
+      console.error('加载节点详情失败:', error)
+      tableData.value = []
+      pagination.value.total = 0
+      resetDetailTableSelection()
+    } finally {
+      detailRequestController = null
+      tableLoading.value = false
+    }
+  })()
+
+  nodeDetailInflight.set(reqSig, run)
+  run.finally(() => {
+    nodeDetailInflight.delete(reqSig)
+  })
+  return run
 }
 
 async function handleSearch() {
@@ -2452,7 +2583,7 @@ async function handleTreeNodeClick(data) {
   currentNode.value = data
   currentNodeKey.value = data.key
   pagination.value.page = 1
-  await loadNodeDetails()
+  scheduleLoadNodeDetailsDebounced()
 }
 
 /** 点击标签行区域切换勾选（与复选框一致，并走 handleTreeCheck 级联） */
@@ -2467,6 +2598,7 @@ function onTreeRowContentClick(_node, data, e) {
   pagination.value.page = 1
   const wasChecked = tree.getCheckedKeys().includes(data.key)
   tree.setChecked(data.key, !wasChecked, false)
+  syncTreeCheckedKeyCount()
   void handleTreeCheck(data)
 }
 
@@ -2477,6 +2609,49 @@ function setsEqualForKeys(a, bList) {
     if (!b.has(k)) return false
   }
   return true
+}
+
+function syncTreeCheckedKeyCount() {
+  treeCheckedKeyCount.value = treeRef.value?.getCheckedKeys?.()?.length || 0
+}
+
+async function selectAllTreeNodes() {
+  const tree = treeRef.value
+  const rootKeys = (pendingRootNodes.value || [])
+    .map((node) => node?.key)
+    .filter((key) => key != null)
+  if (!tree || !rootKeys.length) {
+    return
+  }
+  syncingTreeCheckCascade.value = true
+  try {
+    tree.setCheckedKeys(rootKeys)
+    currentNode.value = pendingRootNodes.value[0] || currentNode.value
+    currentNodeKey.value = currentNode.value?.key || currentNodeKey.value
+    pagination.value.page = 1
+  } finally {
+    await nextTick()
+    syncingTreeCheckCascade.value = false
+  }
+  syncTreeCheckedKeyCount()
+  scheduleLoadNodeDetailsDebounced()
+}
+
+async function clearTreeSelection() {
+  const tree = treeRef.value
+  if (!tree) {
+    return
+  }
+  syncingTreeCheckCascade.value = true
+  try {
+    tree.setCheckedKeys([])
+    pagination.value.page = 1
+  } finally {
+    await nextTick()
+    syncingTreeCheckCascade.value = false
+  }
+  syncTreeCheckedKeyCount()
+  await loadNodeDetails()
 }
 
 async function handleTreeCheck(data) {
@@ -2521,8 +2696,9 @@ async function handleTreeCheck(data) {
     }
   }
   await nextTick()
+  syncTreeCheckedKeyCount()
   pagination.value.page = 1
-  await loadNodeDetails()
+  scheduleLoadNodeDetailsDebounced()
 }
 
 async function handlePageSizeChange(value) {
@@ -2533,6 +2709,14 @@ async function handlePageSizeChange(value) {
 
 async function handlePageChange(value) {
   pagination.value.page = value
+  await loadNodeDetails()
+}
+
+async function handleDetailSortChange({ prop, order }) {
+  detailSort.value = prop === 'usage_count' && order
+    ? { prop, order }
+    : { prop: '', order: '' }
+  pagination.value.page = 1
   await loadNodeDetails()
 }
 
@@ -2548,6 +2732,11 @@ function getNodeLevelLabel(level) {
 
 function viewDetail(id) {
   router.push(`/unqualified-products/${id}`)
+}
+
+function goUsageRecords(id) {
+  if (!id) return
+  router.push(`/unqualified-products/${id}/usage`)
 }
 
 
@@ -2574,12 +2763,15 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onWindowResizeDetailChart)
   disposeDetailChart()
   clearTreeReloadTimer()
+  window.clearTimeout(loadNodeDetailsDebounceTimer)
+  loadNodeDetailsDebounceTimer = null
   cancelTreeRequest()
   cancelDetailRequest()
 })
 </script>
 
 <style scoped>
+
 .unqualified-product-detail-table{
   padding: 4px !important;
 }
@@ -2591,6 +2783,12 @@ onBeforeUnmount(() => {
 .detail-product-name-cell {
   cursor: pointer;
   color: #4c87a3;
+}
+
+.usage-count-cell {
+  cursor: pointer;
+  color: #409eff;
+  font-weight: 600;
 }
 
 .manufacturer-nav-cell--link {
@@ -2729,6 +2927,12 @@ onBeforeUnmount(() => {
 .video-copy-dialog-body :deep(.el-textarea__inner) {
   line-height: 1.8;
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+}
+
+.usage-user-tooltip {
+  max-width: 320px;
+  line-height: 1.7;
+  white-space: pre-wrap;
 }
 
 .page-title {
@@ -2946,8 +3150,9 @@ onBeforeUnmount(() => {
 .filter-form {
   margin-bottom: 20px;
   padding: 16px;
-  background: #f7f9fc;
+  background: #c6e0fd;
   border-radius: 14px;
+  color: black;
 }
 
 .filter-actions {

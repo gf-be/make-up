@@ -6,6 +6,8 @@ function normalizeText(value) {
     .trim();
 }
 
+const { normalizeProvinceToStandard } = require('./chinaProvinces');
+
 function extractProvince(text) {
   return extractProvinceCity(text).province;
 }
@@ -66,16 +68,41 @@ function normalizeProvinceName(value) {
   if (!text || text === '未标注') {
     return '未标注';
   }
-  if (REGION_ALIASES[text]) {
-    return REGION_ALIASES[text];
+  const standardized = normalizeProvinceToStandard(REGION_ALIASES[text] || text);
+  if (standardized) {
+    return standardized;
   }
   if (MUNICIPALITIES.includes(text)) {
     return text;
   }
   if (/自治区|特别行政区|省$/.test(text)) {
-    return text;
+    return normalizeProvinceToStandard(text) || text;
   }
   return text.endsWith('市') ? (CITY_PROVINCE_MAP[text] || text) : `${text}省`;
+}
+
+function normalizeCityName(value) {
+  const text = normalizeText(value);
+  if (!text || text === '未标注') {
+    return '未标注';
+  }
+  if (MUNICIPALITIES.includes(text)) {
+    return text;
+  }
+  const cleaned = text
+    .replace(/^(中国)?/, '')
+    .replace(/^(内蒙古自治区|广西壮族自治区|西藏自治区|宁夏回族自治区|新疆维吾尔自治区|香港特别行政区|澳门特别行政区|台湾省|[^，,；;\s（）()]+省)/, '')
+    .replace(/^(北京市|天津市|上海市|重庆市)/, '$1')
+    .trim();
+  const target = cleaned || text;
+  const cityMatch = target.match(/([\u4e00-\u9fa5]{2,20}?(?:市|自治州|地区|盟))/);
+  if (cityMatch) {
+    return cityMatch[1];
+  }
+  if (/^[\u4e00-\u9fa5]{2,20}$/.test(target)) {
+    return `${target}市`;
+  }
+  return target;
 }
 
 function extractCity(text) {
@@ -89,7 +116,7 @@ function extractCity(text) {
     }
   }
   const match = normalized.match(/([^\s，,；;（）()省自治区]+?(?:市|自治州|地区|盟))/);
-  return match ? match[1] : '未标注';
+  return match ? normalizeCityName(match[1]) : '未标注';
 }
 
 function extractProvinceCity(text) {
@@ -109,18 +136,18 @@ function extractProvinceCity(text) {
   if (provinceMatch) {
     return {
       province: normalizeProvinceName(provinceMatch[1]),
-      city
+      city: normalizeCityName(city)
     };
   }
 
   if (CITY_PROVINCE_MAP[city]) {
-    return { province: CITY_PROVINCE_MAP[city], city };
+    return { province: normalizeProvinceToStandard(CITY_PROVINCE_MAP[city]) || CITY_PROVINCE_MAP[city], city: normalizeCityName(city) };
   }
 
   const provinceAlias = Object.keys(REGION_ALIASES).find((alias) => normalized === alias || normalized.startsWith(alias));
   return {
-    province: provinceAlias ? REGION_ALIASES[provinceAlias] : '未标注',
-    city
+    province: provinceAlias ? normalizeProvinceName(REGION_ALIASES[provinceAlias]) : '未标注',
+    city: normalizeCityName(city)
   };
 }
 
@@ -243,6 +270,10 @@ function extractIssueItems(unqualifiedItems) {
 
 function buildDerivedAnalyticsFields(row = {}) {
   const manufacturerRegion = extractProvinceCity(row.manufacturer_address || row.company_addresses || row.product_region);
+  const productRegionProvince = normalizeProvinceToStandard(row.product_region);
+  if ((!manufacturerRegion.province || manufacturerRegion.province === '未标注') && productRegionProvince) {
+    manufacturerRegion.province = productRegionProvince;
+  }
   const sampledRegion = extractProvinceCity(row.operator_address || row.sample_unit_address);
   return {
     product_category: deriveProductCategory(row.product_name),
@@ -258,6 +289,7 @@ module.exports = {
   normalizeText,
   extractProvince,
   extractCity,
+  normalizeCityName,
   extractProvinceCity,
   COSMETICS_PRODUCT_CATEGORIES,
   deriveProductCategory,

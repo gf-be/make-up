@@ -139,6 +139,11 @@ async function ensureUnqualifiedProductTreeRollupTable(connection) {
   await ensureRollupColumn(connection, 'sampled_city', "VARCHAR(100) NOT NULL DEFAULT '未标注城市' AFTER sampled_province")
   await ensureRollupIndex(connection, 'idx_uptr_manufacturer_region', 'INDEX idx_uptr_manufacturer_region (manufacturer_province, manufacturer_city)')
   await ensureRollupIndex(connection, 'idx_uptr_sampled_region', 'INDEX idx_uptr_sampled_region (sampled_province, sampled_city)')
+  await ensureRollupIndex(
+    connection,
+    'idx_uptr_path_product',
+    'INDEX idx_uptr_path_product (source_key, manufacturer_province, manufacturer_city, product_category, issue_item(160), unqualified_product_id)'
+  )
 
   await connection.query(`
     UPDATE unqualified_product_tree_rollups utr
@@ -152,6 +157,10 @@ async function ensureUnqualifiedProductTreeRollupTable(connection) {
        OR utr.manufacturer_city = '未标注城市'
        OR utr.sampled_province = '未标注省份'
        OR utr.sampled_city = '未标注城市'
+       OR utr.manufacturer_province != COALESCE(NULLIF(TRIM(up.manufacturer_province), ''), NULLIF(TRIM(up.province_display), ''), '未标注省份')
+       OR utr.manufacturer_city != COALESCE(NULLIF(TRIM(up.manufacturer_city), ''), '未标注城市')
+       OR utr.sampled_province != COALESCE(NULLIF(TRIM(up.sampled_province), ''), '未标注省份')
+       OR utr.sampled_city != COALESCE(NULLIF(TRIM(up.sampled_city), ''), '未标注城市')
   `)
 
   const [fkRows] = await connection.query(

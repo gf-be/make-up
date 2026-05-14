@@ -419,7 +419,7 @@ CREATE TABLE IF NOT EXISTS unqualified_products (
     supervision_id INT NULL,
     supervision_detail_id INT NULL,
     is_counterfeit TINYINT(1) DEFAULT 0,
-    usage_user TEXT NULL COMMENT '使用用户（保存文案时追加 JSON）',
+    usage_user JSON NULL COMMENT '使用用户（保存文案时追加 JSON 记录：username/display_name/saved_at）',
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -513,6 +513,35 @@ CREATE TABLE IF NOT EXISTS unqualified_product_copy_records (
     INDEX idx_upcr_user_id (user_id),
     INDEX idx_upcr_created_at (created_at),
     CONSTRAINT fk_upcr_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 不合格产品页：产品被用户使用的累计记录（一产品一用户一行）
+CREATE TABLE IF NOT EXISTS unqualified_product_usage_records (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    unqualified_product_id INT NOT NULL,
+    user_id INT NULL,
+    username VARCHAR(191) NOT NULL DEFAULT '',
+    display_name VARCHAR(255) NULL,
+    use_count INT NOT NULL DEFAULT 0,
+    first_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_upur_product_username (unqualified_product_id, username),
+    INDEX idx_upur_product_last_used (unqualified_product_id, last_used_at),
+    INDEX idx_upur_user_id (user_id),
+    CONSTRAINT fk_upur_unqualified_product FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE,
+    CONSTRAINT fk_upur_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 不合格产品页：使用次数汇总（列表 JOIN，避免逐行子查询）
+CREATE TABLE IF NOT EXISTS unqualified_product_usage_stats (
+    unqualified_product_id INT NOT NULL PRIMARY KEY,
+    total_usage_count INT NOT NULL DEFAULT 0,
+    user_count INT NOT NULL DEFAULT 0,
+    last_used_at DATETIME NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_upus_unqualified_product FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO unqualified_products (

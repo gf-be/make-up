@@ -230,13 +230,12 @@
                               <el-input v-model="infoEditForm.announcement_no" size="small" />
                             </el-descriptions-item>
                             <el-descriptions-item label="发布日期">
-                              <el-date-picker v-model="infoEditForm.publish_date" type="date" value-format="YYYY-MM-DD"
-                                placeholder="选择日期" size="small" />
+                              <el-date-picker v-model="infoEditForm.publish_date" type="date" width="100%"
+                                value-format="YYYY-MM-DD" placeholder="选择日期" size="small" />
                             </el-descriptions-item>
                             <el-descriptions-item label="产品类型">
                               <el-form-item class="nested-form-item">
-                                <el-select v-model="infoEditForm.product_type" placeholder="请选择" 
-                                  size="small">
+                                <el-select v-model="infoEditForm.product_type" placeholder="请选择" size="small">
                                   <el-option v-for="opt in productTypeOptions" :key="opt.value" :label="opt.label"
                                     :value="opt.value" />
                                 </el-select>
@@ -244,14 +243,13 @@
                             </el-descriptions-item>
                             <el-descriptions-item label="通告类型">
                               <el-form-item class="nested-form-item">
-                                <el-select v-model="infoEditForm.announcement_type" placeholder="请选择"
-                                   size="small">
+                                <el-select v-model="infoEditForm.announcement_type" placeholder="请选择" size="small">
                                   <el-option v-for="opt in announcementTypeOptions" :key="opt.value" :label="opt.label"
                                     :value="opt.value" />
                                 </el-select>
                               </el-form-item>
                             </el-descriptions-item>
-                            <el-descriptions-item label="检验/检查单位">
+                            <el-descriptions-item label="检验/检查单位" >
                               <el-input v-model="infoEditForm.inspection_unit" size="small" />
                             </el-descriptions-item>
 
@@ -276,14 +274,14 @@
                           }}</el-descriptions-item>
                           <el-descriptions-item label="通告标题">{{ infoEditForm.title || '—' }}</el-descriptions-item>
                           <el-descriptions-item label="公告编号">{{ infoEditForm.announcement_no || '—'
-                            }}</el-descriptions-item>
+                          }}</el-descriptions-item>
                           <el-descriptions-item label="发布日期">{{ infoEditForm.publish_date || '—'
-                            }}</el-descriptions-item>
+                          }}</el-descriptions-item>
                           <el-descriptions-item label="产品类型">{{ getStagingProductTypeLabel(infoEditForm.product_type)
                           }}</el-descriptions-item>
                           <el-descriptions-item label="通告类型">{{
                             getStagingAnnouncementTypeLabel(infoEditForm.announcement_type) }}</el-descriptions-item>
-                          <el-descriptions-item label="检验/检查单位">{{ infoEditForm.inspection_unit || '—'
+                          <el-descriptions-item label="检验/检查单位" :span="2">{{ infoEditForm.inspection_unit || '—'
                           }}</el-descriptions-item>
                           <el-descriptions-item label="通告网址" :span="2">{{ infoEditForm.source_detail_url || '—'
                           }}</el-descriptions-item>
@@ -399,7 +397,7 @@
                                     </el-descriptions-item>
                                     <el-descriptions-item label="被抽样单位地址">
                                       <span class="attachment-readonly-block">{{ row.sample_unit_address || '—'
-                                        }}</span>
+                                      }}</span>
                                     </el-descriptions-item>
                                     <el-descriptions-item label="生产日期">
                                       {{ row.production_date || '—' }}

@@ -286,6 +286,10 @@ export const getUnqualifiedProductNodeDetails = (data, config = {}) => {
   return request.post('/unqualified-products/node-details', data, config)
 }
 
+export const getUnqualifiedProductNodeDetailChart = (data, config = {}) => {
+  return request.post('/unqualified-products/node-detail-chart', data, config)
+}
+
 export const getUnqualifiedProductCheckedTreeNodes = (data, config = {}) => {
   return request.post('/unqualified-products/checked-tree-nodes', data, config)
 }
@@ -327,6 +331,10 @@ export const getUnqualifiedProductSourcesInRange = (params) => {
   return request.get('/unqualified-products', {
     params: { ...params, list_sources: '1' }
   })
+}
+
+export const getUnqualifiedProductUsageRecords = (id, params) => {
+  return request.get(`/unqualified-products/${id}/usage-records`, { params })
 }
 
 /** 保存文案：写入文案表并在关联明细上追加「使用用户」记录 */

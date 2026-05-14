@@ -56,6 +56,15 @@
       <div class="section-grid">
         <el-card shadow="never">
           <template #header>
+            <div class="section-title">{{ sourceBodyLabel }}</div>
+          </template>
+          <div class="source-body-wrap">
+            <div v-if="sourceBodyText" class="source-body-text">{{ sourceBodyText }}</div>
+            <span v-else class="muted-text">暂无来源正文</span>
+          </div>
+        </el-card>
+        <el-card shadow="never">
+          <template #header>
             <div class="section-title">问题项目拆分</div>
           </template>
           <div class="chip-wrap">
@@ -64,6 +73,7 @@
           </div>
         </el-card>
 
+       
         <el-card shadow="never">
           <template #header>
             <div class="section-title">产品分类拆分</div>
@@ -79,7 +89,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getUnqualifiedProductDetail } from '@/api/index'
 
@@ -87,6 +97,26 @@ const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const detail = ref(null)
+
+/** 抽检公告正文或飞检通告正文（来自关联表 content 字段） */
+const sourceBodyText = computed(() => {
+  const d = detail.value
+  if (!d) return ''
+  const ann = String(d.announcement_body ?? '').trim()
+  const sup = String(d.supervision_body ?? '').trim()
+  return ann || sup || ''
+})
+
+const sourceBodyLabel = computed(() => {
+  if (!detail.value) return '来源正文'
+  if (detail.value.source_type === 'supervision' || detail.value.supervision_id) {
+    return '飞检通告正文'
+  }
+  if (detail.value.source_type === 'announcement' || detail.value.announcement_id) {
+    return '通告正文'
+  }
+  return '来源正文'
+})
 
 async function loadData() {
   loading.value = true
@@ -171,7 +201,7 @@ onMounted(() => {
 .section-grid {
   margin-top: 20px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -183,6 +213,21 @@ onMounted(() => {
 
 .muted-text {
   color: #909399;
+}
+
+.source-body-wrap {
+  width: 100%;
+}
+
+.source-body-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.65;
+  color: #606266;
+  font-size: 14px;
+  max-height: 480px;
+  overflow: auto;
+  padding: 4px 0;
 }
 
 @media (max-width: 768px) {

@@ -22,3 +22,11 @@
 .table-height .el-table__body tr:hover > td {
   background-color: #e6f0ff !important;
 }
+.table-height .ascending{
+  border-bottom-color: #ffffff!important;
+  /* margin-left: 10px!important; */
+  /* float: left; */
+}
+.table-height .descending{
+  border-top-color: #ffffff!important;
+}
