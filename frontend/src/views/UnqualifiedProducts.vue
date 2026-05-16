@@ -133,9 +133,9 @@
                       <div class="tree-node-main">
                         <span class="tree-node-label">{{ data.label }}</span>
                       </div>
-                      <div class="tree-node-side">
+                      <!-- <div class="tree-node-side">
                         <el-tag size="small" type="danger">{{ data.count }}</el-tag>
-                      </div>
+                      </div> -->
                     </div>
                   </template>
                 </el-tree>
@@ -392,6 +392,10 @@ const router = useRouter()
 const treeRef = ref(null)
 /** 根节点全选/全消子节点时，避免级联 setCheckedKeys 触发的子节点 @check 重复拉明细 */
 const syncingTreeCheckCascade = ref(false)
+/** 「全选」拉取子树 key 后，懒加载子层插入时据此补勾选（el-tree 懒加载未展开节点默认无 Node） */
+const fullTreeSelectAllKeysRef = shallowRef(null)
+/** >0 时表示正在程序性改勾选，handleTreeCheck 勿清掉 fullTreeSelectAllKeysRef */
+const programmaticTreeCheckLock = ref(0)
 const treeRerenderKey = ref(0)
 const treeLoading = ref(true)
 /** 与维度树同一次 /tree 请求是否已结束，用于与懒加载的 data 空数组解耦 */
@@ -1366,6 +1370,24 @@ function normalizeProvinceToStandard(raw) {
   return text
 }
 
+/**
+ * 去掉中英文括号及其中内容（可反复剥离嵌套），用于树节点上「省/市+备注」与标准名归并展示。
+ */
+function stripParentheticalNotes(raw) {
+  let s = copyTextValue(raw)
+  if (!s) return ''
+  let prev = ''
+  while (prev !== s) {
+    prev = s
+    s = s
+      .replace(/（[^）]*）/g, '')
+      .replace(/\([^)]*\)/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+  return s
+}
+
 function formatProvinceCityDisplay(provinceRaw, cityRaw) {
   const p = normalizeProvinceToStandard(provinceRaw)
   const c = normalizeCityToStandard(cityRaw)
@@ -1387,10 +1409,14 @@ function normalizeTreeRegionLabel(item = {}) {
   const dimension = item.dimension
   const raw = item.label ?? item.value
   if (['province', 'manufacturer_province', 'sampled_province'].includes(dimension)) {
-    return normalizeProvinceToStandard(raw) || copyTextValue(raw)
+    const stripped = stripParentheticalNotes(raw)
+    const forNorm = stripped !== '' ? stripped : copyTextValue(raw)
+    return normalizeProvinceToStandard(forNorm) || copyTextValue(raw)
   }
   if (['manufacturer_city', 'sampled_city'].includes(dimension)) {
-    return normalizeCityToStandard(raw) || copyTextValue(raw)
+    const stripped = stripParentheticalNotes(raw)
+    const forNorm = stripped !== '' ? stripped : copyTextValue(raw)
+    return normalizeCityToStandard(forNorm) || copyTextValue(raw)
   }
   return item.label
 }
@@ -1471,9 +1497,12 @@ function formatUsageSavedAt(value) {
 }
 
 function formatUsageCount(row) {
-  const count = Number(row?.usage_count ?? 0)
-  if (Number.isFinite(count) && count > 0) {
-    return count
+  const raw = row?.usage_count
+  if (raw !== null && raw !== undefined && raw !== '') {
+    const count = Number(raw)
+    if (Number.isFinite(count)) {
+      return count
+    }
   }
   return getUsageUserRecords(row?.usage_user).length || 0
 }
@@ -1845,6 +1874,43 @@ function mapTreeItemFromApi(item) {
   }
 }
 
+function clearFullTreeSelectAllPending() {
+  fullTreeSelectAllKeysRef.value = null
+}
+
+/** 懒加载子节点 resolve 后，把全选子树中应勾选的 key 合并进当前勾选集合 */
+function mergeFullSelectKeysIntoTree(childNodesData) {
+  const pending = fullTreeSelectAllKeysRef.value
+  if (!pending?.size || !childNodesData?.length) {
+    return
+  }
+  const tree = treeRef.value
+  if (!tree) {
+    return
+  }
+  const toAdd = []
+  for (const c of childNodesData) {
+    const k = c?.key
+    if (k != null && pending.has(k)) {
+      toAdd.push(k)
+    }
+  }
+  if (!toAdd.length) {
+    return
+  }
+  const cur = new Set(tree.getCheckedKeys())
+  toAdd.forEach((k) => cur.add(k))
+  syncingTreeCheckCascade.value = true
+  try {
+    tree.setCheckedKeys([...cur])
+  } finally {
+    syncTreeCheckedKeyCount()
+    nextTick(() => {
+      syncingTreeCheckCascade.value = false
+    })
+  }
+}
+
 /** 懒加载子节点插入后：父已勾选则子节点在界面上也显示为勾选（与 handleTreeCheck 级联一致） */
 function syncCheckedKeysAfterLazyChildrenLoaded(parentData, childrenList) {
   const tree = treeRef.value
@@ -1911,7 +1977,10 @@ function loadTreeNode(node, resolve) {
       const list = (res.data || []).map(mapTreeItemFromApi)
       resolve(list)
       nextTick(() => {
-        syncCheckedKeysAfterLazyChildrenLoaded(data, list)
+        mergeFullSelectKeysIntoTree(list)
+        setTimeout(() => {
+          syncCheckedKeysAfterLazyChildrenLoaded(data, list)
+        }, 0)
       })
     })
     .catch((err) => {
@@ -1955,6 +2024,7 @@ async function loadTree() {
   clearTreeReloadTimer()
   cancelTreeRequest()
   cancelDetailRequest()
+  clearFullTreeSelectAllPending()
   treeRequestController = new AbortController()
   treeLoading.value = true
   try {
@@ -2593,6 +2663,7 @@ function onTreeRowContentClick(_node, data, e) {
   if (!tree || data?.key == null) {
     return
   }
+  clearFullTreeSelectAllPending()
   currentNode.value = data
   currentNodeKey.value = data.key
   pagination.value.page = 1
@@ -2617,21 +2688,46 @@ function syncTreeCheckedKeyCount() {
 
 async function selectAllTreeNodes() {
   const tree = treeRef.value
-  const rootKeys = (pendingRootNodes.value || [])
-    .map((node) => node?.key)
-    .filter((key) => key != null)
+  const roots = pendingRootNodes.value || []
+  const rootKeys = roots.map((node) => node?.key).filter((key) => key != null)
   if (!tree || !rootKeys.length) {
     return
   }
+  fullTreeSelectAllKeysRef.value = null
+  programmaticTreeCheckLock.value += 1
   syncingTreeCheckCascade.value = true
   try {
-    tree.setCheckedKeys(rootKeys)
-    currentNode.value = pendingRootNodes.value[0] || currentNode.value
+    const order = dimensionOrder.value?.length ? dimensionOrder.value : DEFAULT_DIMENSION_ORDER
+    const rootPaths = roots
+      .map((n) => n?.path)
+      .filter((p) => p && typeof p === 'object' && Object.keys(p).length)
+    let allKeys = [...rootKeys]
+    if (rootPaths.length) {
+      try {
+        const res = await getUnqualifiedProductCheckedTreeNodes({
+          ...buildTreeRequestParams(),
+          paths: rootPaths,
+          dimension_order: JSON.stringify(order)
+        })
+        const nodes = res.data || []
+        const keysFromApi = [...new Set(nodes.map((n) => n?.key).filter((k) => k != null))]
+        if (keysFromApi.length) {
+          allKeys = keysFromApi
+          fullTreeSelectAllKeysRef.value = new Set(keysFromApi)
+        }
+      } catch (e) {
+        console.error('全选：拉取子树节点失败，仅勾选根节点', e)
+      }
+    }
+    tree.setCheckedKeys(allKeys)
+    currentNode.value = roots[0] || currentNode.value
     currentNodeKey.value = currentNode.value?.key || currentNodeKey.value
     pagination.value.page = 1
   } finally {
     await nextTick()
+    await nextTick()
     syncingTreeCheckCascade.value = false
+    programmaticTreeCheckLock.value -= 1
   }
   syncTreeCheckedKeyCount()
   scheduleLoadNodeDetailsDebounced()
@@ -2642,6 +2738,7 @@ async function clearTreeSelection() {
   if (!tree) {
     return
   }
+  clearFullTreeSelectAllPending()
   syncingTreeCheckCascade.value = true
   try {
     tree.setCheckedKeys([])
@@ -2657,6 +2754,9 @@ async function clearTreeSelection() {
 async function handleTreeCheck(data) {
   if (syncingTreeCheckCascade.value) {
     return
+  }
+  if (programmaticTreeCheckLock.value === 0) {
+    clearFullTreeSelectAllPending()
   }
   const tree = treeRef.value
   if (tree) {

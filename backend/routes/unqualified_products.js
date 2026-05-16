@@ -17,7 +17,7 @@ const {
   getAnnouncementTypeOptions,
   normalizeProductType,
   normalizeAnnouncementType,
-  syncUnqualifiedProductUsageStatsForIds
+  upsertUnqualifiedProductUsageRecord
 } = require('../utils/unqualifiedProducts');
 
 /** 企业管理页同款：开发与数据管理员可操作 unqualified_products 主档（含无主档来源的记录） */
@@ -1491,9 +1491,14 @@ function getProductOrderClause(alias = 'up', sort = {}) {
   return defaultOrder;
 }
 
+/** 使用次数来自 unqualified_product_usage_records.use_count 汇总，不读主表字段 */
 function getProductUsageStatsJoinSql(alias = 'up') {
   return `
-    LEFT JOIN unqualified_product_usage_stats upus ON upus.unqualified_product_id = ${alias}.id
+    LEFT JOIN (
+      SELECT unqualified_product_id, COALESCE(SUM(use_count), 0) AS total_usage_count
+      FROM unqualified_product_usage_records
+      GROUP BY unqualified_product_id
+    ) upur_tot ON upur_tot.unqualified_product_id = ${alias}.id
   `;
 }
 
@@ -1504,7 +1509,7 @@ function getProductSelectSql(alias = 'up') {
     ${alias}.source_publish_date,
     ${alias}.source_title,
     ${alias}.company_id,
-    COALESCE(upus.total_usage_count, 0) AS usage_count,
+    COALESCE(upur_tot.total_usage_count, 0) AS usage_count,
     CASE
       WHEN ${alias}.announcement_id IS NOT NULL THEN 'announcement'
       WHEN ${alias}.supervision_id IS NOT NULL THEN 'supervision'
@@ -2476,22 +2481,13 @@ router.post('/save-copy-text', authenticate, async (req, res) => {
             merged,
             row.id
           ]);
-          await connection.query(
-            `
-              INSERT INTO unqualified_product_usage_records (
-                unqualified_product_id, user_id, username, display_name,
-                use_count, first_used_at, last_used_at
-              ) VALUES (?, ?, ?, ?, 1, NOW(), NOW())
-              ON DUPLICATE KEY UPDATE
-                user_id = VALUES(user_id),
-                display_name = VALUES(display_name),
-                use_count = use_count + 1,
-                last_used_at = VALUES(last_used_at)
-            `,
-            [row.id, user.id ?? null, entry.username, entry.display_name]
-          );
+          await upsertUnqualifiedProductUsageRecord(connection, {
+            productId: row.id,
+            userId: user.id ?? null,
+            username: entry.username,
+            displayName: entry.display_name
+          });
         }
-        await syncUnqualifiedProductUsageStatsForIds(connection, ids);
       }
 
       await connection.commit();
@@ -2558,7 +2554,7 @@ router.get('/:id/usage-records', async (req, res) => {
             use_count, first_used_at, last_used_at, created_at, updated_at
           FROM unqualified_product_usage_records
           WHERE unqualified_product_id = ?
-          ORDER BY last_used_at DESC, id DESC
+          ORDER BY use_count DESC, last_used_at DESC, id DESC
           LIMIT ? OFFSET ?
         `,
         [productId, pageSize, offset]

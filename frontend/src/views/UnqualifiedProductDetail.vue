@@ -11,23 +11,23 @@
           </div>
           <div class="header-actions">
             <el-button v-if="detail.company_id" @click="goCompany">企业详情</el-button>
-            <el-button type="primary" @click="goSource">查看来源</el-button>
+            <!-- <el-button type="primary" @click="goSource">查看来源</el-button> -->
           </div>
         </div>
       </template>
 
-      <div class="tag-row">
+      <!-- <div class="tag-row">
         <el-tag type="info">{{ detail.product_type_label || '-' }}</el-tag>
         <el-tag type="success">{{ detail.announcement_type_label || '-' }}</el-tag>
         <el-tag>{{ detail.source_publish_date || '无日期' }}</el-tag>
         <el-tag v-if="detail.province_display" type="warning">{{ detail.province_display }}</el-tag>
-      </div>
+      </div> -->
 
       <el-descriptions :column="2" border>
         <el-descriptions-item label="来源类型">{{ detail.source_type === 'supervision' ? '飞行检查' : '抽检通告' }}</el-descriptions-item>
         <el-descriptions-item label="来源标题">{{ detail.source_title || '-' }}</el-descriptions-item>
         <el-descriptions-item label="通告编号">{{ detail.announcement_no || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="发布日期">{{ detail.source_publish_date || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="发布日期">{{ formatDate(detail.source_publish_date) || '-' }}</el-descriptions-item>
         <el-descriptions-item label="生产企业名称">{{ detail.manufacturer_name || detail.company_names || '-' }}</el-descriptions-item>
         <el-descriptions-item label="生产企业地址">{{ detail.manufacturer_address || detail.company_addresses || '-' }}</el-descriptions-item>
         <el-descriptions-item label="经营企业名称">{{ detail.operator_name || detail.sample_unit_name || '-' }}</el-descriptions-item>
@@ -106,6 +106,14 @@ const sourceBodyText = computed(() => {
   const sup = String(d.supervision_body ?? '').trim()
   return ann || sup || ''
 })
+function formatDate(dateStr) {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
 
 const sourceBodyLabel = computed(() => {
   if (!detail.value) return '来源正文'
@@ -134,16 +142,16 @@ function goBack() {
   router.push('/unqualified-products')
 }
 
-function goSource() {
-  if (!detail.value) return
-  if (detail.value.announcement_id) {
-    router.push(`/announcements/${detail.value.announcement_id}`)
-    return
-  }
-  if (detail.value.supervision_id) {
-    router.push(`/supervisions/${detail.value.supervision_id}`)
-  }
-}
+// function goSource() {
+//   if (!detail.value) return
+//   if (detail.value.announcement_id) {
+//     router.push(`/announcements/${detail.value.announcement_id}`)
+//     return
+//   }
+//   if (detail.value.supervision_id) {
+//     router.push(`/supervisions/${detail.value.supervision_id}`)
+//   }
+// }
 
 function goCompany() {
   if (detail.value?.company_id) {

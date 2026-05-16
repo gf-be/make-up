@@ -534,16 +534,6 @@ CREATE TABLE IF NOT EXISTS unqualified_product_usage_records (
     CONSTRAINT fk_upur_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 不合格产品页：使用次数汇总（列表 JOIN，避免逐行子查询）
-CREATE TABLE IF NOT EXISTS unqualified_product_usage_stats (
-    unqualified_product_id INT NOT NULL PRIMARY KEY,
-    total_usage_count INT NOT NULL DEFAULT 0,
-    user_count INT NOT NULL DEFAULT 0,
-    last_used_at DATETIME NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_upus_unqualified_product FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 INSERT INTO unqualified_products (
 
     batch_title, total_batches, sequence_no, product_name, company_names, company_addresses,

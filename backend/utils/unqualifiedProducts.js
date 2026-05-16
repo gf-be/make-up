@@ -323,6 +323,22 @@ function buildSearchHotFields(payload = {}) {
 
 
 
+async function dropTableColumnIfExists(connection, tableName, columnName) {
+  const [rows] = await connection.query(`SHOW COLUMNS FROM ${tableName} LIKE ?`, [columnName]);
+  if (rows.length > 0) {
+    await connection.query(`ALTER TABLE ${tableName} DROP COLUMN \`${columnName}\``);
+  }
+}
+
+
+async function dropUnqualifiedProductUsageStatsTableIfExists(connection) {
+  if (!(await tableExists(connection, 'unqualified_product_usage_stats'))) {
+    return;
+  }
+  await connection.query('DROP TABLE unqualified_product_usage_stats');
+}
+
+
 async function ensureTableColumn(connection, tableName, columnName, definition) {
   const [rows] = await connection.query(`SHOW COLUMNS FROM ${tableName} LIKE ?`, [columnName]);
   if (rows.length === 0) {
@@ -538,6 +554,13 @@ async function ensureUnqualifiedProductUsageRecordsTable(connection) {
   await ensureTableColumn(connection, 'unqualified_product_usage_records', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER last_used_at');
   await ensureTableColumn(connection, 'unqualified_product_usage_records', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at');
 
+  await ensureIndex(
+    connection,
+    'unqualified_product_usage_records',
+    'idx_upur_product_user',
+    'INDEX idx_upur_product_user (unqualified_product_id, user_id)'
+  );
+
   if (await tableExists(connection, 'users')) {
     await ensureForeignKey(
       connection,
@@ -548,67 +571,63 @@ async function ensureUnqualifiedProductUsageRecordsTable(connection) {
   }
 }
 
-async function ensureUnqualifiedProductUsageStatsTable(connection) {
-  await connection.query(`
-    CREATE TABLE IF NOT EXISTS unqualified_product_usage_stats (
-      unqualified_product_id INT NOT NULL PRIMARY KEY,
-      total_usage_count INT NOT NULL DEFAULT 0,
-      user_count INT NOT NULL DEFAULT 0,
-      last_used_at DATETIME NULL,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      CONSTRAINT fk_upus_unqualified_product
-        FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-
-  const [statCountRows] = await connection.query('SELECT COUNT(*) AS n FROM unqualified_product_usage_stats');
-  const [usageCountRows] = await connection.query('SELECT COUNT(*) AS n FROM unqualified_product_usage_records');
-  if (Number(statCountRows[0]?.n || 0) === 0 && Number(usageCountRows[0]?.n || 0) > 0) {
-    await backfillUnqualifiedProductUsageStats(connection);
-  }
-}
-
-async function backfillUnqualifiedProductUsageStats(connection) {
-  await connection.query(`
-    INSERT INTO unqualified_product_usage_stats (unqualified_product_id, total_usage_count, user_count, last_used_at)
-    SELECT
-      unqualified_product_id,
-      COALESCE(SUM(use_count), 0) AS total_usage_count,
-      COUNT(*) AS user_count,
-      MAX(last_used_at) AS last_used_at
-    FROM unqualified_product_usage_records
-    GROUP BY unqualified_product_id
-    ON DUPLICATE KEY UPDATE
-      total_usage_count = VALUES(total_usage_count),
-      user_count = VALUES(user_count),
-      last_used_at = VALUES(last_used_at)
-  `);
-}
-
-async function syncUnqualifiedProductUsageStatsForIds(connection, productIds = []) {
-  const ids = [...new Set((productIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
-  if (!ids.length) {
+/**
+ * 一产品一行：按 (product_id, user_id) 已存在则仅累加 use_count、刷新 last_used_at，不新增行；无 user_id 时按 username 区分。
+ */
+async function upsertUnqualifiedProductUsageRecord(connection, { productId, userId, username, displayName }) {
+  const pid = Number(productId);
+  if (!Number.isFinite(pid) || pid <= 0) {
     return;
   }
-  const placeholders = ids.map(() => '?').join(', ');
-  await connection.query(
-    `
-      INSERT INTO unqualified_product_usage_stats (unqualified_product_id, total_usage_count, user_count, last_used_at)
-      SELECT
-        upur.unqualified_product_id,
-        COALESCE(SUM(upur.use_count), 0) AS total_usage_count,
-        COUNT(*) AS user_count,
-        MAX(upur.last_used_at) AS last_used_at
-      FROM unqualified_product_usage_records upur
-      WHERE upur.unqualified_product_id IN (${placeholders})
-      GROUP BY upur.unqualified_product_id
-      ON DUPLICATE KEY UPDATE
-        total_usage_count = VALUES(total_usage_count),
-        user_count = VALUES(user_count),
-        last_used_at = VALUES(last_used_at)
-    `,
-    ids
+  const uidRaw = userId != null ? Number(userId) : null;
+  const uid = uidRaw != null && Number.isFinite(uidRaw) && uidRaw > 0 ? uidRaw : null;
+  const uname = String(username || '').trim().slice(0, 191);
+  const dnameRaw = displayName == null ? '' : String(displayName).trim();
+  const dname = dnameRaw ? dnameRaw.slice(0, 255) : null;
+
+  if (uid != null) {
+    const [rows] = await connection.query(
+      'SELECT id FROM unqualified_product_usage_records WHERE unqualified_product_id = ? AND user_id = ? LIMIT 1',
+      [pid, uid]
+    );
+    if (rows.length) {
+      await connection.query(
+        `UPDATE unqualified_product_usage_records
+         SET use_count = use_count + 1, last_used_at = NOW(), username = ?, display_name = ?
+         WHERE id = ?`,
+        [uname, dname, rows[0].id]
+      );
+    } else {
+      await connection.query(
+        `INSERT INTO unqualified_product_usage_records (
+          unqualified_product_id, user_id, username, display_name, use_count, first_used_at, last_used_at
+        ) VALUES (?, ?, ?, ?, 1, NOW(), NOW())`,
+        [pid, uid, uname, dname]
+      );
+    }
+    return;
+  }
+
+  const [rows] = await connection.query(
+    `SELECT id FROM unqualified_product_usage_records
+     WHERE unqualified_product_id = ? AND user_id IS NULL AND username = ? LIMIT 1`,
+    [pid, uname]
   );
+  if (rows.length) {
+    await connection.query(
+      `UPDATE unqualified_product_usage_records
+       SET use_count = use_count + 1, last_used_at = NOW(), display_name = ?
+       WHERE id = ?`,
+      [dname, rows[0].id]
+    );
+  } else {
+    await connection.query(
+      `INSERT INTO unqualified_product_usage_records (
+        unqualified_product_id, user_id, username, display_name, use_count, first_used_at, last_used_at
+      ) VALUES (?, NULL, ?, ?, 1, NOW(), NOW())`,
+      [pid, uname, dname]
+    );
+  }
 }
 
 function normalizeCategoryValue(value) {
@@ -1267,7 +1286,8 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureUnqualifiedProductIssueItemsTable(connection);
   await ensureUnqualifiedProductCopyRecordsTable(connection);
   await ensureUnqualifiedProductUsageRecordsTable(connection);
-  await ensureUnqualifiedProductUsageStatsTable(connection);
+  await dropUnqualifiedProductUsageStatsTableIfExists(connection);
+  await dropTableColumnIfExists(connection, 'unqualified_products', 'usage_count');
   await ensureUnqualifiedProductTreeRollupTable(connection);
   await backfillDerivedFields(connection);
   await backfillSearchHotFields(connection);
@@ -1637,6 +1657,6 @@ module.exports = {
   getAnnouncementTypeLabel,
   getProductTypeOptions,
   getAnnouncementTypeOptions,
-  syncUnqualifiedProductUsageStatsForIds
+  upsertUnqualifiedProductUsageRecord
 };
 

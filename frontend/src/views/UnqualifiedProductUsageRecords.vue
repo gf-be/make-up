@@ -18,17 +18,29 @@
 
       <el-table :data="records" border stripe>
         <el-table-column type="index" label="#" width="64" align="center" />
-        <!-- <el-table-column prop="display_name" label="用户" min-width="160">
-          <template #default="{ row }">{{ row.display_name || row.username || '-' }}</template>
-        </el-table-column> -->
-        <el-table-column prop="username" label="用户名" min-width="140" />
-        <el-table-column prop="use_count" label="使用次数" width="120" align="center">
-          <template #default="{ row }">{{ row.use_count || 0 }}</template>
+        <el-table-column label="用户" min-width="200">
+          <template #default="{ row }">
+            <div class="user-cell">
+              <span class="user-display">{{ row.display_name || row.username || '—' }}</span>
+              <span
+                v-if="row.display_name && row.username && row.display_name !== row.username"
+                class="user-login"
+              >（{{ row.username }}）</span>
+            </div>
+          </template>
         </el-table-column>
-        <el-table-column prop="first_used_at" label="首次使用时间" min-width="180">
+        <el-table-column prop="user_id" label="用户ID" width="100" align="center">
+          <template #default="{ row }">{{ row.user_id != null && row.user_id !== '' ? row.user_id : '—' }}</template>
+        </el-table-column>
+        <el-table-column label="累计使用次数" width="140" align="center">
+          <template #default="{ row }">
+            <el-tag type="warning" size="small">{{ Number(row.use_count) || 0 }} 次</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="first_used_at" label="首次使用" min-width="170">
           <template #default="{ row }">{{ formatDateTime(row.first_used_at) }}</template>
         </el-table-column>
-        <el-table-column prop="last_used_at" label="最近使用时间" min-width="180">
+        <el-table-column prop="last_used_at" label="最近使用" min-width="170">
           <template #default="{ row }">{{ formatDateTime(row.last_used_at) }}</template>
         </el-table-column>
       </el-table>
@@ -155,6 +167,21 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.user-cell {
+  line-height: 1.5;
+}
+
+.user-display {
+  font-weight: 500;
+  color: #303133;
+}
+
+.user-login {
+  margin-left: 4px;
+  font-size: 12px;
+  color: #909399;
 }
 
 .pagination {
