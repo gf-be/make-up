@@ -57,7 +57,7 @@
         <template #header>
           <div class="panel-header">
             <span>通告列表</span>
-            <el-tag type="info" effect="plain">共 {{ pagination.total }} 条</el-tag>
+            <!-- <el-tag type="info" effect="plain">共 {{ pagination.total }} 条</el-tag> -->
           </div>
         </template>
 

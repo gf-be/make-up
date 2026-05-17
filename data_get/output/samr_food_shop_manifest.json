@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-05-17T16:03:00",
+  "source": "国家市场监督管理总局-我要看",
+  "list_url": "https://zwfw.samr.gov.cn/scjg/wyk/tbtg/",
+  "items_dir": "F:\\daoke\\化妆品\\data_get\\output\\items",
+  "download_dir": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food_shop",
+  "total_candidates": 1,
+  "success_count": 1,
+  "failed_count": 0,
+  "results": [
+    {
+      "sequence": 1,
+      "title": "市场监管总局办公厅关于45批次食品抽检不合格情况的通报",
+      "detail_url": "http://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/spcjs/art/2026/art_90d83f2e61be4530903dabe5452cb036.html",
+      "publish_date": "2026-04-24",
+      "document_date": "2026-04-24",
+      "announcement_no": "市监食检发〔2026〕41号",
+      "index_no": "11100000MB0143028R/2026-915551",
+      "topic_category": "通报通告",
+      "department": "食品安全抽检监测司",
+      "notice_category": "unqualified_sampling",
+      "attachment_count": 17,
+      "parsed_count": 45,
+      "output_file": "F:\\daoke\\化妆品\\data_get\\output\\items\\food_20260424_市场监管总局办公厅关于45批次食品抽检不合格情况的通报.json",
+      "success": true
+    }
+  ]
+}

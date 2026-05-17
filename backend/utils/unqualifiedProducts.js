@@ -737,6 +737,24 @@ async function ensureUnqualifiedProductTypeCatalogTable(connection) {
   `);
 }
 
+/** 分类管理页：手工维护的抽象产品库（如「染发膏」） */
+async function ensureUnqualifiedProductAbstractCatalogTable(connection) {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS unqualified_product_abstract_catalog (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',
+      category_name VARCHAR(100) NOT NULL,
+      abstract_name VARCHAR(150) NOT NULL,
+      image_url VARCHAR(1000) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_upac_type_category_name (product_type, category_name, abstract_name),
+      INDEX idx_upac_type_category (product_type, category_name),
+      INDEX idx_upac_name (abstract_name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+}
+
 function buildSourceCondition(filter = {}, params = []) {
   if (filter.announcementId !== undefined && filter.announcementId !== null) {
     params.push(Number(filter.announcementId));
@@ -1282,6 +1300,8 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureUnqualifiedProductCategoryCatalogTable(connection);
 
   await ensureUnqualifiedProductTypeCatalogTable(connection);
+
+  await ensureUnqualifiedProductAbstractCatalogTable(connection);
 
   await ensureUnqualifiedProductIssueItemsTable(connection);
   await ensureUnqualifiedProductCopyRecordsTable(connection);

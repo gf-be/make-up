@@ -365,6 +365,9 @@ const handleLogout = async () => {
   display: flex;
   flex-direction: column;
 }
+.el-menu--horizontal>.el-menu-item.is-active {
+  color: #f5f7f8 !important;
+}
 
 .header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

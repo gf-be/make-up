@@ -92,7 +92,7 @@
               <div class="section-header">
                 <!-- <h3>{{ announcementProductTypeLabel }}问题产品详细信息</h3> -->
 
-                <div class="section-tags">
+                <!-- <div class="section-tags">
                   <el-tag type="info">总计 {{ productDetailsSummary.total || 0 }} 批次</el-tag>
                   <el-tag v-if="productDetailsSummary.has_filters" type="success">
                     当前筛选 {{ productDetailsSummary.filtered_total || 0 }} 批次
@@ -100,7 +100,7 @@
                   <el-tag v-if="activeCounterfeitCount" type="danger">
                     涉嫌假冒 {{ activeCounterfeitCount }} 批次
                   </el-tag>
-                </div>
+                </div> -->
               </div>
 
               <el-form :model="productDetailFilters" inline class="detail-filter-form">
@@ -225,9 +225,9 @@
                         </el-descriptions>
                       </template>
                     </el-table-column>
-                    <!-- <el-table-column prop="sequence_no" label="序号" width="70" align="center" /> -->
-                    <el-table-column prop="product_name" label="产品名称" min-width="180" show-overflow-tooltip />
-                    <el-table-column prop="company_names" label="注册人/备案人等名称" min-width="180" show-overflow-tooltip />
+                    <el-table-column prop="sequence_no" label="序号" width="70" align="center" />
+                    <el-table-column prop="product_name" label="产品" min-width="180" show-overflow-tooltip />
+                    <el-table-column prop="company_names" label="生产企业" min-width="180" show-overflow-tooltip />
                     <!-- <el-table-column prop="sample_unit_name" label="被抽样单位" min-width="160" show-overflow-tooltip /> -->
                     <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="130" show-overflow-tooltip />
                     <el-table-column v-if="canManageProductDetails" label="操作" width="140" fixed="right" align="center">

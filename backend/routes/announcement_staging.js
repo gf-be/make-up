@@ -177,8 +177,9 @@ router.post('/import-json', async (req, res) => {
 
   try {
     connection = await pool.getConnection();
-    const result = await importStagingFromJsonDirectory(connection, DEFAULT_STAGING_SOURCE_DIR, req.body || {});
-    const overview = await getAnnouncementStagingOverview(connection, DEFAULT_STAGING_SOURCE_DIR);
+    const sourceDirectory = req.body?.directory || DEFAULT_STAGING_SOURCE_DIR;
+    const result = await importStagingFromJsonDirectory(connection, sourceDirectory, req.body || {});
+    const overview = await getAnnouncementStagingOverview(connection, sourceDirectory);
 
     const parseWarningCount = result.parse_warning_count ?? result.parse_failed_count ?? 0;
     const messageParts = [

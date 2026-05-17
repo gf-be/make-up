@@ -998,7 +998,15 @@ def import_to_backend(
         raise RuntimeError(food_result.get("message") or "写入 food_inspection 失败")
 
     logger.info("导入导入检查 staging: %s", staging_url)
-    staging_resp = session.post(staging_url, json={"product_type": "food", "announcement_type": "sampling"}, timeout=180)
+    staging_resp = session.post(
+        staging_url,
+        json={
+            "directory": str(items_dir),
+            "product_type": "food",
+            "announcement_type": "sampling",
+        },
+        timeout=180,
+    )
     staging_resp.raise_for_status()
     staging_result = staging_resp.json()
     if staging_result.get("success") is False:

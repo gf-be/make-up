@@ -371,6 +371,22 @@ export const deleteCategoryCatalog = (id) => {
   return request.delete(`/category-catalog/${id}`)
 }
 
+export const listCategoryAbstractProducts = (params) => {
+  return request.get('/category-catalog/abstract-products', { params })
+}
+
+export const createCategoryAbstractProduct = (data) => {
+  return request.post('/category-catalog/abstract-products', data)
+}
+
+export const updateCategoryAbstractProduct = (id, data) => {
+  return request.put(`/category-catalog/abstract-products/${id}`, data)
+}
+
+export const deleteCategoryAbstractProduct = (id) => {
+  return request.delete(`/category-catalog/abstract-products/${id}`)
+}
+
 export const postFoodInspectionImportJson = (data = {}) => {
   return request.post('/food-inspections/import-json', data)
 }

@@ -476,9 +476,10 @@ function collectParsedRows(payload = {}) {
 
   attachments.forEach((attachment) => {
     const parsedRows = Array.isArray(attachment?.parse_result?.rows) ? attachment.parse_result.rows : [];
-    parsedRows.forEach((row, index) => {
-      const normalizedRow = normalizeDetailRow(row, index);
+    parsedRows.forEach((row) => {
+      const normalizedRow = normalizeDetailRow(row, rows.length);
       if (normalizedRow.product_name) {
+        normalizedRow.sequence_no = rows.length + 1;
         rows.push(normalizedRow);
       }
     });

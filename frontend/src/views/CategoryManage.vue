@@ -1,145 +1,259 @@
 <template>
   <div class="category-manage">
     <el-card shadow="never" class="page-card">
-      <!-- <template #header>
-        <div class="page-header">
-          <span class="page-title">产品分类管理</span>
-          <span class="page-hint">左侧选择产品类型；右侧维护该类型下的分类词条（数据源自拆分表 <code>unqualified_product_category_items</code> 与主表回填，亦可手工新增）</span>
-        </div>
-      </template> -->
-
       <el-row :gutter="16" class="layout-row">
         <el-col :xs="24" :md="8" :lg="7" class="left-col">
-          <el-card shadow="never" class="panel-card" v-loading="typesLoading">
+          <el-card shadow="never" class="panel-card" v-loading="typesLoading || catalogLoading">
             <template #header>
-              <span class="panel-title">产品类型</span>
+              <div class="panel-header">
+                <span class="panel-title">分类</span>
+                <div class="panel-actions">
+                  <el-button type="primary" link @click="openTypeDialog">新增类型</el-button>
+                  <el-button type="primary" link :disabled="!selectedProductType" @click="openCategoryDialog">新增分类</el-button>
+                  <el-button link type="primary" @click="reloadTree">刷新</el-button>
+                </div>
+              </div>
             </template>
-            <div class="type-toolbar">
-              <el-input
-                v-model="newTypeKey"
-                placeholder="类型键，如 tobacco 或与导入数据一致的英文键"
-                maxlength="50"
-                show-word-limit
-                clearable
-              />
-              <el-input
-                v-model="newTypeLabel"
-                placeholder="显示名称（可选）"
-                maxlength="100"
-                clearable
-              />
-              <el-button type="primary" :loading="creatingType" :disabled="!newTypeKey.trim()" @click="handleCreateProductType">
-                新增类型
-              </el-button>
-            </div>
-            <div class="type-list">
-              <button
-                v-for="opt in productTypeOptions"
-                :key="opt.value"
-                type="button"
-                class="type-item"
-                :class="{ 'type-item--active': opt.value === selectedProductType }"
-                @click="selectedProductType = opt.value"
-              >
-                {{ opt.label }}
-              </button>
-            </div>
-            <el-empty v-if="!typesLoading && !productTypeOptions.length" description="暂无类型数据" />
+
+            <el-tree
+              v-if="categoryTree.length"
+              class="category-tree"
+              :data="categoryTree"
+              node-key="key"
+              :props="treeProps"
+              default-expand-all
+              highlight-current
+              :expand-on-click-node="false"
+              @node-click="handleTreeNodeClick"
+            >
+           
+              <template #default="{ data }">
+                
+                <div class="tree-node">
+                  <span class="tree-node-label">{{ data.label }}</span>
+                  <el-tag v-if="data.type === 'category'" size="small" type="info">
+                    {{ data.usage_count ?? 0 }}
+                  </el-tag>
+                </div>
+              </template>
+            </el-tree>
+            <el-empty v-else-if="!typesLoading && !catalogLoading" description="暂无类型或分类" />
           </el-card>
         </el-col>
 
         <el-col :xs="24" :md="16" :lg="17" class="right-col">
-          <el-card shadow="never" class="panel-card" v-loading="listLoading">
+          <el-card shadow="never" class="panel-card" v-loading="abstractLoading">
             <template #header>
               <div class="right-header">
-                <span class="panel-title">产品分类</span>
-                <!-- <span v-if="selectedProductType" class="panel-sub">{{ currentTypeLabel }}</span> -->
+                <div>
+                  <span class="panel-title">产品列表</span>
+                  <!-- <span v-if="selectedCategoryName" class="panel-sub">
+                    {{ currentTypeLabel }} / {{ selectedCategoryName }}
+                  </span> -->
+                </div>
+                <el-button
+                  type="primary"
+                  :disabled="!selectedCategoryName"
+                  @click="openAbstractDialog()"
+                >
+                  新增抽象产品
+                </el-button>
               </div>
             </template>
 
-            <div class="toolbar">
-              <el-input
-                v-model="newCategoryName"
-                placeholder="输入新的分类名称"
-                maxlength="100"
-                show-word-limit
-                clearable
-                style="max-width: 320px"
-                @keyup.enter="handleCreate"
-              />
-              <el-button type="primary" :loading="creating" :disabled="!selectedProductType || !newCategoryName.trim()" @click="handleCreate">
-                新增
-              </el-button>
-            </div>
-            <!-- <p class="table-hint">双击表格行或点击左侧箭头展开，查看该分类关联的产品名称（最多 500 条）。</p> -->
+            <el-empty
+              v-if="!selectedCategoryName"
+              description="请先在左侧选择二级分类"
+              :image-size="96"
+            />
 
-            <el-table
-              ref="catalogTableRef"
-              :data="catalogRows"
-              stripe
-              border
-              empty-text="该类型下暂无分类词条，请输入名称后新增"
-              row-key="id"
-              @row-dblclick="onCatalogRowDblClick"
-              @expand-change="onCatalogExpandChange"
-            >
-              <el-table-column type="expand" width="42">
-                <template #default="{ row }">
-                  <div v-loading="expandState(row.id).loading" class="category-expand-panel">
-                    <p v-if="expandState(row.id).loaded && expandState(row.id).items.length" class="expand-hint">
-                      含 {{ expandState(row.id).items.length }} 条产品
-                    </p>
-                    <ul v-if="expandState(row.id).items.length" class="expand-product-list">
-                      <li
-                        v-for="p in expandState(row.id).items"
-                        :key="`${row.id}-${p.id}-${String(p.product_name || '').trim()}`"
-                        class="expand-product-row"
-                      >
-                        <span class="expand-product-name" :title="p.product_name">{{ p.product_name }}</span>
-                        <el-select
-                          class="expand-category-select"
-                          size="small"
-                          placeholder="修改分类"
-                          filterable
-                          :disabled="!catalogRows.length"
-                          :model-value="row.category_name"
-                          :loading="reassigningProductKey === `${row.id}:${p.id}`"
-                          @change="(toCat) => onAssignProductCategory(row, p, toCat)"
-                        >
-                          <el-option
-                            v-for="cat in catalogRows"
-                            :key="cat.id"
-                            :label="cat.category_name"
-                            :value="cat.category_name"
-                          />
-                        </el-select>
-                      </li>
-                    </ul>
-                    <el-empty
-                      v-else-if="expandState(row.id).loaded"
-                      description="暂无关联产品"
-                      :image-size="72"
-                    />
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column prop="category_name" label="分类名称" min-width="180" show-overflow-tooltip />
-              <el-table-column prop="usage_count" label="关联明细数" width="120" align="center">
-                <template #default="{ row }">{{ row.usage_count ?? 0 }}</template>
-              </el-table-column>
-              <el-table-column prop="created_at" label="创建时间" width="178">
-                <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
-              </el-table-column>
-              <el-table-column label="操作" width="100" align="center" fixed="right">
-                <template #default="{ row }">
-                  <el-button type="danger" link :loading="deletingId === row.id" @click="handleDelete(row)">删除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
+            <template v-else>
+              <el-table
+                :data="abstractRows"
+                stripe
+                border
+                row-key="id"
+                empty-text="该分类下暂无抽象产品"
+              >
+                <el-table-column label="图片" width="92" align="center">
+                  <template #default="{ row }">
+                    <el-image
+                      v-if="row.image_url"
+                      class="abstract-thumb"
+                      :src="row.image_url"
+                      fit="cover"
+                      :preview-src-list="[row.image_url]"
+                      preview-teleported
+                    >
+                      <template #error>
+                        <div class="image-fallback">无图</div>
+                      </template>
+                    </el-image>
+                    <div v-else class="image-fallback">无图</div>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="abstract_name" label="名称" min-width="180" show-overflow-tooltip />
+                <el-table-column label="类型" min-width="180" show-overflow-tooltip>
+                  <template #default="{ row }">
+                    {{ getTypeLabel(row.product_type) }} / {{ row.category_name }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="image_url" label="图片地址" min-width="260" show-overflow-tooltip />
+                <el-table-column prop="updated_at" label="更新时间" width="178">
+                  <template #default="{ row }">{{ formatDateTime(row.updated_at || row.created_at) }}</template>
+                </el-table-column>
+                <el-table-column label="操作" width="140" align="center" fixed="right">
+                  <template #default="{ row }">
+                    <el-button type="primary" link @click="openAbstractDialog(row)">编辑</el-button>
+                    <el-button type="danger" link :loading="deletingAbstractId === row.id" @click="handleDeleteAbstract(row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </template>
           </el-card>
         </el-col>
       </el-row>
     </el-card>
+
+    <el-dialog
+      v-model="typeDialogVisible"
+      title="新增产品类型"
+      width="min(520px, 94vw)"
+      align-center
+      append-to-body
+      destroy-on-close
+    >
+      <el-form label-width="92px" class="category-dialog-form">
+        <el-form-item label="类型键" required>
+          <el-input
+            v-model="newTypeKey"
+            placeholder="数据库内存储的名称"
+            maxlength="50"
+            show-word-limit
+            clearable
+            @keyup.enter="handleCreateProductType"
+          />
+        </el-form-item>
+        <el-form-item label="显示名称">
+          <el-input
+            v-model="newTypeLabel"
+            placeholder="可选，如 化妆品"
+            maxlength="100"
+            clearable
+            @keyup.enter="handleCreateProductType"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="typeDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="creatingType" :disabled="!newTypeKey.trim()" @click="handleCreateProductType">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="categoryDialogVisible"
+      title="新增分类"
+      width="min(520px, 94vw)"
+      align-center
+      append-to-body
+      destroy-on-close
+    >
+      <el-form label-width="92px" class="category-dialog-form">
+        <el-form-item label="产品类型" required>
+          <el-select v-model="selectedProductType" filterable style="width: 100%">
+            <el-option
+              v-for="item in productTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="分类名称" required>
+          <el-input
+            v-model="newCategoryName"
+            placeholder="如 保湿、修护、染发"
+            maxlength="100"
+            show-word-limit
+            clearable
+            @keyup.enter="handleCreateCategory"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="categoryDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="creatingCategory"
+          :disabled="!selectedProductType || !newCategoryName.trim()"
+          @click="handleCreateCategory"
+        >
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="abstractDialogVisible"
+      :title="editingAbstractId ? '编辑抽象产品' : '新增抽象产品'"
+      width="min(620px, 94vw)"
+      align-center
+      append-to-body
+      destroy-on-close
+    >
+      <el-form label-width="96px" class="abstract-form">
+        <el-form-item label="名称" required>
+          <el-input
+            v-model="abstractForm.abstract_name"
+            placeholder="如：染发膏"
+            maxlength="150"
+            show-word-limit
+            clearable
+          />
+        </el-form-item>
+        <el-form-item label="图片地址">
+          <el-input
+            v-model="abstractForm.image_url"
+            placeholder="https://..."
+            maxlength="1000"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item label="产品类型" required>
+          <el-select v-model="abstractForm.product_type" filterable style="width: 100%" @change="onAbstractFormTypeChange">
+            <el-option
+              v-for="item in productTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="所属分类" required>
+          <el-select v-model="abstractForm.category_name" filterable style="width: 100%">
+            <el-option
+              v-for="cat in formCategoryOptions"
+              :key="cat.id || cat.category_name"
+              :label="cat.category_name"
+              :value="cat.category_name"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="abstractForm.image_url" label="预览">
+          <el-image class="abstract-preview" :src="abstractForm.image_url" fit="cover">
+            <template #error>
+              <div class="preview-fallback">图片无法预览</div>
+            </template>
+          </el-image>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="abstractDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingAbstract" @click="saveAbstractProduct">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -147,131 +261,166 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  assignCategoryCatalogProduct,
+  createCategoryAbstractProduct,
   createCategoryCatalog,
   createCategoryCatalogProductType,
-  deleteCategoryCatalog,
+  deleteCategoryAbstractProduct,
   getCategoryCatalogProductTypes,
+  listCategoryAbstractProducts,
   listCategoryCatalog,
-  listCategoryCatalogProducts
+  updateCategoryAbstractProduct
 } from '@/api/index'
 
-const catalogTableRef = ref(null)
+const treeProps = {
+  label: 'label',
+  children: 'children'
+}
+
 const typesLoading = ref(false)
-const listLoading = ref(false)
-const creating = ref(false)
+const catalogLoading = ref(false)
+const abstractLoading = ref(false)
 const creatingType = ref(false)
-const deletingId = ref(null)
-/** `${catalogCategoryRowId}:${productRowId}` 提交修改分类时 */
-const reassigningProductKey = ref('')
+const creatingCategory = ref(false)
+const savingAbstract = ref(false)
+const deletingAbstractId = ref(null)
 
 const productTypeOptions = ref([])
+const categoriesByType = reactive({})
 const selectedProductType = ref('')
-const catalogRows = ref([])
-const newCategoryName = ref('')
+const selectedCategoryName = ref('')
+const abstractRows = ref([])
 const newTypeKey = ref('')
 const newTypeLabel = ref('')
-
-/** 分类行 id → 展开区加载状态与产品列表 */
-const expandRowsState = reactive({})
-
-const currentTypeLabel = computed(() => {
-  const opt = productTypeOptions.value.find((o) => o.value === selectedProductType.value)
-  return opt?.label || selectedProductType.value || ''
+const newCategoryName = ref('')
+const typeDialogVisible = ref(false)
+const categoryDialogVisible = ref(false)
+const abstractDialogVisible = ref(false)
+const editingAbstractId = ref(null)
+const abstractForm = reactive({
+  product_type: '',
+  category_name: '',
+  abstract_name: '',
+  image_url: ''
 })
 
-function expandState(rowId) {
-  if (!expandRowsState[rowId]) {
-    expandRowsState[rowId] = { loading: false, loaded: false, items: [] }
-  }
-  return expandRowsState[rowId]
+const currentTypeLabel = computed(() => getTypeLabel(selectedProductType.value))
+
+const selectedCategoryRows = computed(() => categoriesByType[selectedProductType.value] || [])
+
+const formCategoryOptions = computed(() => categoriesByType[abstractForm.product_type] || [])
+
+const categoryTree = computed(() => productTypeOptions.value.map((type) => ({
+  key: `type:${type.value}`,
+  type: 'type',
+  product_type: type.value,
+  label: type.label,
+  children: (categoriesByType[type.value] || []).map((cat) => ({
+    key: `cat:${type.value}:${cat.category_name}`,
+    type: 'category',
+    product_type: type.value,
+    label: cat.category_name,
+    category_name: cat.category_name,
+    usage_count: cat.usage_count
+  }))
+})))
+
+function getTypeLabel(value) {
+  const opt = productTypeOptions.value.find((o) => o.value === value)
+  return opt?.label || value || ''
 }
 
-function resetExpandRowsState() {
-  Object.keys(expandRowsState).forEach((k) => delete expandRowsState[k])
+function formatDateTime(value) {
+  if (value == null || value === '') return '-'
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** 按产品名称去重（trim 后相同视为重复，保留首条） */
-function dedupeProductsByName(rows) {
-  const seen = new Set()
-  const out = []
-  for (const r of rows || []) {
-    const key = String(r?.product_name ?? '').trim()
-    if (!key || seen.has(key)) continue
-    seen.add(key)
-    out.push(r)
-  }
-  return out
+function openTypeDialog() {
+  newTypeKey.value = ''
+  newTypeLabel.value = ''
+  typeDialogVisible.value = true
 }
 
-async function loadCategoryProducts(row, { force = false } = {}) {
-  const st = expandState(row.id)
-  if (st.loading) return
-  if (!force && st.loaded) return
-
-  const pt = selectedProductType.value
-  if (!pt) return
-
-  if (force) {
-    st.items = []
-    st.loaded = false
+function openCategoryDialog() {
+  if (!selectedProductType.value && productTypeOptions.value.length) {
+    selectedProductType.value = productTypeOptions.value[0].value
   }
+  newCategoryName.value = ''
+  categoryDialogVisible.value = true
+}
 
-  st.loading = true
+async function loadProductTypes() {
+  typesLoading.value = true
   try {
-    const res = await listCategoryCatalogProducts({
-      product_type: pt,
-      category_name: row.category_name
-    })
-    st.items = dedupeProductsByName(res.data || [])
-    st.loaded = true
-  } catch {
-    st.loaded = true
-    st.items = []
+    const res = await getCategoryCatalogProductTypes()
+    productTypeOptions.value = res.data || []
+    if (!selectedProductType.value && productTypeOptions.value.length) {
+      selectedProductType.value = productTypeOptions.value[0].value
+    }
   } finally {
-    st.loading = false
+    typesLoading.value = false
   }
 }
 
-async function onAssignProductCategory(categoryRow, product, toCategory) {
-  if (!toCategory || toCategory === categoryRow.category_name) return
-
-  const pt = selectedProductType.value
-  if (!pt) return
-
-  reassigningProductKey.value = `${categoryRow.id}:${product.id}`
+async function loadCatalogForType(productType) {
+  if (!productType) return []
+  catalogLoading.value = true
   try {
-    await assignCategoryCatalogProduct({
-      product_id: product.id,
-      product_type: pt,
-      from_category_name: categoryRow.category_name,
-      to_category_name: toCategory
-    })
-    ElMessage.success('已修改该产品分类')
-    await loadCatalog()
-    await loadCategoryProducts(categoryRow, { force: true })
-  } catch {
-    /* 拦截器已提示 */
+    const res = await listCategoryCatalog({ product_type: productType })
+    categoriesByType[productType] = res.data || []
+    return categoriesByType[productType]
   } finally {
-    reassigningProductKey.value = ''
+    catalogLoading.value = false
   }
 }
 
-function onCatalogExpandChange(row, expandedRowsOrBool) {
-  let open = false
-  if (typeof expandedRowsOrBool === 'boolean') {
-    open = expandedRowsOrBool
-  } else if (Array.isArray(expandedRowsOrBool)) {
-    open = expandedRowsOrBool.some((r) => r.id === row.id)
+async function ensureCatalogForType(productType) {
+  if (!productType) return []
+  if (categoriesByType[productType]) return categoriesByType[productType]
+  return loadCatalogForType(productType)
+}
+
+async function loadAbstractProducts() {
+  if (!selectedProductType.value || !selectedCategoryName.value) {
+    abstractRows.value = []
+    return
   }
-  if (open) {
-    loadCategoryProducts(row)
+  abstractLoading.value = true
+  try {
+    const res = await listCategoryAbstractProducts({
+      product_type: selectedProductType.value,
+      category_name: selectedCategoryName.value
+    })
+    abstractRows.value = res.data || []
+  } finally {
+    abstractLoading.value = false
   }
 }
 
-function onCatalogRowDblClick(row) {
-  catalogTableRef.value?.toggleRowExpansion(row)
-  loadCategoryProducts(row)
+async function reloadTree() {
+  await loadProductTypes()
+  await Promise.all(productTypeOptions.value.map((item) => loadCatalogForType(item.value)))
+  if (!selectedCategoryName.value && selectedProductType.value) {
+    const rows = categoriesByType[selectedProductType.value] || []
+    selectedCategoryName.value = rows[0]?.category_name || ''
+  }
+  if (selectedProductType.value && selectedCategoryName.value) {
+    await loadAbstractProducts()
+  }
+}
+
+async function handleTreeNodeClick(data) {
+  if (data.type === 'type') {
+    selectedProductType.value = data.product_type
+    await ensureCatalogForType(data.product_type)
+    const rows = categoriesByType[data.product_type] || []
+    selectedCategoryName.value = rows[0]?.category_name || ''
+    return
+  }
+  selectedProductType.value = data.product_type
+  selectedCategoryName.value = data.category_name
 }
 
 async function handleCreateProductType() {
@@ -289,80 +438,92 @@ async function handleCreateProductType() {
     const v = res?.data?.value
     if (v) {
       selectedProductType.value = v
+      selectedCategoryName.value = ''
+      await loadCatalogForType(v)
     }
+    typeDialogVisible.value = false
     ElMessage.success('已新增产品类型')
   } catch {
-    /* 拦截器已提示 */
+    /* request interceptor already shows errors */
   } finally {
     creatingType.value = false
   }
 }
 
-function formatDateTime(value) {
-  if (value == null || value === '') return '—'
-  const d = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(d.getTime())) return String(value)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-async function loadProductTypes() {
-  typesLoading.value = true
-  try {
-    const res = await getCategoryCatalogProductTypes()
-    productTypeOptions.value = res.data || []
-    if (!selectedProductType.value && productTypeOptions.value.length) {
-      selectedProductType.value = productTypeOptions.value[0].value
-    }
-  } finally {
-    typesLoading.value = false
-  }
-}
-
-async function loadCatalog() {
-  const pt = selectedProductType.value
-  resetExpandRowsState()
-  if (!pt) {
-    catalogRows.value = []
-    return
-  }
-  listLoading.value = true
-  try {
-    const res = await listCategoryCatalog({ product_type: pt })
-    catalogRows.value = res.data || []
-  } finally {
-    listLoading.value = false
-  }
-}
-
-async function handleCreate() {
+async function handleCreateCategory() {
   const name = newCategoryName.value.trim()
   if (!selectedProductType.value || !name) return
-  creating.value = true
+  creatingCategory.value = true
   try {
     await createCategoryCatalog({
       product_type: selectedProductType.value,
       category_name: name
     })
     newCategoryName.value = ''
-    await loadCatalog()
-    ElMessage.success('已新增分类词条')
+    await loadCatalogForType(selectedProductType.value)
+    selectedCategoryName.value = name
+    categoryDialogVisible.value = false
+    ElMessage.success('已新增分类')
   } catch {
-    /* 拦截器已提示 */
+    /* request interceptor already shows errors */
   } finally {
-    creating.value = false
+    creatingCategory.value = false
   }
 }
 
-async function handleDelete(row) {
-  const usage = Number(row.usage_count || 0)
-  const tip =
-    usage > 0
-      ? `该分类仍关联 ${usage} 条不合格产品明细（主表字段或拆分表标签）。删除仅从「分类词条库」移除，不会自动改掉明细上的文字，确定删除？`
-      : '确定从词条库中删除该分类？'
+async function onAbstractFormTypeChange(value) {
+  await ensureCatalogForType(value)
+  const rows = categoriesByType[value] || []
+  if (!rows.some((cat) => cat.category_name === abstractForm.category_name)) {
+    abstractForm.category_name = rows[0]?.category_name || ''
+  }
+}
 
+async function openAbstractDialog(row = null) {
+  editingAbstractId.value = row?.id || null
+  abstractForm.product_type = row?.product_type || selectedProductType.value || productTypeOptions.value[0]?.value || ''
+  await ensureCatalogForType(abstractForm.product_type)
+  abstractForm.category_name = row?.category_name || selectedCategoryName.value || formCategoryOptions.value[0]?.category_name || ''
+  abstractForm.abstract_name = row?.abstract_name || ''
+  abstractForm.image_url = row?.image_url || ''
+  abstractDialogVisible.value = true
+}
+
+async function saveAbstractProduct() {
+  const name = abstractForm.abstract_name.trim()
+  if (!abstractForm.product_type || !abstractForm.category_name || !name) {
+    ElMessage.warning('请填写名称、产品类型和所属分类')
+    return
+  }
+  savingAbstract.value = true
+  const payload = {
+    product_type: abstractForm.product_type,
+    category_name: abstractForm.category_name,
+    abstract_name: name,
+    image_url: abstractForm.image_url.trim()
+  }
   try {
-    await ElMessageBox.confirm(tip, '删除确认', {
+    if (editingAbstractId.value) {
+      await updateCategoryAbstractProduct(editingAbstractId.value, payload)
+      ElMessage.success('已更新抽象产品')
+    } else {
+      await createCategoryAbstractProduct(payload)
+      ElMessage.success('已新增抽象产品')
+    }
+    abstractDialogVisible.value = false
+    selectedProductType.value = payload.product_type
+    selectedCategoryName.value = payload.category_name
+    await loadAbstractProducts()
+  } catch {
+    /* request interceptor already shows errors */
+  } finally {
+    savingAbstract.value = false
+  }
+}
+
+async function handleDeleteAbstract(row) {
+  try {
+    await ElMessageBox.confirm(`确定删除抽象产品「${row.abstract_name}」？`, '删除确认', {
       type: 'warning',
       confirmButtonText: '删除',
       cancelButtonText: '取消'
@@ -371,25 +532,39 @@ async function handleDelete(row) {
     return
   }
 
-  deletingId.value = row.id
+  deletingAbstractId.value = row.id
   try {
-    await deleteCategoryCatalog(row.id)
+    await deleteCategoryAbstractProduct(row.id)
     ElMessage.success('已删除')
-    await loadCatalog()
+    await loadAbstractProducts()
   } catch {
-    /* 拦截器已提示 */
+    /* request interceptor already shows errors */
   } finally {
-    deletingId.value = null
+    deletingAbstractId.value = null
   }
 }
 
-watch(selectedProductType, () => {
-  loadCatalog()
-})
+watch(
+  () => selectedProductType.value,
+  async (pt, oldPt) => {
+    if (!pt || pt === oldPt) return
+    await ensureCatalogForType(pt)
+    const rows = categoriesByType[pt] || []
+    if (!rows.some((cat) => cat.category_name === selectedCategoryName.value)) {
+      selectedCategoryName.value = rows[0]?.category_name || ''
+    }
+  }
+)
+
+watch(
+  () => [selectedProductType.value, selectedCategoryName.value],
+  () => {
+    loadAbstractProducts()
+  }
+)
 
 onMounted(async () => {
-  await loadProductTypes()
-  await loadCatalog()
+  await reloadTree()
 })
 </script>
 
@@ -403,30 +578,6 @@ onMounted(async () => {
   border-radius: 18px;
 }
 
-.page-header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.page-title {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.page-hint {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-  line-height: 1.5;
-}
-
-.page-hint code {
-  font-size: 12px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--el-fill-color-light);
-}
-
 .layout-row {
   align-items: stretch;
 }
@@ -435,118 +586,95 @@ onMounted(async () => {
   min-height: 360px;
 }
 
+.panel-header,
+.right-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .panel-title {
   font-weight: 600;
 }
 
-.type-toolbar {
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.panel-sub {
+  margin-left: 10px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.type-toolbar,
+.category-toolbar {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-bottom: 14px;
 }
 
-.category-expand-panel {
-  padding: 12px 16px 16px;
-  min-height: 72px;
+.category-toolbar {
+  padding-top: 14px;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
 
-.expand-hint {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
+.category-tree {
+  margin-top: 8px;
 }
 
-.expand-product-list {
-  margin: 0;
-  padding-left: 0;
-  max-height: 320px;
-  overflow: auto;
-  line-height: 1.6;
-  list-style: none;
-}
-
-.expand-product-row {
+.tree-node {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding-right: 8px;
 }
 
-.expand-product-row:last-child {
-  border-bottom: none;
-}
-
-.expand-product-name {
-  flex: 1;
+.tree-node-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.expand-category-select {
-  width: 200px;
-  flex-shrink: 0;
-}
-
-.right-header {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.panel-sub {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
-.type-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.type-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 10px 14px;
-  border-radius: 10px;
+.abstract-thumb,
+.abstract-preview {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
   border: 1px solid var(--el-border-color-lighter);
-  background: var(--el-fill-color-blank);
-  font-size: 14px;
-  cursor: pointer;
-  color: var(--el-text-color-primary);
+  background: var(--el-fill-color-light);
 }
 
-.type-item:hover {
-  border-color: var(--el-color-primary-light-5);
-  color: var(--el-color-primary);
+.abstract-preview {
+  width: 96px;
+  height: 96px;
 }
 
-.type-item--active {
-  border-color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-  font-weight: 600;
-}
-
-.toolbar {
+.image-fallback,
+.preview-fallback {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  background: var(--el-fill-color-light);
 }
 
-.table-hint {
-  margin: 0 0 12px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
+.category-dialog-form,
+.abstract-form {
+  padding-top: 8px;
 }
 
 .left-col,

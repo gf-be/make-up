@@ -113,6 +113,196 @@ router.post('/product-types', requireCategoryManagers(), async (req, res) => {
   }
 });
 
+function normalizeAbstractProductPayload(body = {}) {
+  const productType = normalizeProductType(body.product_type || 'cosmetics');
+  const categoryName = String(body.category_name || '').trim();
+  const abstractName = String(body.abstract_name || body.name || '').trim();
+  const imageUrl = body.image_url == null ? '' : String(body.image_url).trim();
+
+  if (!categoryName) {
+    const error = new Error('所属分类不能为空');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (categoryName.length > 100) {
+    const error = new Error('所属分类最长 100 字符');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!abstractName) {
+    const error = new Error('抽象产品名称不能为空');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (abstractName.length > 150) {
+    const error = new Error('抽象产品名称最长 150 字符');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (imageUrl.length > 1000) {
+    const error = new Error('图片地址最长 1000 字符');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    productType,
+    categoryName,
+    abstractName,
+    imageUrl: imageUrl || null
+  };
+}
+
+async function assertCategoryExists(connection, productType, categoryName) {
+  const [[row]] = await connection.query(
+    `
+      SELECT id
+      FROM unqualified_product_category_catalog
+      WHERE product_type = ? AND category_name = ?
+      LIMIT 1
+    `,
+    [productType, categoryName]
+  );
+  if (!row) {
+    const error = new Error('请先在当前类型下新增目标分类');
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+router.get('/abstract-products', requireCategoryManagers(), async (req, res) => {
+  try {
+    await ensureReady();
+    const productType = normalizeProductType(req.query.product_type || 'cosmetics');
+    const categoryName = String(req.query.category_name || '').trim();
+    if (!categoryName) {
+      return res.status(400).json({ success: false, message: '缺少分类名称 category_name' });
+    }
+
+    const [rows] = await pool.query(
+      `
+        SELECT id, product_type, category_name, abstract_name, image_url, created_at, updated_at
+        FROM unqualified_product_abstract_catalog
+        WHERE product_type = ? AND category_name = ?
+        ORDER BY abstract_name ASC, id ASC
+      `,
+      [productType, categoryName]
+    );
+
+    res.json({ success: true, data: rows || [] });
+  } catch (error) {
+    console.error('获取抽象产品列表失败:', error);
+    res.status(500).json({ success: false, message: '获取抽象产品列表失败' });
+  }
+});
+
+router.post('/abstract-products', requireCategoryManagers(), async (req, res) => {
+  try {
+    await ensureReady();
+    const { productType, categoryName, abstractName, imageUrl } = normalizeAbstractProductPayload(req.body);
+    await assertCategoryExists(pool, productType, categoryName);
+
+    try {
+      await pool.query(
+        `
+          INSERT INTO unqualified_product_abstract_catalog (
+            product_type, category_name, abstract_name, image_url
+          )
+          VALUES (?, ?, ?, ?)
+        `,
+        [productType, categoryName, abstractName, imageUrl]
+      );
+    } catch (insertErr) {
+      if (insertErr?.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ success: false, message: '该分类下已存在相同抽象产品名称' });
+      }
+      throw insertErr;
+    }
+
+    const [[created]] = await pool.query(
+      `
+        SELECT id, product_type, category_name, abstract_name, image_url, created_at, updated_at
+        FROM unqualified_product_abstract_catalog
+        WHERE product_type = ? AND category_name = ? AND abstract_name = ?
+        LIMIT 1
+      `,
+      [productType, categoryName, abstractName]
+    );
+
+    res.json({ success: true, message: '已新增抽象产品', data: created });
+  } catch (error) {
+    console.error('新增抽象产品失败:', error);
+    res.status(error.statusCode || 500).json({ success: false, message: error.statusCode ? error.message : '新增抽象产品失败' });
+  }
+});
+
+router.put('/abstract-products/:id', requireCategoryManagers(), async (req, res) => {
+  try {
+    await ensureReady();
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ success: false, message: '无效的 id' });
+    }
+
+    const { productType, categoryName, abstractName, imageUrl } = normalizeAbstractProductPayload(req.body);
+    await assertCategoryExists(pool, productType, categoryName);
+
+    try {
+      const [result] = await pool.query(
+        `
+          UPDATE unqualified_product_abstract_catalog
+          SET product_type = ?, category_name = ?, abstract_name = ?, image_url = ?
+          WHERE id = ?
+        `,
+        [productType, categoryName, abstractName, imageUrl, id]
+      );
+      if (!Number(result?.affectedRows || 0)) {
+        return res.status(404).json({ success: false, message: '抽象产品不存在或已删除' });
+      }
+    } catch (updateErr) {
+      if (updateErr?.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ success: false, message: '该分类下已存在相同抽象产品名称' });
+      }
+      throw updateErr;
+    }
+
+    const [[updated]] = await pool.query(
+      `
+        SELECT id, product_type, category_name, abstract_name, image_url, created_at, updated_at
+        FROM unqualified_product_abstract_catalog
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [id]
+    );
+
+    res.json({ success: true, message: '已更新抽象产品', data: updated });
+  } catch (error) {
+    console.error('更新抽象产品失败:', error);
+    res.status(error.statusCode || 500).json({ success: false, message: error.statusCode ? error.message : '更新抽象产品失败' });
+  }
+});
+
+router.delete('/abstract-products/:id', requireCategoryManagers(), async (req, res) => {
+  try {
+    await ensureReady();
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ success: false, message: '无效的 id' });
+    }
+
+    const [result] = await pool.query('DELETE FROM unqualified_product_abstract_catalog WHERE id = ?', [id]);
+    if (!Number(result?.affectedRows || 0)) {
+      return res.status(404).json({ success: false, message: '抽象产品不存在或已删除' });
+    }
+
+    res.json({ success: true, message: '已删除抽象产品' });
+  } catch (error) {
+    console.error('删除抽象产品失败:', error);
+    res.status(500).json({ success: false, message: '删除抽象产品失败' });
+  }
+});
+
 router.get('/category-products', requireCategoryManagers(), async (req, res) => {
   try {
     await ensureReady();

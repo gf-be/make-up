@@ -311,6 +311,184 @@
                         class="mb-16" :title="currentParseNotice.title" />
 
 
+                      <el-tabs v-if="currentAttachmentGroups.length" v-model="activeAttachmentParseTab"
+                        class="attachment-parse-tabs">
+                        <el-tab-pane :label="`Excel（${currentExcelAttachmentGroup.filtered_rows.length}）`" name="excel">
+                          <div class="attachment-group-list">
+                            <div class="attachment-group-card attachment-group-card-combined">
+                              <!-- <div class="attachment-group-summary">
+                                <span class="muted-text">已合并 {{ currentExcelAttachmentGroups.length }} 个 Excel 附件</span>
+                                <el-tag v-for="attachment in currentExcelAttachmentGroups" :key="attachment.index"
+                                  size="small" effect="plain">
+                                  {{ attachment.attachment_name || `附件${attachment.index}` }}
+                                </el-tag>
+                              </div> -->
+
+                              <template v-if="currentExcelAttachmentGroup.filtered_rows.length">
+                                <el-table v-if="isFlightBatch" :data="currentExcelAttachmentGroup.filtered_rows"
+                                  size="small" stripe :max-height="attachmentTableMaxHeight" class="table-height">
+                                  <el-table-column prop="sequence_no" label="序号" width="70" align="center" />
+                                  <el-table-column prop="title" label="标题" min-width="220" show-overflow-tooltip />
+                                  <el-table-column prop="company_name" label="企业名称" min-width="220"
+                                    show-overflow-tooltip />
+                                  <el-table-column prop="inspection_unit" label="检查单位" min-width="180"
+                                    show-overflow-tooltip />
+                                  <el-table-column prop="defects_and_problems" label="检查问题" min-width="260"
+                                    show-overflow-tooltip />
+                                  <el-table-column prop="handling_measures" label="处理措施" min-width="220"
+                                    show-overflow-tooltip />
+                                </el-table>
+
+                                <el-table v-else :data="currentExcelAttachmentGroup.filtered_rows" size="small" stripe
+                                  :max-height="attachmentTableMaxHeight" class="table-height"
+                                  :row-key="(row) => stagingSamplingTableRowKey(currentExcelAttachmentGroup, row)">
+                                  <el-table-column type="expand" width="40">
+                                    <template #default="{ row }">
+                                      <template v-if="attachmentsListEditing">
+                                        <el-descriptions :column="2" border size="small" class="detail-expanded">
+                                          <el-descriptions-item label="注册人/备案人等名称">
+                                            <el-input v-model="row.company_names" :autosize="{ minRows: 2, maxRows: 6 }"
+                                              size="small" placeholder="注册人/备案人等名称" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="注册人/备案人等地址">
+                                            <el-input v-model="row.company_addresses" type="textarea"
+                                              :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="地址" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="被抽样单位名称">
+                                            <el-input v-model="row.sample_unit_name" size="small"
+                                              placeholder="被抽样单位名称" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="被抽样单位地址">
+                                            <el-input v-model="row.sample_unit_address" type="textarea"
+                                              :autosize="{ minRows: 2, maxRows: 4 }" size="small" placeholder="地址" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="生产日期">
+                                            <el-input v-model="row.production_date" size="small" placeholder="生产日期" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="限期使用日期/保质期">
+                                            <el-input v-model="row.expiry_date" size="small" placeholder="限期使用日期/保质期" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="所在地/进口地区">
+                                            <el-input v-model="row.product_region" size="small" placeholder="所在地/进口地区" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="注册/备案编号">
+                                            <el-input v-model="row.registration_no" size="small" placeholder="注册/备案编号" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="生产许可证号">
+                                            <el-input v-model="row.production_license_no" size="small"
+                                              placeholder="生产许可证号" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="检验结果">
+                                            <el-input v-model="row.inspection_result" type="textarea"
+                                              :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="检验结果" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="规定要求">
+                                            <el-input v-model="row.requirement" type="textarea"
+                                              :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="规定要求" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="备注" :span="2">
+                                            <el-input v-model="row.remarks" type="textarea"
+                                              :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="备注" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="涉嫌假冒">
+                                            <el-switch :model-value="Boolean(Number(row.is_counterfeit))"
+                                              @update:model-value="(v) => { row.is_counterfeit = v ? 1 : 0 }" />
+                                          </el-descriptions-item>
+                                        </el-descriptions>
+                                      </template>
+                                      <el-descriptions v-else :column="2" border size="small" class="detail-expanded">
+                                        <el-descriptions-item label="注册人/备案人等名称">
+                                          <span class="attachment-readonly-block">{{ row.company_names || '—' }}</span>
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="注册人/备案人等地址">
+                                          <span class="attachment-readonly-block">{{ row.company_addresses || '—' }}</span>
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="被抽样单位名称">
+                                          {{ row.sample_unit_name || '—' }}
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="被抽样单位地址">
+                                          <span class="attachment-readonly-block">{{ row.sample_unit_address || '—'
+                                          }}</span>
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="生产日期">
+                                          {{ row.production_date || '—' }}
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="限期使用日期/保质期">
+                                          {{ row.expiry_date || '—' }}
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="所在地/进口地区">
+                                          {{ row.product_region || '—' }}
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="注册/备案编号">
+                                          {{ row.registration_no || '—' }}
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="生产许可证号">
+                                          {{ row.production_license_no || '—' }}
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="检验结果">
+                                          <span class="attachment-readonly-block">{{ row.inspection_result || '—' }}</span>
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="规定要求">
+                                          <span class="attachment-readonly-block">{{ row.requirement || '—' }}</span>
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="备注" :span="2">
+                                          <span class="attachment-readonly-block">{{ row.remarks || '—' }}</span>
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="涉嫌假冒">
+                                          {{ Number(row.is_counterfeit) ? '是' : '否' }}
+                                        </el-descriptions-item>
+                                      </el-descriptions>
+                                    </template>
+                                  </el-table-column>
+                                  <el-table-column label="产品名称" show-overflow-tooltip>
+                                    <template #default="{ row }">
+                                      <el-input v-if="attachmentsListEditing" v-model="row.product_name" size="small" />
+                                      <span v-else>{{ row.product_name || '—' }}</span>
+                                    </template>
+                                  </el-table-column>
+
+                                  <el-table-column prop="sample_unit_name" label="被抽样单位" show-overflow-tooltip>
+                                    <template #default="{ row }">
+                                      <el-input v-if="attachmentsListEditing" v-model="row.sample_unit_name" size="small" />
+                                      <span v-else>{{ row.sample_unit_name || '—' }}</span>
+                                    </template>
+                                  </el-table-column>
+                                  <el-table-column prop="unqualified_items" label="不符合规定项目" show-overflow-tooltip>
+                                    <template #default="{ row }">
+                                      <el-input v-if="attachmentsListEditing" v-model="row.unqualified_items"
+                                        size="small" />
+                                      <span v-else>{{ row.unqualified_items || '—' }}</span>
+                                    </template>
+                                  </el-table-column>
+
+                                </el-table>
+                              </template>
+                              <el-empty v-else
+                                :description="detailFilters.keyword ? '当前筛选条件下没有匹配结果' : '当前 Excel 附件暂无可展示的解析明细'" />
+                            </div>
+                          </div>
+                        </el-tab-pane>
+
+                        <el-tab-pane :label="`Word（${currentWordAttachmentGroups.length}）`" name="word">
+                          <div v-if="currentWordAttachmentGroups.length" class="attachment-group-list">
+                            <div v-for="attachment in currentWordAttachmentGroups" :key="attachment.index"
+                              class="attachment-group-card word-attachment-card">
+                              <div class="attachment-word-header">
+                                <div class="attachment-word-title">{{ attachment.attachment_name || `附件${attachment.index}`
+                                }}</div>
+                                <el-tag size="small" effect="plain">Word</el-tag>
+                              </div>
+                              <div class="attachment-word-message">
+                                {{ attachment.parse_message || '当前 Word 附件没有可展示的解析文本。' }}
+                              </div>
+                            </div>
+                          </div>
+                          <el-empty v-else description="当前批次暂无 Word 附件解析内容" />
+                        </el-tab-pane>
+                      </el-tabs>
+                      <el-empty v-else description="当前批次暂无附件解析产品列表" />
+
+                      <!-- Legacy per-attachment renderer retained for reference during migration.
                       <div v-if="currentAttachmentGroups.length" class="attachment-group-list">
                         <div v-for="attachment in currentAttachmentGroups" :key="attachment.index"
                           class="attachment-group-card">
@@ -455,7 +633,8 @@
                           <el-empty v-else :description="detailFilters.keyword ? '当前筛选条件下没有匹配结果' : '当前附件暂无可展示的解析明细'" />
                         </div>
                       </div>
-                      <el-empty v-else description="当前批次暂无附件解析产品列表" />
+                      </div>
+                      <el-empty v-else description="当前批次暂无附件解析产品列表" /> -->
                     </el-tab-pane>
 
 
@@ -701,6 +880,7 @@ const lastImportResult = ref(null)
 const selectedBatchId = ref(null)
 const selectedTreeKey = ref('')
 const activeDetailTab = ref('body')
+const activeAttachmentParseTab = ref('excel')
 /** 附件解析产品列表（抽检表格）： false 为只读展示，true 为单元格可编辑 */
 const attachmentsListEditing = ref(false)
 /** 通告正文页签：默认只读，点击「编辑」后显示表单与正文编辑器 */
@@ -1349,6 +1529,20 @@ function filterAttachmentRows(rows = [], keyword = '') {
   })
 }
 
+function normalizeAttachmentType(attachment = {}) {
+  return String(attachment.attachment_type || attachment.file_ext || '').trim().toLowerCase().replace(/^\./, '')
+}
+
+function isExcelAttachment(attachment = {}) {
+  const type = normalizeAttachmentType(attachment)
+  return ['excel', 'xls', 'xlsx'].includes(type)
+}
+
+function isWordAttachment(attachment = {}) {
+  const type = normalizeAttachmentType(attachment)
+  return ['word', 'doc', 'docx'].includes(type)
+}
+
 function stagingSamplingTableRowKey(attachment, row) {
   const attIdx = attachment?.__attachment_index ?? attachment?.index ?? 0
   const r = row || {}
@@ -1362,6 +1556,7 @@ function buildWorkspacePayload() {
     selectedTreeKey: selectedTreeKey.value,
     selectedBatchId: selectedBatchId.value,
     activeDetailTab: activeDetailTab.value,
+    activeAttachmentParseTab: activeAttachmentParseTab.value,
     selectedAttachmentIndex: selectedAttachmentIndex.value,
     lastImportResult: lastImportResult.value,
     mainTab: mainTab.value
@@ -1389,6 +1584,7 @@ function applyWorkspacePayload(payload = {}) {
     filters.product_type = legacyProductType
   }
   activeDetailTab.value = payload.activeDetailTab || 'body'
+  activeAttachmentParseTab.value = payload.activeAttachmentParseTab || 'excel'
 
   selectedAttachmentIndex.value = payload.selectedAttachmentIndex ?? null
   lastImportResult.value = payload.lastImportResult || null
@@ -1495,10 +1691,25 @@ const currentAttachmentGroups = computed(() => {
   }))
 })
 
+const currentExcelAttachmentGroups = computed(() => (
+  currentAttachmentGroups.value.filter((attachment) => isExcelAttachment(attachment))
+))
+
+const currentWordAttachmentGroups = computed(() => (
+  currentAttachmentGroups.value.filter((attachment) => isWordAttachment(attachment))
+))
+
+const currentExcelAttachmentGroup = computed(() => ({
+  index: 'excel-all',
+  __attachment_index: 'excel-all',
+  attachment_name: '全部 Excel 附件',
+  filtered_rows: currentExcelAttachmentGroups.value.flatMap((attachment) => attachment.filtered_rows || [])
+}))
+
 /** 当前是否存在可切换编辑模式的抽检附件表格（非飞行检查且有过滤后行） */
 const hasAttachmentSamplingEditableTable = computed(() => {
   if (isFlightBatch.value) return false
-  return currentAttachmentGroups.value.some((g) => (g.filtered_rows || []).length > 0)
+  return currentExcelAttachmentGroup.value.filtered_rows.length > 0
 })
 
 function enterAttachmentsTableEdit() {
@@ -1527,13 +1738,13 @@ const currentParseNotice = computed(() => {
     }
   }
 
-  if (Number(validation.failed_attachment_count || 0) > 0) {
-    const names = Array.isArray(validation.failed_attachment_names) ? validation.failed_attachment_names.filter(Boolean).join('、') : ''
-    return {
-      type: 'info',
-      title: names ? `当前仍有未解析成功附件：${names}` : `当前仍有 ${validation.failed_attachment_count} 个附件未解析成功`
-    }
-  }
+  // if (Number(validation.failed_attachment_count || 0) > 0) {
+  //   const names = Array.isArray(validation.failed_attachment_names) ? validation.failed_attachment_names.filter(Boolean).join('、') : ''
+  //   return {
+  //     type: 'info',
+  //     title: names ? `当前仍有未解析成功附件：${names}` : `当前仍有 ${validation.failed_attachment_count} 个附件未解析成功`
+  //   }
+  // }
 
   return null
 })
@@ -2154,7 +2365,7 @@ watch(
 )
 
 watch(
-  [filters, detailFilters, selectedTreeKey, selectedBatchId, activeDetailTab, selectedAttachmentIndex, lastImportResult, mainTab],
+  [filters, detailFilters, selectedTreeKey, selectedBatchId, activeDetailTab, activeAttachmentParseTab, selectedAttachmentIndex, lastImportResult, mainTab],
 
 
   () => {
@@ -3045,6 +3256,31 @@ onBeforeUnmount(() => {
   border-radius: 16px;
   border: 1px solid #e8edf7;
   background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+}
+
+.attachment-parse-tabs {
+  margin-top: 4px;
+}
+
+.attachment-group-summary,
+.attachment-word-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.attachment-word-title {
+  font-weight: 600;
+  color: #303133;
+}
+
+.attachment-word-message {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.7;
+  color: #606266;
 }
 
 .company-products-label {

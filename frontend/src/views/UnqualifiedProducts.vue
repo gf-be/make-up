@@ -2938,9 +2938,10 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.el-form-item__label{
+/* .el-form-item__label{
   width: 60% !important;
-}
+} */
+
 .unqualified-product-detail-table{
   padding: 4px !important;
 }
