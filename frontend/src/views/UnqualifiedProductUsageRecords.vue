@@ -37,9 +37,9 @@
             <el-tag type="warning" size="small">{{ Number(row.use_count) || 0 }} 次</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="first_used_at" label="首次使用" min-width="170">
+        <!-- <el-table-column prop="first_used_at" label="首次使用" min-width="170">
           <template #default="{ row }">{{ formatDateTime(row.first_used_at) }}</template>
-        </el-table-column>
+        </el-table-column> -->
         <el-table-column prop="last_used_at" label="最近使用" min-width="170">
           <template #default="{ row }">{{ formatDateTime(row.last_used_at) }}</template>
         </el-table-column>

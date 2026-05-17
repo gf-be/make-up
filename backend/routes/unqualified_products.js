@@ -2334,6 +2334,51 @@ function mergeNodeDetailChartBuckets(rows, dimensionKey) {
     .sort((a, b) => b.value - a.value);
 }
 
+const NODE_DETAIL_CHART_MAX_PRODUCT_IDS = 3000;
+
+function parseNodeDetailProductIds(input) {
+  const raw = input.product_ids;
+  if (raw === undefined || raw === null || raw === '') {
+    return [];
+  }
+  let arr = [];
+  if (Array.isArray(raw)) {
+    arr = raw;
+  } else if (typeof raw === 'string') {
+    const s = raw.trim();
+    if (!s) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed)) {
+        arr = parsed;
+      } else {
+        arr = s.split(/[\s,，;；|｜]+/);
+      }
+    } catch {
+      arr = s.split(/[\s,，;；|｜]+/);
+    }
+  }
+  const ids = [];
+  const seen = new Set();
+  for (const x of arr) {
+    const n = typeof x === 'number' ? x : Number.parseInt(String(x).trim(), 10);
+    if (!Number.isFinite(n) || n <= 0) {
+      continue;
+    }
+    if (seen.has(n)) {
+      continue;
+    }
+    seen.add(n);
+    ids.push(n);
+    if (ids.length >= NODE_DETAIL_CHART_MAX_PRODUCT_IDS) {
+      break;
+    }
+  }
+  return ids;
+}
+
 async function handleNodeDetailChart(req, res) {
   try {
     await ensureUnqualifiedProductsReady();
@@ -2350,9 +2395,16 @@ async function handleNodeDetailChart(req, res) {
       return res.json({ success: true, data: [], chart_dimension: dimensionKey });
     }
 
+    const productIds = parseNodeDetailProductIds(input);
+
     const { whereClause, params } = buildBaseFilterState(input);
     const queryParams = [...params];
     const pathSql = buildPathExistsSql(selectedPaths, queryParams, 'up');
+    const idClause =
+      productIds.length > 0 ? `AND up.id IN (${productIds.map(() => '?').join(', ')})` : '';
+    if (productIds.length) {
+      queryParams.push(...productIds);
+    }
 
     const [aggRows] = await pool.query(
       `
@@ -2360,6 +2412,7 @@ async function handleNodeDetailChart(req, res) {
         FROM unqualified_products up
         WHERE ${whereClause}
           AND ${pathSql}
+          ${idClause}
         GROUP BY (${bucketExpr})
         ORDER BY cnt DESC
         LIMIT 500

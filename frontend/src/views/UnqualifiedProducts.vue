@@ -9,26 +9,19 @@
           <el-col :span="5">
             <el-form-item label="企业关键词">
               <el-input v-model="filters.company_keyword" placeholder="搜索企业或被抽样单位" clearable
-                @keyup.enter="handleSearch" width="80%"/>
+                @keyup.enter="handleSearch" />
             </el-form-item>
           </el-col>
-          <el-col :span="4">
-            <el-form-item label="起始年份">
-              <el-select v-model="filters.year_start" clearable filterable placeholder="不限" style="width: 100%">
-                <el-option v-for="item in filterOptions.years" :key="`start-${item.value}`" :label="item.label"
-                  :value="item.value" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="4">
+         
+          <!-- <el-col :span="4">
             <el-form-item label="结束年份">
               <el-select v-model="filters.year_end" clearable filterable placeholder="不限" style="width: 100%">
                 <el-option v-for="item in filterOptions.years" :key="`end-${item.value}`" :label="item.label"
                   :value="item.value" />
               </el-select>
             </el-form-item>
-          </el-col>
-          <el-col :span="5">
+          </el-col> -->
+          <el-col :span="4">
             <el-form-item label="生产企业省份">
               <el-select v-model="filters.manufacturer_province" clearable filterable placeholder="全部"
                 style="width: 100%">
@@ -37,7 +30,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="5">
+          <el-col :span="4">
             <el-form-item label="抽检企业省份">
               <el-select v-model="filters.sampled_province" clearable filterable placeholder="全部"
                 style="width: 100%">
@@ -46,22 +39,32 @@
               </el-select>
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="32">
-          <el-col :span="5">
+          <el-col :span="6">
             <el-form-item label="不符合项目">
               <el-select v-model="filters.issue_items" multiple filterable collapse-tags collapse-tags-tooltip clearable
                 placeholder="选择一个或多个项目" style="width: 100%">
-                <el-option v-for="item in filterOptions.issue_items" :key="item.value" :label="item.label"
-                  :value="item.value" />
+                <el-option v-for="item in filterOptions.issue_items" :key="item.value" :title="item.label" :label="item.label"
+                  :value="item.value" filterable style="width: 200px" show-overflow-tooltip />
               </el-select>
             </el-form-item>
           </el-col>
-
           <el-col :span="4">
             <el-form-item label="产品类型">
               <el-select v-model="filters.product_type" clearable placeholder="全部产品类型" style="width: 100%">
                 <el-option v-for="item in filterOptions.product_types" :key="item.value" :label="item.label"
+                  :value="item.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="32">
+        
+
+         
+          <el-col :span="5">
+            <el-form-item label="年份" style="width: 100%">
+              <el-select v-model="filters.year_start" clearable filterable placeholder="不限" >
+                <el-option v-for="item in filterOptions.years" :key="`start-${item.value}`" :label="item.label"
                   :value="item.value" />
               </el-select>
             </el-form-item>
@@ -262,7 +265,12 @@
             重新加载
           </el-button>
           <span class="detail-chart-hint">
-            当前范围共 {{ pagination.total || 0 }} 条（图表由服务端聚合）
+            <template v-if="detailTableSelectedCount > 0">
+              按已勾选的 {{ detailTableSelectedCount }} 条参与统计
+            </template>
+            <template v-else>
+              未勾选时按当前节点范围内全部 {{ pagination.total || 0 }} 条
+            </template>
           </span>
         </div>
         <div ref="detailChartRef" class="detail-chart-canvas detail-chart-canvas--dialog" />
@@ -367,8 +375,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import ExcelJS from 'exceljs'
-import * as echarts from 'echarts'
 import { Close, Rank } from '@element-plus/icons-vue'
 import {
   getUnqualifiedProductFilterOptions,
@@ -447,12 +453,25 @@ const detailChartRef = ref(null)
 const detailChartBuckets = ref([])
 const detailChartDataLoading = ref(false)
 let detailChartInstance = null
+let echartsModulePromise = null
 const videoCopyDialogVisible = ref(false)
 const videoCopyText = ref('')
 /** 与当前文案正文对应的产品明细 id（文案中「节选/勾选」出现的条目） */
 const videoCopyProductIds = ref([])
 const generatingVideoCopy = ref(false)
 const savingVideoCopy = ref(false)
+
+function loadEchartsModule() {
+  if (!echartsModulePromise) {
+    echartsModulePromise = import('echarts').then((mod) => mod.default || mod)
+  }
+  return echartsModulePromise
+}
+
+async function loadExcelJSModule() {
+  const mod = await import('exceljs')
+  return mod.default || mod
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return '-'
@@ -559,7 +578,11 @@ function buildDetailChartOption() {
   }
 }
 
-function updateDetailChart() {
+async function updateDetailChart() {
+  if (!detailChartDialogVisible.value || !detailChartRef.value) {
+    return
+  }
+  const echarts = await loadEchartsModule()
   if (!detailChartDialogVisible.value || !detailChartRef.value) {
     return
   }
@@ -596,6 +619,9 @@ const dimensionPresetName = ref('')
 const savingDimensionPreset = ref(false)
 /** 服务端保存的方案（标题表 + 关联表），供「猜你想用」优先展示 */
 const serverSavedDimensionPresets = ref([])
+const SAVED_DIMENSION_PRESETS_TTL_MS = 30_000
+let savedDimensionPresetsPromise = null
+let savedDimensionPresetsFetchedAt = 0
 /** 分类卡片 header：方案主题下拉当前选中 id */
 const themePresetSelectValue = ref(null)
 const deletingPresetId = ref(null)
@@ -752,24 +778,42 @@ const dimensionPresetPickList = computed(() => {
   return out.slice(0, 24)
 })
 
-async function fetchSavedDimensionPresets() {
+async function fetchSavedDimensionPresets({ force = false } = {}) {
   if (!getAuthToken()) {
     serverSavedDimensionPresets.value = []
     themePresetSelectValue.value = null
+    savedDimensionPresetsFetchedAt = 0
     return
   }
-  try {
-    const res = await listMyUnqualifiedDimensionPresets()
-    serverSavedDimensionPresets.value = Array.isArray(res.data) ? res.data : []
-    if (
-      themePresetSelectValue.value != null
-      && !serverSavedDimensionPresets.value.some((x) => x.id === themePresetSelectValue.value)
-    ) {
-      themePresetSelectValue.value = null
+  if (!force) {
+    if (savedDimensionPresetsPromise) {
+      return savedDimensionPresetsPromise
     }
-  } catch {
-    serverSavedDimensionPresets.value = []
+    if (Date.now() - savedDimensionPresetsFetchedAt < SAVED_DIMENSION_PRESETS_TTL_MS) {
+      return serverSavedDimensionPresets.value
+    }
   }
+  savedDimensionPresetsPromise = (async () => {
+    try {
+      const res = await listMyUnqualifiedDimensionPresets()
+      serverSavedDimensionPresets.value = Array.isArray(res.data) ? res.data : []
+      savedDimensionPresetsFetchedAt = Date.now()
+      if (
+        themePresetSelectValue.value != null
+        && !serverSavedDimensionPresets.value.some((x) => x.id === themePresetSelectValue.value)
+      ) {
+        themePresetSelectValue.value = null
+      }
+      return serverSavedDimensionPresets.value
+    } catch {
+      serverSavedDimensionPresets.value = []
+      savedDimensionPresetsFetchedAt = 0
+      return []
+    } finally {
+      savedDimensionPresetsPromise = null
+    }
+  })()
+  return savedDimensionPresetsPromise
 }
 
 function onThemePresetDropdownVisible(visible) {
@@ -811,7 +855,7 @@ async function confirmDeleteDimensionPreset(p) {
     }
     serverSavedDimensionPresets.value = serverSavedDimensionPresets.value.filter((x) => x.id !== p.id)
   } catch {
-    await fetchSavedDimensionPresets()
+    await fetchSavedDimensionPresets({ force: true })
   } finally {
     deletingPresetId.value = null
   }
@@ -847,7 +891,7 @@ async function applyCategoryDimensionWithName() {
     if (next) {
       setAuthSession(getAuthToken(), next)
     }
-    await fetchSavedDimensionPresets()
+    await fetchSavedDimensionPresets({ force: true })
     ElMessage.success('层级已应用并保存名称')
     categorySettingDialogVisible.value = false
   } finally {
@@ -1119,6 +1163,8 @@ function buildDetailSortParams() {
   }
 }
 
+const DEFAULT_FILTER_YEAR_START = '2026'
+
 function createDefaultFilters() {
   return {
     keyword: '',
@@ -1132,7 +1178,7 @@ function createDefaultFilters() {
     province: '',
     manufacturer_province: '',
     sampled_province: '',
-    year_start: '',
+    year_start: DEFAULT_FILTER_YEAR_START,
     year_end: '',
     announcement_id: '',
     supervision_id: ''
@@ -1164,7 +1210,7 @@ function applyRouteFilters() {
     province: String(route.query.province || ''),
     manufacturer_province: normalizeProvinceToStandard(route.query.manufacturer_province ?? '') || '',
     sampled_province: normalizeProvinceToStandard(route.query.sampled_province ?? '') || '',
-    year_start: String(route.query.year_start || fallbackYear || ''),
+    year_start: String(route.query.year_start || fallbackYear || DEFAULT_FILTER_YEAR_START),
     year_end: String(route.query.year_end || fallbackYear || ''),
     announcement_id: String(route.query.announcement_id || ''),
     supervision_id: String(route.query.supervision_id || '')
@@ -1645,7 +1691,7 @@ function buildVideoProductLine(row) {
   const issues = issuesForVoice(row?.unqualified_items)
 
   const head = producer && product && sales
-    ? `由${producer}生产，${sales}经销的${product}`
+    ? `由${producer}生产，${sales}销售的${product}`
     : (product || (producer ? `${producer}相关批次产品` : '有关产品'))
   // const middle = region ? `在${region}抽检时` : '在通报所列抽检环节中'
   // const middle = sales ? `${sales}经销的` : '在通报所列抽检环节中'
@@ -2121,18 +2167,25 @@ async function refreshDetailChartFullData() {
     detailChartDataLoading.value = false
     await nextTick()
     if (detailChartDialogVisible.value) {
-      updateDetailChart()
+      await updateDetailChart()
       resizeDetailChart()
     }
     return
   }
   detailChartDataLoading.value = true
   try {
-    const res = await getUnqualifiedProductNodeDetailChart({
+    const selectedChartIds = Array.from(detailTableSelectedIds.value)
+      .map((id) => Number(id))
+      .filter((n) => Number.isFinite(n) && n > 0)
+    const chartBody = {
       ...buildTreeRequestParams(),
       paths: pathsPayload,
       chart_dimension: detailChartDimension.value
-    })
+    }
+    if (selectedChartIds.length > 0) {
+      chartBody.product_ids = selectedChartIds
+    }
+    const res = await getUnqualifiedProductNodeDetailChart(chartBody)
     if (!detailChartDialogVisible.value) {
       detailChartBuckets.value = []
       return
@@ -2149,7 +2202,7 @@ async function refreshDetailChartFullData() {
       return
     }
     await nextTick()
-    updateDetailChart()
+    await updateDetailChart()
     resizeDetailChart()
   }
 }
@@ -2179,9 +2232,21 @@ watch(
       if (!detailChartDialogVisible.value) {
         return
       }
-      updateDetailChart()
+      void updateDetailChart()
       resizeDetailChart()
     })
+  }
+)
+
+watch(
+  () => {
+    const s = detailTableSelectedIds.value
+    return `${s.size}\u0000${[...s].map((id) => Number(id)).sort((a, b) => a - b).join(',')}`
+  },
+  () => {
+    if (detailChartDialogVisible.value) {
+      void refreshDetailChartFullData()
+    }
   }
 )
 
@@ -2463,6 +2528,7 @@ async function exportNodeDetailsExcel() {
     if (!checked.length) {
       ElMessage.info('提示：表「维度树」当前未勾选节点，表2 仅含说明；导出前请在左侧树勾选要统计的节点。')
     }
+    const ExcelJS = await loadExcelJSModule()
     const wb = new ExcelJS.Workbook()
     appendDetailsSheet(wb, allRows)
     appendCheckedDimensionTreeSheet(wb, order, checked)
@@ -2849,14 +2915,15 @@ function onWindowResizeDetailChart() {
   resizeDetailChart()
 }
 
-onMounted(async () => {
+onMounted(() => {
   applyRouteFilters()
   appliedDimensionHistory.value = readSavedAppliedDimensionHistory()
   syncDraftWithOrder(readSavedAppliedDimensionOrder() ?? DEFAULT_DIMENSION_ORDER)
-  fetchSavedDimensionPresets()
-  await Promise.all([loadStats(), loadFilterOptions()])
-  await loadTree()
   window.addEventListener('resize', onWindowResizeDetailChart)
+  void fetchSavedDimensionPresets()
+  void loadStats()
+  void loadFilterOptions()
+  void loadTree()
 })
 
 onBeforeUnmount(() => {
@@ -2871,7 +2938,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-
+.el-form-item__label{
+  width: 60% !important;
+}
 .unqualified-product-detail-table{
   padding: 4px !important;
 }
