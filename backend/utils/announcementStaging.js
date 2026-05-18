@@ -48,6 +48,7 @@ const STAGING_DETAIL_FIELDS = [
   'production_date',
   'expiry_date',
   'product_region',
+  'attachment_sampling_category',
   'registration_no',
   'production_license_no',
   'inspection_institution',
@@ -55,6 +56,8 @@ const STAGING_DETAIL_FIELDS = [
   'inspection_result',
   'requirement',
   'remarks',
+  'picture_url',
+  'food_body_text',
   'is_counterfeit'
 ];
 
@@ -389,7 +392,25 @@ function resolvePayloadTypeInfo(payload = {}, importOptions = {}) {
   );
 }
 
+function resolveAnnouncementLevelInfo(payload = {}) {
+  const crawl = payload?.crawl_record && typeof payload.crawl_record === 'object' ? payload.crawl_record : {};
+  const meta = payload?._import_meta && typeof payload._import_meta === 'object' ? payload._import_meta : {};
+
+  const level = normalizeNullableText(payload.announcement_level || crawl.announcement_level || meta.announcement_level);
+
+
+  const label = normalizeNullableText(
+    payload.announcement_level_label || crawl.announcement_level_label || meta.announcement_level_label
+  );
+
+
+  return { announcement_level: level, announcement_level_label: label };
+}
+
 function mergeImportMetaIntoPayload(payload = {}, importOptions = {}) {
+  const levelInfo = resolveAnnouncementLevelInfo(payload);
+
+
   const typeInfo = resolvePayloadTypeInfo(payload, importOptions);
 
   return {
@@ -401,7 +422,9 @@ function mergeImportMetaIntoPayload(payload = {}, importOptions = {}) {
       product_type: typeInfo.product_type,
       announcement_type: typeInfo.announcement_type,
       product_type_label: typeInfo.product_type_label,
-      announcement_type_label: typeInfo.announcement_type_label
+      announcement_type_label: typeInfo.announcement_type_label,
+      ...(levelInfo.announcement_level ? { announcement_level: levelInfo.announcement_level } : {}),
+      ...(levelInfo.announcement_level_label ? { announcement_level_label: levelInfo.announcement_level_label } : {})
     }
   };
 }
@@ -437,6 +460,9 @@ function normalizeDetailRow(row = {}, index = 0) {
     production_date: normalizeNullableText(row.production_date),
     expiry_date: normalizeNullableText(row.expiry_date),
     product_region: normalizeNullableText(row.product_region),
+    attachment_sampling_category: normalizeNullableText(
+      row.attachment_sampling_category ?? row.food_category ?? row['食品细类'] ?? row.sampling_category
+    ),
     registration_no: normalizeNullableText(row.registration_no),
     production_license_no: normalizeNullableText(row.production_license_no),
     inspection_institution: normalizeNullableText(row.inspection_institution),
@@ -444,6 +470,8 @@ function normalizeDetailRow(row = {}, index = 0) {
     inspection_result: normalizeNullableMultilineText(row.inspection_result),
     requirement: normalizeNullableMultilineText(row.requirement),
     remarks: normalizeNullableMultilineText(remarks) || '/',
+    picture_url: normalizeNullableText(row.picture_url ?? row.picture_path ?? row.image_url),
+    food_body_text: normalizeNullableMultilineText(row.food_body_text),
     is_counterfeit: isCounterfeit
   };
 }
@@ -789,6 +817,10 @@ async function ensureAnnouncementTablePublishColumns(connection) {
   await ensureColumnExists(connection, 'announcements', 'source_detail_url', 'VARCHAR(500) NULL AFTER announcement_type');
   await ensureColumnExists(connection, 'announcements', 'source_page', 'VARCHAR(500) NULL AFTER source_detail_url');
   await ensureColumnExists(connection, 'announcements', 'source_json_file', 'VARCHAR(500) NULL AFTER source_page');
+  await ensureColumnExists(connection, 'announcements', 'announcement_level', 'VARCHAR(24) NULL AFTER source_json_file');
+  await ensureColumnExists(connection, 'announcements', 'announcement_level_label', 'VARCHAR(32) NULL AFTER announcement_level');
+  await ensureColumnExists(connection, 'announcements', 'sampling_unqualified_batch_count', 'INT NULL AFTER announcement_level_label');
+  await ensureColumnExists(connection, 'announcements', 'sampling_total_batch_count', 'INT NULL AFTER sampling_unqualified_batch_count');
   await ensureIndexExists(connection, 'announcements', 'idx_announcements_product_type', 'ALTER TABLE announcements ADD INDEX idx_announcements_product_type (product_type)');
   await ensureIndexExists(connection, 'announcements', 'idx_announcements_announcement_type', 'ALTER TABLE announcements ADD INDEX idx_announcements_announcement_type (announcement_type)');
   await ensureIndexExists(connection, 'announcements', 'idx_announcements_source_detail_url', 'ALTER TABLE announcements ADD INDEX idx_announcements_source_detail_url (source_detail_url(191))');
@@ -1023,6 +1055,9 @@ async function ensureAnnouncementStagingSchema(connection) {
 
   await ensureColumnExists(connection, 'announcement_staging_batches', 'product_type', "VARCHAR(50) NOT NULL DEFAULT 'cosmetics' AFTER primary_attachment_path");
   await ensureColumnExists(connection, 'announcement_staging_batches', 'announcement_type', "VARCHAR(50) NOT NULL DEFAULT 'sampling' AFTER product_type");
+  await ensureColumnExists(connection, 'announcement_staging_batches', 'announcement_level', "VARCHAR(24) NULL AFTER announcement_type");
+  await ensureColumnExists(connection, 'announcement_staging_batches', 'announcement_level_label', "VARCHAR(32) NULL AFTER announcement_level");
+
   await ensureColumnExists(connection, 'announcement_staging_batches', 'published_supervision_id', 'INT NULL AFTER published_announcement_id');
   await ensureColumnExists(connection, 'announcement_staging_batches', 'imported_by_user_id', 'INT NULL AFTER published_supervision_id');
   await ensureColumnExists(connection, 'announcement_staging_batches', 'imported_by_username', 'VARCHAR(50) NULL AFTER imported_by_user_id');
@@ -1060,6 +1095,7 @@ async function ensureAnnouncementStagingSchema(connection) {
       inspection_result LONGTEXT NULL,
       requirement LONGTEXT NULL,
       remarks LONGTEXT NULL,
+      picture_url VARCHAR(768) NULL,
       is_counterfeit TINYINT(1) DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1075,6 +1111,9 @@ async function ensureAnnouncementStagingSchema(connection) {
   await ensureColumnExists(connection, 'announcement_staging_items', 'manufacturer_address', 'TEXT NULL AFTER manufacturer_name');
   await ensureColumnExists(connection, 'announcement_staging_items', 'operator_name', 'VARCHAR(500) NULL AFTER manufacturer_address');
   await ensureColumnExists(connection, 'announcement_staging_items', 'operator_address', 'TEXT NULL AFTER operator_name');
+  await ensureColumnExists(connection, 'announcement_staging_items', 'attachment_sampling_category', 'VARCHAR(191) NULL AFTER product_region');
+  await ensureColumnExists(connection, 'announcement_staging_items', 'picture_url', 'VARCHAR(768) NULL AFTER remarks');
+  await ensureColumnExists(connection, 'announcement_staging_items', 'food_body_text', 'LONGTEXT NULL AFTER picture_url');
 
   await ensureAnnouncementTablePublishColumns(connection);
   await ensureSupervisionTablePublishColumns(connection);
@@ -1132,16 +1171,20 @@ async function findExistingStagingBatch(connection, batchPayload = {}) {
     return null;
   }
 
+  const productTypeForDup = normalizeProductType(batchPayload.product_type);
+  const dupParams = [productTypeForDup, ...params];
+
   const [rows] = await connection.query(
     `
       SELECT id, status, title, published_announcement_id, published_supervision_id
       FROM announcement_staging_batches
       WHERE status = 'pending'
+        AND product_type = ?
         AND (${conditions.map((condition) => `(${condition})`).join(' OR ')})
       ORDER BY id DESC
       LIMIT 1
     `,
-    params
+    dupParams
   );
 
   return rows[0] || null;
@@ -1178,15 +1221,19 @@ async function findExistingPublishedRecord(connection, batchPayload = {}) {
     return null;
   }
 
+  const productTypeForDup = normalizeProductType(batchPayload.product_type);
+  const dupParams = [productTypeForDup, ...params];
+
   const [rows] = await connection.query(
     `
       SELECT id, title
       FROM ${targetTable}
-      WHERE ${conditions.map((condition) => `(${condition})`).join(' OR ')}
+      WHERE product_type = ?
+        AND (${conditions.map((condition) => `(${condition})`).join(' OR ')})
       ORDER BY id DESC
       LIMIT 1
     `,
-    params
+    dupParams
   );
 
   if (!rows[0]) {
@@ -1600,6 +1647,8 @@ function buildStagingBatchPayload(sourceJsonFile, payload = {}, importOptions = 
   const attachmentPreview = buildAttachmentPreview(mergedPayload, typeInfo);
   const attachmentValidation = buildAttachmentValidation(mergedPayload, rows, attachmentPreview);
 
+  const levelInfo = resolveAnnouncementLevelInfo(mergedPayload);
+
 
   return {
     source_sequence: Number.isFinite(Number(mergedPayload.sequence)) ? Number(mergedPayload.sequence) : null,
@@ -1626,6 +1675,8 @@ function buildStagingBatchPayload(sourceJsonFile, payload = {}, importOptions = 
     primary_attachment_path: normalizeNullableText(primaryAttachment.local_path),
     product_type: typeInfo.product_type,
     announcement_type: typeInfo.announcement_type,
+    announcement_level: levelInfo.announcement_level,
+    announcement_level_label: levelInfo.announcement_level_label,
     raw_payload: JSON.stringify(mergedPayload),
     ...auditPayload,
     items: rows,
@@ -1720,6 +1771,8 @@ async function upsertStagingBatchFromJsonPayload(connection, sourceJsonFile, pay
         primary_attachment_path,
         product_type,
         announcement_type,
+        announcement_level,
+        announcement_level_label,
         raw_payload,
         imported_by_user_id,
         imported_by_username,
@@ -1728,7 +1781,7 @@ async function upsertStagingBatchFromJsonPayload(connection, sourceJsonFile, pay
         source_file_name,
         source_relative_path,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     `,
     [
       batchPayload.source_sequence,
@@ -1748,6 +1801,8 @@ async function upsertStagingBatchFromJsonPayload(connection, sourceJsonFile, pay
       batchPayload.primary_attachment_path,
       batchPayload.product_type,
       batchPayload.announcement_type,
+      batchPayload.announcement_level,
+      batchPayload.announcement_level_label,
       batchPayload.raw_payload,
       batchPayload.imported_by_user_id,
       batchPayload.imported_by_username,
@@ -2580,9 +2635,47 @@ async function replaceSupervisionAttachments(connection, supervisionId, attachme
   }
 }
 
+/**
+ * 抽检发布：优先用 announcement_staging_items（与工作台、暂存明细表一致），否则回退 raw_payload 展平。
+ */
+async function resolveSamplingStagingItemsForPublish(connection, stagingBatchId, batch = {}) {
+  const rawPayload = parseJsonSafely(batch.raw_payload, {});
+  const typeInfo = getBatchTypeInfo(batch, rawPayload);
+
+  const [stagingRows] = await connection.query(
+    `
+      SELECT ${STAGING_DETAIL_FIELDS.join(', ')}
+      FROM announcement_staging_items
+      WHERE staging_batch_id = ?
+      ORDER BY sequence_no ASC, id ASC
+    `,
+    [stagingBatchId]
+  );
+
+  if (Array.isArray(stagingRows) && stagingRows.length > 0) {
+    return stagingRows.map((dbRow, index) =>
+      normalizeDetailRow(
+        Object.fromEntries(STAGING_DETAIL_FIELDS.map((field) => [field, dbRow[field]])),
+        index
+      )
+    );
+  }
+
+  return collectBatchRows(rawPayload, typeInfo.announcement_type);
+}
+
 async function publishSamplingStagingBatch(connection, detail) {
-  const { batch, items, attachments } = detail;
+  const { batch, attachments } = detail;
+  const items = await resolveSamplingStagingItemsForPublish(connection, Number(batch.id), batch);
   const typeInfo = getBatchTypeInfo(batch, parseJsonSafely(batch.raw_payload, {}));
+
+  const levelFromPayload = resolveAnnouncementLevelInfo(parseJsonSafely(batch.raw_payload, {}));
+
+  const announcementLevel = normalizeNullableText(batch.announcement_level || levelFromPayload.announcement_level);
+
+  const announcementLevelLabel = normalizeNullableText(batch.announcement_level_label || levelFromPayload.announcement_level_label);
+
+
   const finalInspectionCount = items.length > 0 ? items.length : Number(batch.inspection_count || 0);
   const targetAnnouncementId = await resolvePublishedAnnouncementId(connection, batch);
 
@@ -2604,7 +2697,8 @@ async function publishSamplingStagingBatch(connection, detail) {
         UPDATE announcements
         SET title = ?, content = ?, announcement_no = ?, publish_date = ?,
             inspection_unit = ?, inspection_count = ?, attachment_path = ?, attachment_name = ?,
-            product_type = ?, announcement_type = ?, source_detail_url = ?, source_page = ?, source_json_file = ?, status = 'published'
+            product_type = ?, announcement_type = ?, source_detail_url = ?, source_page = ?, source_json_file = ?,
+            announcement_level = ?, announcement_level_label = ?, status = 'published'
         WHERE id = ?
       `,
       [
@@ -2621,6 +2715,9 @@ async function publishSamplingStagingBatch(connection, detail) {
         batch.source_detail_url || null,
         batch.source_page || null,
         batch.source_json_file || null,
+
+        announcementLevel,
+        announcementLevelLabel,
         announcementId
       ]
     );
@@ -2643,9 +2740,11 @@ async function publishSamplingStagingBatch(connection, detail) {
           source_detail_url,
           source_page,
           source_json_file,
+          announcement_level,
+          announcement_level_label,
           status,
           author_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NULL)
       `,
       [
         batch.title,
@@ -2660,7 +2759,10 @@ async function publishSamplingStagingBatch(connection, detail) {
         typeInfo.announcement_type,
         batch.source_detail_url || null,
         batch.source_page || null,
-        batch.source_json_file || null
+        batch.source_json_file || null,
+
+        announcementLevel,
+        announcementLevelLabel
       ]
     );
 

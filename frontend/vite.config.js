@@ -18,6 +18,10 @@ export default defineConfig({
         // 后端端口号
         target: 'http://localhost:3003',
         changeOrigin: true
+      },
+      '/upload': {
+        target: 'http://localhost:3003',
+        changeOrigin: true
       }
     }
   },

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -48,8 +49,16 @@ app.options('*', cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// 静态文件服务（用于上传的附件）
+// 静态文件服务（multer 等上传目录）
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// public 目录：本地产品配图放 public/upload/products/，浏览器访问 /upload/products/文件名
+const publicDir = path.join(__dirname, 'public');
+try {
+  fs.mkdirSync(path.join(publicDir, 'upload', 'products'), { recursive: true });
+} catch (e) {
+  console.warn('[static] ensure public/upload/products:', e.message);
+}
+app.use(express.static(publicDir));
 
 // 路由
 app.use('/api/auth', require('./routes/auth'));

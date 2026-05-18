@@ -5,8 +5,8 @@ DrissionPage 抓取市场监管总局“通知通告”中的食品抽检不合�
 流程：
 1. 访问 https://zwfw.samr.gov.cn/scjg/wyk/tbtg/ 列表页；
 2. 筛选“市场监管总局办公厅/总局关于 xx 批次食品抽检不合格情况的通报/通告”；
-3. 抓取正文，下载 Excel/ZIP/PDF/Word 附件；
-4. 解析正文分项与 Excel/ZIP 附件，生成 data_get/output/items/*.json；
+3. 抓取正文，下载 Excel/ZIP/PDF 附件；
+4. 调用 data_get/parse_food_attachment.js 解析 Excel/ZIP（以表格第一列序号为分批主键，同序号多行合并；表头序号、同一抽样编号多行亦并入一条；抽样编号合并后续空白行沿用并入；不导入备注列），生成 data_get/output/items/*.json；
 5. 可选调用后端接口，分别写入 food_inspection 原始拆解表和导入检查 staging；
 6. 可选确认发布，正式同步到 announcements、announcement_product_details、
    inspections、inspection_details、unqualified_products、companies。
@@ -29,7 +29,7 @@ import time
 import zipfile
 from datetime import date, datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -46,7 +46,7 @@ except ImportError:  # pragma: no cover - 运行环境提示用
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BASE_URL = "https://zwfw.samr.gov.cn"
-LIST_URL = f"{BASE_URL}/scjg/wyk/tbtg/"
+LIST_URL = f"{BASE_URL}/scjg/wyk/"
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "output"
 DEFAULT_ITEMS_DIR = DEFAULT_OUTPUT_DIR / "items"
 DEFAULT_DOWNLOAD_DIR = Path(__file__).resolve().parent / "downloads" / "samr_food"
@@ -58,10 +58,21 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
 )
 
-SUPPORTED_ATTACHMENT_EXTENSIONS = {".xlsx", ".xls", ".doc", ".docx", ".pdf", ".zip"}
+SUPPORTED_ATTACHMENT_EXTENSIONS = {".xlsx", ".xls", ".pdf", ".zip"}
 EXCEL_EXTENSIONS = {".xlsx", ".xls"}
-WORD_EXTENSIONS = {".doc", ".docx"}
 ZIP_EXTENSIONS = {".zip"}
+# JSON 中为 Windows 友好路径：第二级目录为通告年号/公告编号 announcement_no（经 safe_filename 清洗）
+PRODUCT_IMAGE_PATH_TEMPLATE = r"backend\public\upload\products\{announcement_no_slug}\{sequence_no}.png"
+
+
+def announcement_picture_folder_slug(announcement_no: object) -> str:
+    raw = normalize_whitespace(announcement_no)
+    if not raw:
+        return "misc"
+    slug = safe_filename(raw, limit=120)
+    if slug in ("announcement", ""):
+        return "misc"
+    return slug
 
 CONTENT_CONTAINER_SELECTORS = [
     ".TRS_Editor",
@@ -166,6 +177,26 @@ def normalize_multiline_text(value: object) -> str:
     return "\n".join(line for line in lines if line).strip()
 
 
+# 形如 https://spcjsac.\ngsxt.gov.cn/ 的站内强制换行（下一行须为 ASCII 开头的 URL 片段）
+_SOFT_URL_DOT_BREAK = re.compile(
+    r"(https?://[^\s]+\.)\s*\n\s*([a-zA-Z][a-zA-Z0-9._\-/?:#&%=~+]*)",
+    re.IGNORECASE,
+)
+
+
+def repair_soft_wrapped_urls(text: object) -> str:
+    """合并 HTML get_text('\\n') 在域名内插入的无效换行（常见于主机名在中间被拆开）。"""
+    if not text:
+        return ""
+    s = text.replace("\r\n", "\n").replace("\r", "\n")
+    for _ in range(128):
+        s2 = _SOFT_URL_DOT_BREAK.sub(r"\1\2", s, count=1)
+        if s2 == s:
+            break
+        s = s2
+    return s
+
+
 def normalize_date_text(value: object) -> Optional[str]:
     text = normalize_whitespace(value)
     if not text:
@@ -187,11 +218,6 @@ def normalize_cell(value: object) -> str:
     if isinstance(value, (datetime, date)):
         return value.strftime("%Y-%m-%d")
     return normalize_whitespace(value)
-
-
-def join_text(parts: Iterable[object], sep: str = "；", default: str = "") -> str:
-    values = [normalize_whitespace(part) for part in parts if normalize_whitespace(part)]
-    return sep.join(values) if values else default
 
 
 def safe_filename(value: str, limit: int = 90) -> str:
@@ -271,7 +297,7 @@ def is_content_noise_line(line: str) -> bool:
 
 
 def clean_content_lines(text: object) -> str:
-    lines = normalize_multiline_text(text).split("\n")
+    lines = normalize_multiline_text(repair_soft_wrapped_urls(text)).split("\n")
     out: List[str] = []
     for line in lines:
         normalized = normalize_whitespace(line)
@@ -326,6 +352,62 @@ def extract_publish_date(soup: BeautifulSoup, fallback: Optional[str] = None) ->
     if match:
         return normalize_date_text(match.group(2))
     return normalize_date_text(page_text)
+
+
+def extract_meta_department_hint(soup: BeautifulSoup) -> Optional[str]:
+    for node in soup.select("meta"):
+        key = clean_text(node.get("name") or node.get("property") or node.get("itemprop")).lower()
+        if key in {"author", "source", "department", "publisher", "site"}:
+            content = clean_text(node.get("content"))
+            if content:
+                return content
+    return None
+
+
+def infer_food_announcement_level(
+    detail_url: Optional[str],
+    title: Optional[str],
+    department: Optional[str] = None,
+) -> Tuple[str, str]:
+    """
+    通告层级：national=国家级、municipal=市级（地级市/直辖市等市场监管部门发布）。
+    国家市场监督管理总局及总局官网转载一般视为国家级；地方市场监管局发布为市级。
+    """
+    host = ""
+    parsed = urlparse(normalize_whitespace(detail_url))
+    if parsed.hostname:
+        host = parsed.hostname.lower()
+
+    dept = normalize_whitespace(department)
+    t = normalize_whitespace(title)
+    blob = f"{dept} {t}"
+
+    if "samr.gov.cn" in host or ("samr.gov.cn" in normalize_whitespace(detail_url).lower()):
+        return "national", "国家级"
+
+    national_markers = (
+        "国家市场监督管理总局",
+        "市场监管总局办公厅",
+        "市场监管总局通报",
+        "市场监管总局通告",
+        "市场监管总局关于",
+        "市场监管总局 ",
+        "市场监管总局 ",
+    )
+    if any(marker in blob for marker in national_markers):
+        return "national", "国家级"
+
+    if re.search(
+        r"[\u4e00-\u9fff]{2,16}?(?:市|自治区|特别行政区)(?:市场监管局|市场监督管理局)(?:发文|通告|通报|发布的通报)?",
+        blob,
+    ) and "国家市场监督管理总局" not in blob:
+        return "municipal", "市级"
+
+    municipal_markers = ("市市场监管局", "市市场监督管理局", "区市场监督管理局")
+    if any(marker in blob for marker in municipal_markers) and "总局" not in dept and "国家市场监督管理" not in blob:
+        return "municipal", "市级"
+
+    return "national", "国家级"
 
 
 def select_list_items(soup: BeautifulSoup) -> List[Tag]:
@@ -398,32 +480,29 @@ def parse_food_attachment_with_node(local_path: Path) -> Tuple[List[Dict[str, ob
     return rows, message
 
 
-def parse_word_attachment_with_node(local_path: Path) -> Dict[str, object]:
-    if not NODE_FOOD_ATTACHMENT_PARSER.is_file():
-        raise RuntimeError(f"未找到食品附件解析脚本: {NODE_FOOD_ATTACHMENT_PARSER}")
-    completed = subprocess.run(
-        ["node", str(NODE_FOOD_ATTACHMENT_PARSER), str(local_path)],
-        cwd=str(PROJECT_ROOT),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=True,
+def build_product_picture_path(sequence_no: int, announcement_no: Optional[str] = None) -> str:
+    announcement_no_slug = announcement_picture_folder_slug(announcement_no or "")
+    return PRODUCT_IMAGE_PATH_TEMPLATE.format(
+        announcement_no_slug=announcement_no_slug,
+        sequence_no=int(sequence_no),
     )
-    data = json.loads(completed.stdout.strip() or "{}")
-    raw_text = normalize_multiline_text(data.get("rawText") if isinstance(data, dict) else "")
-    message = clean_text(data.get("message") if isinstance(data, dict) else "")
-    if raw_text and not message:
-        message = f"Word 附件无表格，已提取正文文本：\n{raw_text[:900]}"
-    return {
-        "supported": True,
-        "attachment_type": "word",
-        "parsedCount": 0,
-        "counterfeitCount": 0,
-        "rows": [],
-        "message": message or "Word 附件未提取到正文文本。",
-        "raw_text": raw_text,
-    }
+
+
+def assign_product_picture_paths(
+    attachments: List[Dict[str, object]],
+    announcement_no: Optional[str] = None,
+) -> int:
+    sequence_no = 1
+    for attachment in attachments:
+        rows = attachment.get("parse_result", {}).get("rows", [])
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if isinstance(row, dict) and normalize_whitespace(row.get("product_name")):
+                row["sequence_no"] = sequence_no
+                row["picture_url"] = build_product_picture_path(sequence_no, announcement_no)
+                sequence_no += 1
+    return sequence_no - 1
 
 
 def parse_zip_attachment(local_path: Path, logger: logging.Logger) -> Dict[str, object]:
@@ -489,6 +568,8 @@ FOOD_BODY_START_MARKERS = (
     "通报如下",
 )
 CHINESE_NUMERAL_ITEM = re.compile(r"（([一二三四五六七八九十百千零〇0-9]{1,6})）")
+# food_content_segments 切段：括号内仅中文数位或阿拉伯数字，避免匹配「（手机APP）」等
+FOOD_BODY_ORDINAL_MARK = re.compile(r"[（(]([一二三四五六七八九十百千零〇两0-9]{1,10})[）)]")
 
 
 def _normalize_body_text_for_food_parse(content_text: str) -> str:
@@ -516,124 +597,45 @@ def _slice_food_narrative_body(text: str) -> str:
     return cut.strip()
 
 
-def _split_food_body_items(narrative: str) -> List[Tuple[str, str]]:
-    matches = list(CHINESE_NUMERAL_ITEM.finditer(narrative.strip()))
+def _split_food_body_items_by_ordinals(narrative: str, pattern: re.Pattern) -> List[Tuple[str, str]]:
+    """按（一）（二）或半角括号序号切分段落，每一段为「标签 + 正文」。"""
+    text = normalize_whitespace(narrative)
+    if not text:
+        return []
+    trimmed = text.strip()
+    matches = list(pattern.finditer(trimmed))
     out: List[Tuple[str, str]] = []
     for i, match in enumerate(matches):
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(narrative)
-        body = narrative[match.end():end].strip()
-        if body:
-            out.append((match.group(1), body))
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(trimmed)
+        body = trimmed[match.end():end].strip()
+        label = normalize_whitespace(match.group(1))
+        if label and body:
+            out.append((label, body))
     return out
 
 
-def _extract_product_name_from_item_head(head: str) -> str:
-    patterns = (
-        r"生产的\s*([^，。；]+?)\s*$",
-        r"进口[的、]\s*([^，。；]+?)\s*$",
-        r"加工[的、]\s*([^，。；]+?)\s*$",
-        r"经销[的、]\s*([^，。；]+?)\s*$",
-        r"销售[的、]\s*([^，。；]+?)\s*$",
-        r"来自[^，。；]+?的\s*([^，。；]+?)\s*$",
-    )
-    for pattern in patterns:
-        match = re.search(pattern, head)
-        if match:
-            name = normalize_whitespace(match.group(1)).strip()
-            if 2 <= len(name) <= 200:
-                return name
-    return ""
-
-
-def _extract_company_from_item_head(head: str) -> str:
-    for pattern in (r"标称(.+?)生产[的、]", r"标称(.+?)进口[的、]", r"标称(.+?)委托"):
-        match = re.search(pattern, head)
-        if match:
-            return normalize_whitespace(match.group(1)).strip()
-    return ""
-
-
-def _extract_sample_unit_from_item(segment: str, head: str) -> str:
-    match = re.search(r"（经营者为([^）]+)）", segment)
-    if match:
-        return normalize_whitespace(match.group(1)).strip()
-    match = re.match(r"^(.+?)在(?:淘宝|天猫|拼多多|美团|快手|抖音|微信|饿了么|京东商城|天猫商城)", segment)
-    if match:
-        return normalize_whitespace(match.group(1)).strip()
-    match = re.match(r"^(.+?)销售[的、]", head)
-    if match:
-        return normalize_whitespace(match.group(1)).strip()
-    return ""
-
-
-def _extract_unqualified_label(inspection_sentence: str) -> str:
-    text = inspection_sentence.strip()
-    match = re.match(r"^(.+?)(?:检验值|残留量|含量|数\s|菌落总数|大肠菌群|Mpn|比例之和|不符合)", text)
-    if match:
-        return match.group(1).strip("，、； ")
-    return text.split("，")[0][:240]
-
-
-def _split_inspection_and_remarks(tail: str) -> Tuple[str, str]:
-    parts = re.split(r"(?<=[。；])(?=经)", tail.strip())
-    if len(parts) >= 2 and re.match(r"^经", parts[1].strip()):
-        return parts[0].strip(), "".join(parts[1:]).strip()
-    return tail.strip(), ""
-
-
-def parse_food_unqualified_body_items(content_text: str) -> List[Dict[str, object]]:
+def parse_food_content_text_segments(content_text: str) -> List[Dict[str, object]]:
+    """
+    按通报正文「（一）」「（二）」……顺序拆分每款产品对应叙述文案，
+    ordinal_index 为从 1 起的顺序序号，与同通报附件产品表中的 sequence_no 对齐。
+    """
     text = _normalize_body_text_for_food_parse(content_text)
     narrative = _slice_food_narrative_body(text)
-    if not narrative or "，其中" not in narrative:
+    if not narrative:
         return []
-    rows: List[Dict[str, object]] = []
-    for index, (_label, body) in enumerate(_split_food_body_items(narrative), start=1):
-        if "，其中" not in body:
-            continue
-        head, tail = body.split("，其中", 1)
-        main_insp, extra_remarks = _split_inspection_and_remarks(tail)
-        product_name = _extract_product_name_from_item_head(head)
-        if not product_name:
-            continue
-        rows.append({
-            "sequence_no": index,
-            "product_name": product_name,
-            "company_names": _extract_company_from_item_head(head) or None,
-            "company_addresses": None,
-            "sample_unit_name": _extract_sample_unit_from_item(body, head) or None,
-            "sample_unit_address": None,
-            "package_spec": None,
-            "batch_no": None,
-            "production_date": None,
-            "expiry_date": None,
-            "product_region": None,
-            "registration_no": None,
-            "production_license_no": None,
-            "inspection_institution": None,
-            "unqualified_items": _extract_unqualified_label(main_insp) if main_insp else None,
-            "inspection_result": join_text([f"其中{main_insp}" if main_insp else "", extra_remarks], sep="\n") or None,
-            "requirement": None,
-            "remarks": join_text(["来源：正文分项解析", extra_remarks], sep="；", default="来源：正文分项解析"),
-            "is_counterfeit": 0,
+    tuples = _split_food_body_items_by_ordinals(narrative.strip(), FOOD_BODY_ORDINAL_MARK)
+    if not tuples:
+        tuples = _split_food_body_items_by_ordinals(narrative.strip(), CHINESE_NUMERAL_ITEM)
+    items: List[Dict[str, object]] = []
+    for index, (label, body) in enumerate(tuples, start=1):
+        paragraph_compact = normalize_whitespace(normalize_multiline_text(f"（{label}）{body}"))
+        paragraph_compact = re.sub(r"[ \t]+", " ", paragraph_compact)
+        items.append({
+            "ordinal_label": label,
+            "ordinal_index": index,
+            "paragraph_text": paragraph_compact,
         })
-    return rows
-
-
-def build_body_fallback_attachment(rows: List[Dict[str, object]], message: str) -> Dict[str, object]:
-    return {
-        "attachment_name": "正文分项解析（自动）",
-        "attachment_url": "",
-        "local_path": "",
-        "file_ext": ".txt",
-        "parse_result": {
-            "supported": True,
-            "attachment_type": "content",
-            "parsedCount": len(rows),
-            "counterfeitCount": 0,
-            "rows": rows,
-            "message": message,
-        },
-    }
+    return items
 
 
 class SamrFoodCrawler:
@@ -829,19 +831,9 @@ class SamrFoodCrawler:
         notice_category = classify_food_notice(title, content_text) or item.get("notice_category") or "unqualified_sampling"
         storage_key = build_notice_storage_key(title, publish_date, announcement_no, detail_url)
         attachments = self.extract_attachments(soup, detail_url, storage_key)
-        parsed_total = sum(
-            len(att.get("parse_result", {}).get("rows", []))
-            for att in attachments
-            if isinstance(att, dict)
-        )
-        if parsed_total == 0 and content_text:
-            body_rows = parse_food_unqualified_body_items(content_text)
-            if body_rows:
-                attachments.append(build_body_fallback_attachment(
-                    body_rows,
-                    f"通报正文分项解析，共 {len(body_rows)} 条（附件表格未解析出明细时回填）",
-                ))
-                parsed_total = len(body_rows)
+        parsed_total = assign_product_picture_paths(attachments, announcement_no)
+        department_hint = extract_meta_department_hint(soup)
+        ann_level_code, ann_level_label = infer_food_announcement_level(detail_url, title, department_hint)
         payload = {
             "sequence": sequence,
             "title": title,
@@ -852,6 +844,9 @@ class SamrFoodCrawler:
             "source_page": source_page,
             "product_type": "food",
             "announcement_type": "sampling",
+            "announcement_level": ann_level_code,
+            "announcement_level_label": ann_level_label,
+            "department": department_hint,
             "notice_category": notice_category,
             "notice_category_label": get_food_notice_label(notice_category),
             "classification_status": "identified",
@@ -862,15 +857,20 @@ class SamrFoodCrawler:
                 "product_type_label": "食品",
                 "announcement_type_label": "抽检通告",
                 "notice_category": notice_category,
+                "announcement_level": ann_level_code,
+                "announcement_level_label": ann_level_label,
             },
             "crawl_record": {
                 "product_type": "food",
                 "announcement_type": "sampling",
                 "source_page": source_page,
                 "detail_url": detail_url,
+                "announcement_level": ann_level_code,
+                "announcement_level_label": ann_level_label,
             },
             "content_text": content_text,
             "content_preview": content_text[:1000],
+            "food_content_segments": parse_food_content_text_segments(content_text),
             "attachments": attachments,
             "success": True,
         }
@@ -930,19 +930,6 @@ class SamrFoodCrawler:
                     "counterfeitCount": 0,
                     "rows": [],
                     "message": f"解析食品抽检附件失败: {exc}",
-                }
-        elif file_ext in WORD_EXTENSIONS:
-            try:
-                parse_result = parse_word_attachment_with_node(local_path)
-            except Exception as exc:
-                parse_result = {
-                    "supported": True,
-                    "attachment_type": "word",
-                    "parsedCount": 0,
-                    "counterfeitCount": 0,
-                    "rows": [],
-                    "message": f"提取 Word 附件正文失败: {exc}",
-                    "raw_text": "",
                 }
         elif file_ext in ZIP_EXTENSIONS:
             try:

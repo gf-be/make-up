@@ -59,8 +59,6 @@
         </el-row>
         <el-row :gutter="32">
         
-
-         
           <el-col :span="5">
             <el-form-item label="年份" style="width: 100%">
               <el-select v-model="filters.year_start" clearable filterable placeholder="不限" >
@@ -70,9 +68,9 @@
             </el-form-item>
           </el-col>
           <el-col :span="4">
-            <el-form-item label="通告类型">
-              <el-select v-model="filters.announcement_type" clearable placeholder="全部通告类型" style="width: 100%">
-                <el-option v-for="item in filterOptions.announcement_types" :key="item.value" :label="item.label"
+            <el-form-item label="产品分类">
+              <el-select v-model="filters.product_category" clearable placeholder="全部" style="width: 100%">
+                <el-option v-for="item in filterOptions.product_categories" :key="item.value" :label="item.label"
                   :value="item.value" />
               </el-select>
             </el-form-item>
@@ -91,7 +89,7 @@
       <el-alert v-if="hasActiveFilters" type="success" :closable="false" show-icon class="mb-20"
         :title="`当前检索条件命中 ${summary.matched_count || 0} 条结果`" />
       <el-row :gutter="16" class="content-row">
-        <el-col :span="8">
+        <el-col :span="7">
           <el-card shadow="never" class="tree-card" v-loading="treeLoading">
             <template #header>
               <div class="panel-header panel-header--stacked">
@@ -147,7 +145,7 @@
           </el-card>
         </el-col>
 
-        <el-col :span="16">
+        <el-col :span="17">
           <el-card shadow="never" class="detail-card">
             <template #header>
               <div class="panel-header detail-card-header">
@@ -157,14 +155,20 @@
                   <el-button type="success" plain size="small" @click="detailChartDialogVisible = true">
                     统计图
                   </el-button>
-                  <el-button type="primary" plain size="small" :loading="exportingNodeDetails"
+
+                  <el-button type="primary" plain size="small" :loading="combinedExportLoading"
+                    :disabled="!nodeDetailsCanExport || detailTableSelectedCount === 0"
+                    @click="openCombinedExportDialog">
+                    导出
+                  </el-button>
+                  <!-- <el-button type="primary" plain size="small" :loading="exportingNodeDetails"
                     :disabled="!nodeDetailsCanExport" @click="exportNodeDetailsExcel">
                     导出 Excel
                   </el-button>
                   <el-button type="warning" plain size="small" :loading="generatingVideoCopy"
                     :disabled="!nodeDetailsCanExport" @click="openVideoCopyDialog">
                     文案
-                  </el-button>
+                  </el-button> -->
                 </div>
               </div>
             </template>
@@ -178,9 +182,20 @@
                     <el-descriptions :column="2" border>
                       <el-descriptions-item label="来源标题">{{ row.source_title || row.batch_title || '-'
                       }}</el-descriptions-item>
+                      <el-descriptions-item label="商品图片" >
+                        <el-image
+                          :src="pictureSrcFromRow(row)"
+                          :preview-src-list="[pictureSrcFromRow(row)]"
+                          style="height: 70px; width: 70px;"
+                        />
+                      </el-descriptions-item>
                       <el-descriptions-item label="来源日期">{{ formatDate(row.source_publish_date) || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="产品类型">{{ row.product_type_label || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="通告类型">{{ row.announcement_type_label || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="产品分类">{{ row.product_category || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="正文文案" :span="2">
+                        <div class="detail-food-body-preview">{{ row.food_body_text || '暂无' }}</div>
+                      </el-descriptions-item>
+                      <!-- <el-descriptions-item label="产品类型">{{ row.product_type_label || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="通告类型">{{ row.announcement_type_label || '-' }}</el-descriptions-item> -->
                       <el-descriptions-item label="生产企业名称">{{ row.manufacturer_name || row.company_names || '-'
                       }}</el-descriptions-item>
                       <el-descriptions-item label="生产企业地址">{{ row.manufacturer_address || row.company_addresses || '-'
@@ -195,31 +210,32 @@
                       <el-descriptions-item label="标示批号">{{ row.batch_no || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="标示生产日期">{{ row.production_date || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="限期使用日期/保质期">{{ row.expiry_date || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="所在地/进口地区">{{ row.product_region || '-' }}</el-descriptions-item>
+                      <el-descriptions-item v-if="!isUnqualifiedFoodRow(row)" label="所在地/进口地区">{{ row.product_region || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="生产企业省市">{{ formatProvinceCityDisplay(row.manufacturer_province,
                         row.manufacturer_city) }}</el-descriptions-item>
                       <el-descriptions-item label="样品省市">{{ formatProvinceCityDisplay(row.sampled_province,
                         row.sampled_city) }}</el-descriptions-item>
-                      <el-descriptions-item label="注册/备案编号">{{ row.registration_no || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="生产许可证号">{{ row.production_license_no || '-' }}</el-descriptions-item>
+                      <el-descriptions-item v-if="!isUnqualifiedFoodRow(row)" label="注册/备案编号">{{ row.registration_no || '-' }}</el-descriptions-item>
+                      <el-descriptions-item v-if="!isUnqualifiedFoodRow(row)" label="生产许可证号">{{ row.production_license_no || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="问题类型">{{ row.issue_category || '-' }}</el-descriptions-item>
-                      <el-descriptions-item label="产品分类">{{ row.product_category || '-' }}</el-descriptions-item>
+                      <!-- <el-descriptions-item label="产品分类">{{ row.product_category || '-' }}</el-descriptions-item> -->
                       <el-descriptions-item label="检验结果/处理措施" :span="2">{{ row.inspection_result || '-'
                       }}</el-descriptions-item>
-                      <el-descriptions-item label="依据/规定要求" :span="2">{{ row.requirement || '-'
+                      <el-descriptions-item label="依据/规定要求" >{{ row.requirement || '-'
                       }}</el-descriptions-item>
-                      <el-descriptions-item label="备注" :span="2">{{ row.remarks || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="备注" >{{ row.remarks || '-' }}</el-descriptions-item>
                     </el-descriptions>
                   </template>
                 </el-table-column>
                 <el-table-column type="selection" width="48" />
-                <el-table-column prop="product_name" label="产品名称" min-width="220" show-overflow-tooltip>
+                <el-table-column prop="product_name" label="产品名称" min-width="170" show-overflow-tooltip>
                   <template #default="{ row }">
                     <span class="detail-product-name-cell" title="双击查看详情" @click="viewDetail(row.id)">{{
                       row.product_name }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="160" show-overflow-tooltip />
+                <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="220" show-overflow-tooltip />
+                <!-- <el-table-column prop="inspection_result" label="检验结果/处理措施" min-width="220" show-overflow-tooltip /> -->
                 <el-table-column prop="manufacturer_name" label="生产企业" min-width="220" show-overflow-tooltip>
                   <template #default="{ row }">
                     <span class="manufacturer-nav-cell" :class="{ 'manufacturer-nav-cell--link': row.company_id }"
@@ -368,6 +384,97 @@
 
       </template>
     </el-dialog>
+
+    <el-dialog v-model="combinedExportDialogVisible" title="导出" width="min(1200px, 96vw)" align-center
+      append-to-body destroy-on-close>
+      <div v-loading="combinedExportLoading" class="combined-export-dialog-body">
+        <div class="combined-export-summary">
+          <el-tag type="success">已勾选明细 {{ combinedExportRows.length }} 条</el-tag>
+          <!-- <el-tag type="info">预览与 Excel 均为表格内已勾选条目</el-tag> -->
+        </div>
+        <div class="combined-export-stack">
+          <div class="combined-export-panel combined-export-panel--tabs">
+            <el-tabs v-model="combinedExportCopyTab" class="combined-export-copy-tabs">
+              <el-tab-pane label="当前文案生成方案" name="scheme">
+                <el-input
+                  v-model="combinedExportCopyText"
+                  class="combined-export-copy-textarea"
+                  type="textarea"
+                  :rows="14"
+                  readonly
+                  resize="vertical"
+                  placeholder="打开弹窗后自动生成文案"
+                />
+              </el-tab-pane>
+              <el-tab-pane
+                v-if="showCombinedExportFoodBodyTab"
+                name="food_body"
+              >
+                <template #label>
+                  <span title="前两段与「当前文案生成方案」一致；其后一行「以下为勾选的 N 个产品：」（N 为有 food_body_text 的食品条数），再接序号明细">食品正文</span>
+                </template>
+                <!-- <p class="combined-export-tab-hint">
+                  开头两段统计口径与「当前文案生成方案」相同（勾选范围内全体记录）；其后按<strong>序号 1.、2.…</strong>列出<strong>食品类</strong>明细已保存的 <code>food_body_text</code>（顺序与导出表格一致），条目之间仅单行换行、不留空行。
+                </p> -->
+                <el-alert
+                  v-if="combinedExportFoodBodySegmentCount === 0"
+                  type="info"
+                  :closable="false"
+                  show-icon
+                  class="combined-export-food-alert"
+                  title="当前勾选结果中暂无食品类明细的正文文案（food_body_text）；仍将展示开头两段统计说明。"
+                />
+                <el-input
+                  :model-value="combinedExportFoodBodyConcatText"
+                  class="combined-export-copy-textarea"
+                  type="textarea"
+                  :rows="14"
+                  readonly
+                  resize="vertical"
+                  placeholder="勾选食品产品且已维护正文文案后，将在此按顺序展示"
+                />
+              </el-tab-pane>
+            </el-tabs>
+          </div>
+          <div class="combined-export-panel">
+            <div class="combined-export-panel-title">表格预览</div>
+            <el-table :data="combinedExportRows" size="small" border stripe max-height="430">
+              <el-table-column type="index" label="#" width="52" align="center" />
+              <el-table-column label="日期" width="105" show-overflow-tooltip>
+                <template #default="{ row }">{{ formatDate(row.source_publish_date) }}</template>
+              </el-table-column>
+              <el-table-column prop="source_title" label="来源通告" min-width="220" show-overflow-tooltip />
+              <el-table-column prop="product_name" label="问题对象/标题" min-width="160" show-overflow-tooltip />
+              <el-table-column prop="manufacturer_name" label="生产企业" min-width="150" show-overflow-tooltip />
+              <!-- <el-table-column prop="operator_name" label="经营企业" min-width="150" show-overflow-tooltip /> -->
+              <el-table-column prop="unqualified_items" label="不符合规定项目/检查问题" min-width="180" show-overflow-tooltip />
+              <el-table-column prop="product_category" label="产品分类" width="120" show-overflow-tooltip />
+              <el-table-column prop="picture_url" label="商品图片" min-width="150" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <el-image
+                    :src="pictureSrcFromRow(row)"
+                    :preview-src-list="[pictureSrcFromRow(row)]"
+                    style="height: 50px; width: 50px;"
+                  />
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="combinedExportDialogVisible = false">关闭</el-button>
+        <el-button
+          type="primary"
+          :loading="combinedExportPackaging"
+          :disabled="!combinedExportRows.length"
+          title="下载 zip：内含 文案.txt、Excel、商品图片/（文案内容一致）"
+          @click="exportCombinedExportPackageZip"
+        >
+          导出
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -410,6 +517,7 @@ const pendingRootNodes = ref([])
 const treeRootCount = ref(0)
 const tableLoading = ref(false)
 const exportingNodeDetails = ref(false)
+const combinedExportPackaging = ref(false)
 const treeReloadTimer = ref(null)
 const treeProps = {
   label: 'label',
@@ -460,6 +568,29 @@ const videoCopyText = ref('')
 const videoCopyProductIds = ref([])
 const generatingVideoCopy = ref(false)
 const savingVideoCopy = ref(false)
+const combinedExportDialogVisible = ref(false)
+const combinedExportLoading = ref(false)
+const combinedExportRows = ref([])
+const combinedExportCheckedNodes = ref([])
+const combinedExportCopyText = ref('')
+const combinedExportCopyTab = ref('scheme')
+
+const combinedExportFoodBodyConcatText = computed(() =>
+  buildCombinedExportFoodBodyFullCopy(combinedExportRows.value)
+)
+
+const combinedExportFoodBodySegmentCount = computed(() => {
+  const rows = combinedExportRows.value || []
+  return rows.filter(
+    (r) => String(r?.product_type || '').toLowerCase() === 'food' && String(r?.food_body_text ?? '').trim()
+  ).length
+})
+
+const activeCombinedExportCopyText = computed(() =>
+  combinedExportCopyTab.value === 'food_body'
+    ? combinedExportFoodBodyConcatText.value
+    : combinedExportCopyText.value
+)
 
 function loadEchartsModule() {
   if (!echartsModulePromise) {
@@ -473,6 +604,11 @@ async function loadExcelJSModule() {
   return mod.default || mod
 }
 
+async function loadJSZipModule() {
+  const mod = await import('jszip')
+  return mod.default || mod
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
@@ -480,6 +616,66 @@ function formatDate(dateStr) {
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
+}
+
+/** 食品抽检不合格记录：与详情页一致，不展示化妆品式注册/备案、生产许可等字段 */
+function isUnqualifiedFoodRow(row) {
+  return String(row?.product_type || '').toLowerCase() === 'food'
+}
+
+function decodeURIComponentSafe(segment) {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
+}
+
+/** 明细行存储字段（工作台入库可能与 picture_url 并存 public_url） */
+function getUnqualifiedProductPictureStoredPath(row) {
+  return String(row?.picture_url ?? row?.public_url ?? '').trim()
+}
+
+/**
+ * 列表/导出预览：本地相对路径解析规则与 AnnouncementStaging、AnnouncementDetail 一致。
+ */
+function resolveUnqualifiedProductPictureSrc(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  if (/^https?:\/\//i.test(s)) return s
+  if (/^\/\//.test(s)) {
+    return `${typeof window !== 'undefined' ? window.location.protocol : 'https:'}${s}`
+  }
+  const normalizedPath = s.replace(/\\/g, '/').replace(/^\/+/, '')
+  if (normalizedPath.startsWith('upload/')) return `/${normalizedPath}`
+  const localProductPrefix = 'backend/public/upload/products/'
+  if (normalizedPath.startsWith(localProductPrefix)) {
+    return `/${normalizedPath.slice('backend/public/'.length)}`
+  }
+  return `/upload/products/${normalizedPath}`
+}
+
+/** 打包下载 fetch 用：同源路径分段编码（中文目录名），并与浏览器加载静态资源的语义对齐 */
+function resolveUnqualifiedProductPictureAbsoluteUrl(raw) {
+  const browserSrc = resolveUnqualifiedProductPictureSrc(raw)
+  if (!browserSrc) return ''
+  if (/^https?:\/\//i.test(browserSrc)) return browserSrc
+  try {
+    const pathOnly = browserSrc.startsWith('/') ? browserSrc : `/${browserSrc}`
+    const u = new URL(pathOnly, window.location.origin)
+    const encodedPath =
+      u.pathname
+        .split('/')
+        .map((seg) => (seg ? encodeURIComponent(decodeURIComponentSafe(seg)) : ''))
+        .join('/') || '/'
+    return `${u.origin}${encodedPath}${u.search}${u.hash}`
+  } catch {
+    return ''
+  }
+}
+
+function pictureSrcFromRow(row) {
+  return resolveUnqualifiedProductPictureSrc(getUnqualifiedProductPictureStoredPath(row))
 }
 
 const DETAIL_CHART_MAX_CATEGORIES = 24
@@ -649,6 +845,20 @@ const filterOptions = ref({
   years: []
 })
 const filters = ref(createDefaultFilters())
+
+/** 仅食品类产品/食品抽检通告场景展示「食品正文」导出 Tab（须在 filters 声明之后，避免 TDZ） */
+const showCombinedExportFoodBodyTab = computed(() => {
+  if (String(filters.value.product_type || '').toLowerCase() === 'food') return true
+  const rows = combinedExportRows.value || []
+  return rows.some((r) => String(r?.product_type || '').toLowerCase() === 'food')
+})
+
+watch(showCombinedExportFoodBodyTab, (visible) => {
+  if (!visible && combinedExportCopyTab.value === 'food_body') {
+    combinedExportCopyTab.value = 'scheme'
+  }
+})
+
 const pagination = ref({
   page: 1,
   limit: 10,
@@ -1562,7 +1772,7 @@ function topProvincePhrase(rows, maxShow = 5) {
   }
   const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, maxShow)
   if (!sorted.length) return ''
-  const head = sorted.slice(0, 3).map(([name, count]) => `${name}（${count}条）`).join('、')
+  const head = sorted.slice(0, 3).map(([name, count]) => `${name}`).join('、')
   return sorted.length > 3 ? `${head}等` : head
 }
 
@@ -1705,19 +1915,40 @@ function getVideoCopyProductLineRows(rows, fromTableSelection) {
     : pickVideoCopyRows(rows || [], VIDEO_COPY_PRODUCT_LIMIT)
 }
 
-function buildVideoCopyTextShared(rows, fromTableSelection) {
+/** 视频/导出文案开头的两段统计口径说明（与 Tab「当前文案生成方案」一致） */
+function buildVideoCopyPreambleParts(rows, fromTableSelection) {
   const sourceTitles = uniqueCopyValues((rows || []).map((row) => row?.source_title || row?.batch_title))
   const problemTypes = uniqueCopyValues((rows || []).map((row) => row?.issue_category || row?.announcement_type_label))
   const categories = uniqueCopyValues((rows || []).flatMap((row) => [row?.product_category, row?.product_type_label]))
   const provincePhrase = topProvincePhrase(rows) || '多地'
-  const productLinesRows = getVideoCopyProductLineRows(rows, fromTableSelection)
 
-  const lines = [
+  return [
     fromTableSelection
       ? `据本次在明细表中勾选的产品梳理，共涉及通告 ${sourceTitles.length} 份、不合格记录 ${(rows || []).length} 条。`
       : `据本次资料梳理，共涉及通告 ${sourceTitles.length} 份、不合格记录 ${(rows || []).length} 条。`,
     `根据${formatCopyList(sourceTitles, 4)}，本次共发现${formatCopyList(problemTypes, 8)}等情况，涵盖${formatCopyList(categories, 8)}等品类，样本主要分布在${provincePhrase}。`
   ]
+}
+
+/** 导出弹窗 Tab「食品正文」：前两段复用 preamble，接「以下为勾选的 N 个产品：」，再接序号 food_body_text */
+function buildCombinedExportFoodBodyFullCopy(rows) {
+  const preamble = buildVideoCopyPreambleParts(rows || [], true).join('\n')
+  const segments = []
+  for (const row of rows || []) {
+    if (String(row?.product_type || '').toLowerCase() !== 'food') continue
+    const t = String(row?.food_body_text ?? '').trim()
+    if (t) segments.push(t)
+  }
+  if (!segments.length) return preamble
+  const n = segments.length
+  const numbered = segments.map((t, i) => `${i + 1}. ${t}`)
+  const joined = numbered.join('\n')
+  return `${preamble}\n以下为勾选的 ${n} 个产品：\n${joined}`
+}
+
+function buildVideoCopyTextShared(rows, fromTableSelection) {
+  const lines = [...buildVideoCopyPreambleParts(rows, fromTableSelection)]
+  const productLinesRows = getVideoCopyProductLineRows(rows, fromTableSelection)
 
   if (productLinesRows.length) {
     lines.push(
@@ -1861,6 +2092,84 @@ async function saveVideoCopyText() {
     /* request 拦截器已提示 */
   } finally {
     savingVideoCopy.value = false
+  }
+}
+
+async function buildCombinedExportPayload() {
+  const pathsPayload = getNodeDetailsPathsPayload()
+  const checkedPathsPayload = getCheckedTreePathsPayload()
+  if (!pathsPayload.length) {
+    ElMessage.warning('没有可导出的范围，请先在维度树选择节点')
+    return null
+  }
+  if (!(pagination.value.total > 0)) {
+    ElMessage.warning('当前没有可导出的明细')
+    return null
+  }
+
+  const allRows = await fetchAllNodeDetailRows(pathsPayload)
+  if (!allRows.length) {
+    ElMessage.warning('当前范围没有可导出的明细')
+    return null
+  }
+
+  const order = dimensionOrder.value?.length ? dimensionOrder.value : DEFAULT_DIMENSION_ORDER
+  const checkedRes = checkedPathsPayload.length
+    ? await getUnqualifiedProductCheckedTreeNodes({
+      ...buildTreeRequestParams(),
+      paths: checkedPathsPayload,
+      dimension_order: JSON.stringify(order)
+    })
+    : { data: [] }
+  const checked = sortCheckedTreeNodesByPath(order, checkedRes.data || [])
+
+  const selectedIds = detailTableSelectedIds.value
+  if (!selectedIds.size) {
+    ElMessage.warning('请先在明细表格勾选要导出的产品')
+    return null
+  }
+  const rowsForExport = allRows.filter((row) => row?.id != null && selectedIds.has(row.id))
+
+  if (!rowsForExport.length) {
+    ElMessage.warning('当前勾选的产品在所选范围内未匹配到明细，请刷新列表或重新勾选后再试')
+    return null
+  }
+
+  const copyText = buildVideoCopyTextForSelectedRows(rowsForExport)
+
+  return {
+    exportRows: rowsForExport,
+    checked,
+    copyText,
+    rowsForCopy: rowsForExport
+  }
+}
+
+async function openCombinedExportDialog() {
+  if (combinedExportLoading.value) return
+  combinedExportDialogVisible.value = true
+  combinedExportLoading.value = true
+  combinedExportRows.value = []
+  combinedExportCheckedNodes.value = []
+  combinedExportCopyText.value = ''
+  combinedExportCopyTab.value = 'scheme'
+
+  try {
+    const payload = await buildCombinedExportPayload()
+    if (!payload) {
+      combinedExportDialogVisible.value = false
+      return
+    }
+    combinedExportRows.value = payload.exportRows
+    combinedExportCheckedNodes.value = payload.checked
+    combinedExportCopyText.value = payload.copyText
+    await recordVideoCopyLog(payload.rowsForCopy, payload.copyText)
+  } catch (error) {
+    console.error('打开导出弹窗失败:', error)
+    ElMessage.error(error?.message || '生成导出内容失败')
+    combinedExportDialogVisible.value = false
+  } finally {
+    combinedExportLoading.value = false
   }
 }
 
@@ -2403,14 +2712,20 @@ function columnLetterFromIndex(n) {
   return s
 }
 
-function downloadExcelWorkbookBuffer(buffer, filename) {
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+function downloadBlobAsFile(blob, filename) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function downloadExcelWorkbookBuffer(buffer, filename) {
+  downloadBlobAsFile(
+    new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    filename
+  )
 }
 
 function appendDetailsSheet(wb, allRows) {
@@ -2500,6 +2815,122 @@ function appendCheckedDimensionTreeSheet(wb, order, checked) {
   }
   ws.getColumn(lastCol).numFmt = '#,##0'
   ws.views = [{ state: 'frozen', ySplit: 1 }]
+}
+
+function guessImageExtensionFromMimeOrUrl(mime, url) {
+  const m = String(mime || '').toLowerCase()
+  if (m.includes('png')) return 'png'
+  if (m.includes('jpeg') || m.includes('jpg')) return 'jpg'
+  if (m.includes('webp')) return 'webp'
+  if (m.includes('gif')) return 'gif'
+  const u = String(url || '').split('?')[0].toLowerCase()
+  const m2 = u.match(/\.(png|jpe?g|webp|gif)$/)
+  if (m2) return m2[1] === 'jpeg' ? 'jpg' : m2[1]
+  return 'png'
+}
+
+function sanitizeExportImageFileBase(name) {
+  const s = String(name || 'image')
+    .replace(/[\\/:*?"<>|\r\n\t\x00-\x1f]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return s.slice(0, 120) || 'image'
+}
+
+function buildCombinedExportImageFilename(row, index1, ext) {
+  const idx = String(index1).padStart(3, '0')
+  const idPart = row?.id != null && row.id !== '' ? sanitizeExportImageFileBase(String(row.id)).slice(0, 36) : ''
+  const namePart = sanitizeExportImageFileBase(row?.product_name || '未命名').slice(0, 80)
+  const stem = `${idx}_${idPart ? `${idPart}_` : ''}${namePart}`
+  return `${stem.slice(0, 180)}.${ext}`
+}
+
+async function buildCombinedExportExcelBuffer() {
+  const order = dimensionOrder.value?.length ? dimensionOrder.value : DEFAULT_DIMENSION_ORDER
+  const ExcelJS = await loadExcelJSModule()
+  const wb = new ExcelJS.Workbook()
+  appendDetailsSheet(wb, combinedExportRows.value)
+  appendCheckedDimensionTreeSheet(wb, order, combinedExportCheckedNodes.value)
+  return wb.xlsx.writeBuffer()
+}
+
+/**
+ * 导出弹窗合一：打包为 zip 下载（文案.txt、Excel、商品图片/）
+ */
+async function exportCombinedExportPackageZip() {
+  if (!combinedExportRows.value.length || combinedExportPackaging.value) return
+
+  combinedExportPackaging.value = true
+  const text = String(activeCombinedExportCopyText.value || '').trim()
+  let imageOk = 0
+  let imageSkip = 0
+  let imageFail = 0
+  try {
+    const JSZip = await loadJSZipModule()
+    const zip = new JSZip()
+
+    if (text) {
+      zip.file('文案.txt', `\ufeff${text}`)
+    }
+
+    const buffer = await buildCombinedExportExcelBuffer()
+    const excelName = `${buildNodeDetailsExportFileBase()}.xlsx`
+    zip.file(excelName, new Uint8Array(buffer))
+
+    const rows = combinedExportRows.value || []
+    const imgPrefix = '商品图片/'
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i]
+      const fetchUrl = resolveUnqualifiedProductPictureAbsoluteUrl(getUnqualifiedProductPictureStoredPath(row))
+      if (!fetchUrl) {
+        imageSkip += 1
+        continue
+      }
+      try {
+        const sameOrigin = fetchUrl.startsWith(window.location.origin)
+        const res = await fetch(fetchUrl, {
+          cache: 'no-store',
+          credentials: sameOrigin ? 'same-origin' : 'omit',
+          mode: 'cors'
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const blob = await res.blob()
+        if (!String(blob?.type || '').startsWith('image/')) {
+          console.warn('导出商品图片：响应非图片类型', blob.type, fetchUrl)
+          imageFail += 1
+          continue
+        }
+        const ext = guessImageExtensionFromMimeOrUrl(blob.type, fetchUrl)
+        const fname = buildCombinedExportImageFilename(row, i + 1, ext)
+        zip.file(`${imgPrefix}${fname}`, blob)
+        imageOk += 1
+      } catch (err) {
+        console.warn('打包商品图片失败:', getUnqualifiedProductPictureStoredPath(row), err)
+        imageFail += 1
+      }
+    }
+
+    const zipBlob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    })
+    const zipName = `${sanitizeExportFileBase(`${buildNodeDetailsExportFileBase()}_导出包`)}.zip`
+    downloadBlobAsFile(zipBlob, zipName)
+
+    const parts = []
+    parts.push(text ? '文案.txt' : '文案为空已跳过 txt')
+    parts.push(`Excel（${excelName}）`)
+    parts.push(`商品图片 ${imageOk} 张`)
+    if (imageSkip) parts.push(`无图跳过 ${imageSkip}`)
+    if (imageFail) parts.push(`下载失败 ${imageFail}`)
+    ElMessage.success(`已开始下载压缩包：${parts.join('；')}`)
+  } catch (error) {
+    console.error('导出压缩包失败:', error)
+    ElMessage.error(error?.message || '导出失败')
+  } finally {
+    combinedExportPackaging.value = false
+  }
 }
 
 async function exportNodeDetailsExcel() {
@@ -2952,7 +3383,7 @@ onBeforeUnmount(() => {
 
 .detail-product-name-cell {
   cursor: pointer;
-  color: #4c87a3;
+  color: #3396c4;
 }
 
 .usage-count-cell {
@@ -2963,7 +3394,7 @@ onBeforeUnmount(() => {
 
 .manufacturer-nav-cell--link {
   cursor: pointer;
-  color: #4c87a3;
+  color: #4ea6cf;
 }
 
 .manufacturer-nav-cell--link:hover {
@@ -3099,6 +3530,67 @@ onBeforeUnmount(() => {
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
 }
 
+.combined-export-dialog-body {
+  min-height: 420px;
+}
+
+.combined-export-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.combined-export-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.combined-export-copy-tabs :deep(.el-tabs__content) {
+  padding-top: 8px;
+}
+
+.combined-export-tab-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.55;
+}
+
+.combined-export-tab-hint code {
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #f0f2f5;
+}
+
+.combined-export-food-alert {
+  margin-bottom: 10px;
+}
+
+.combined-export-copy-textarea :deep(.el-textarea__inner) {
+  line-height: 1.8;
+  font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+}
+
+.combined-export-hint {
+  color: #909399;
+  font-size: 13px;
+}
+
+.combined-export-panel {
+  min-width: 0;
+}
+
+.combined-export-panel-title {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #303133;
+}
+
 .usage-user-tooltip {
   max-width: 320px;
   line-height: 1.7;
@@ -3232,7 +3724,7 @@ onBeforeUnmount(() => {
 }
 
 .pivot-rows-drop.is-drag-over {
-  border-color: #409eff;
+  border-color: #77a7d8;
   background: #ecf5ff;
 }
 
@@ -3320,7 +3812,7 @@ onBeforeUnmount(() => {
 .filter-form {
   margin-bottom: 20px;
   padding: 16px;
-  background: #c6e0fd;
+  background: #d9eaf8;
   border-radius: 14px;
   color: black;
 }

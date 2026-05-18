@@ -26,11 +26,22 @@ const BASE_FIELDS = [
 
 const DB_FIELDS = [
   'sequence_no',
-  ...BASE_FIELDS,
+  ...(() => {
+    const fields = [...BASE_FIELDS];
+    const insertAt = fields.indexOf('product_region');
+    if (insertAt >= 0) {
+      fields.splice(insertAt + 1, 0, 'attachment_sampling_category');
+    } else {
+      fields.push('attachment_sampling_category');
+    }
+    return fields;
+  })(),
   'manufacturer_name',
   'manufacturer_address',
   'operator_name',
   'operator_address',
+  'picture_url',
+  'food_body_text',
   'is_counterfeit'
 ];
 
@@ -330,6 +341,9 @@ async function ensureAnnouncementProductDetailsTable(pool) {
   await ensureDetailColumn(pool, 'manufacturer_address', 'TEXT NULL AFTER manufacturer_name');
   await ensureDetailColumn(pool, 'operator_name', 'VARCHAR(500) NULL AFTER manufacturer_address');
   await ensureDetailColumn(pool, 'operator_address', 'TEXT NULL AFTER operator_name');
+  await ensureDetailColumn(pool, 'attachment_sampling_category', 'VARCHAR(191) NULL AFTER product_region');
+  await ensureDetailColumn(pool, 'picture_url', 'VARCHAR(768) NULL AFTER remarks');
+  await ensureDetailColumn(pool, 'food_body_text', 'LONGTEXT NULL AFTER picture_url');
 
   await pool.query(`
     UPDATE announcement_product_details

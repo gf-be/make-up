@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 const pool = require('../config/database');
 const {
   DEFAULT_STAGING_SOURCE_DIR,
@@ -36,8 +38,10 @@ const {
   normalizeProductType,
   normalizeAnnouncementType,
   getProductTypeLabel,
-  getAnnouncementTypeLabel
+  getAnnouncementTypeLabel,
+  replaceUnqualifiedProductsFromAnnouncementDetails
 } = require('../utils/unqualifiedProducts');
+const { ensureAnnouncementProductDetailsTable } = require('../utils/announcementAttachmentParser');
 const { ensureInspectionDetailsSchema } = require('../utils/announcementInspectionSync');
 const { authenticate } = require('../utils/auth');
 
@@ -56,6 +60,55 @@ const uploadJsonFiles = multer({
   }
 });
 
+const PRODUCT_IMAGE_UPLOAD_DIR = path.join(__dirname, '..', 'public', 'upload', 'products');
+const PRODUCT_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+
+function ensureProductImageUploadDir() {
+  fs.mkdirSync(PRODUCT_IMAGE_UPLOAD_DIR, { recursive: true });
+}
+
+const uploadProductImages = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(String(file.originalname || '')).toLowerCase();
+    const mime = String(file.mimetype || '').toLowerCase();
+    if (PRODUCT_IMAGE_EXTENSIONS.has(ext) || mime.startsWith('image/')) {
+      return cb(null, true);
+    }
+    return cb(new Error('只允许上传图片文件'));
+  },
+  limits: {
+    files: 500,
+    fileSize: 20 * 1024 * 1024
+  }
+});
+
+/** 与 data_get/get_eatting.py announcement_picture_folder_slug / safe_filename 对齐（入参为通告年号/公告编号 announcement_no） */
+function normalizeWhitespaceAnnouncementTitle(value) {
+  return String(value ?? '')
+    .replace(/\u0007/g, ' ')
+    .replace(/[\t ]+/g, ' ')
+    .trim();
+}
+
+function sanitizeAnnouncementPictureFolderSlug(announcementNoRaw) {
+  const raw = normalizeWhitespaceAnnouncementTitle(announcementNoRaw);
+  if (!raw) {
+    return 'misc';
+  }
+  let text = raw.replace(/[\\/:*?"<>|]+/g, '_');
+  text = text.replace(/_+/g, '_').replace(/^[.\s_]+|[.\s_]+$/g, '');
+  if (!text) {
+    return 'misc';
+  }
+  const limited = text.slice(0, 120);
+  const slug = limited || 'announcement';
+  if (slug === 'announcement') {
+    return 'misc';
+  }
+  return slug;
+}
+
 
 function clampPageSize(limit, defaultValue = 10, maxValue = 100) {
   const parsed = Number.parseInt(limit, 10);
@@ -65,17 +118,17 @@ function clampPageSize(limit, defaultValue = 10, maxValue = 100) {
   return Math.min(parsed, maxValue);
 }
 
-function buildTypeInfo(productType, announcementType) {
-  const normalizedProductType = normalizeProductType(productType);
-  const normalizedAnnouncementType = normalizeAnnouncementType(announcementType);
+// function buildTypeInfo(productType, announcementType) {
+//   const normalizedProductType = normalizeProductType(productType);
+//   const normalizedAnnouncementType = normalizeAnnouncementType(announcementType);
 
-  return {
-    product_type: normalizedProductType,
-    announcement_type: normalizedAnnouncementType,
-    product_type_label: getProductTypeLabel(normalizedProductType),
-    announcement_type_label: getAnnouncementTypeLabel(normalizedAnnouncementType)
-  };
-}
+//   return {
+//     product_type: normalizedProductType,
+//     announcement_type: normalizedAnnouncementType,
+//     product_type_label: getProductTypeLabel(normalizedProductType),
+//     announcement_type_label: getAnnouncementTypeLabel(normalizedAnnouncementType)
+//   };
+// }
 
 function parseStagingCalendarYear(yearRaw) {
   const yearParsed = Number.parseInt(String(yearRaw ?? '').trim(), 10);
@@ -276,6 +329,124 @@ router.post('/import-json-upload', authenticate, uploadJsonFiles.array('files', 
   } catch (error) {
     console.error('上传 JSON 到临时表失败:', error);
     res.status(500).json({ success: false, message: error.message || '上传 JSON 到临时表失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+router.post('/product-images/upload', authenticate, uploadProductImages.array('files', 500), async (req, res) => {
+  let connection;
+
+  try {
+    const files = req.files || [];
+    if (!files.length) {
+      return res.status(400).json({ success: false, message: '请选择需要导入的图片文件' });
+    }
+
+    const startSequence = Number.parseInt(req.body?.start_sequence, 10);
+    if (!Number.isInteger(startSequence) || startSequence <= 0) {
+      return res.status(400).json({ success: false, message: '请输入有效的起始序号' });
+    }
+
+    const announcementNo = req.body?.announcement_no ?? '';
+    const announcementSlug = sanitizeAnnouncementPictureFolderSlug(announcementNo);
+    if (announcementSlug === 'misc' && !normalizeWhitespaceAnnouncementTitle(announcementNo)) {
+      return res.status(400).json({ success: false, message: '请先提供当前通告年号（公告编号），导入目录按年号命名' });
+    }
+
+    const announcementIdRaw = req.body?.announcement_id ?? req.body?.published_announcement_id;
+    const announcementIdParsed = announcementIdRaw != null && String(announcementIdRaw).trim() !== ''
+      ? Number.parseInt(String(announcementIdRaw).trim(), 10)
+      : NaN;
+
+    /** 写入正式公告明细 `picture_url`（与静态 URL 形态一致：`/upload/products/{slug}/{n}.png`） */
+    const persistAnnouncementId = Number.isInteger(announcementIdParsed) && announcementIdParsed > 0
+      ? announcementIdParsed
+      : null;
+
+    if (persistAnnouncementId !== null) {
+      connection = await pool.getConnection();
+      const [annRows] = await connection.query('SELECT id FROM announcements WHERE id = ? LIMIT 1', [persistAnnouncementId]);
+      connection.release();
+      connection = undefined;
+      if (!annRows || !annRows.length) {
+        return res.status(404).json({ success: false, message: `公告不存在：id=${persistAnnouncementId}` });
+      }
+    }
+
+    ensureProductImageUploadDir();
+    const batchDir = path.join(PRODUCT_IMAGE_UPLOAD_DIR, announcementSlug);
+    fs.mkdirSync(batchDir, { recursive: true });
+
+    const items = [];
+    files.forEach((file, index) => {
+      const sequenceNo = startSequence + index;
+      const fileName = `${sequenceNo}.png`;
+      const absolutePath = path.join(batchDir, fileName);
+      fs.writeFileSync(absolutePath, file.buffer);
+      const publicUrl = `/upload/products/${announcementSlug}/${fileName}`;
+      items.push({
+        sequence_no: sequenceNo,
+        original_name: file.originalname,
+        file_name: fileName,
+        relative_path: `backend\\public\\upload\\products\\${announcementSlug}\\${fileName}`,
+        /** 存入数据库推荐使用此字段 */
+        picture_url: publicUrl,
+        public_url: publicUrl,
+        bytes: file.size
+      });
+    });
+
+    let detailRowsUpdated = 0;
+    if (persistAnnouncementId !== null && items.length > 0) {
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+
+      await ensureAnnouncementProductDetailsTable(connection);
+      try {
+        for (const item of items) {
+          const [upd] = await connection.query(
+            `
+              UPDATE announcement_product_details
+              SET picture_url = ?, updated_at = CURRENT_TIMESTAMP
+              WHERE announcement_id = ? AND sequence_no = ?
+            `,
+            [item.picture_url, persistAnnouncementId, item.sequence_no]
+          );
+          detailRowsUpdated += Number(upd?.affectedRows || 0);
+        }
+        await replaceUnqualifiedProductsFromAnnouncementDetails(connection, persistAnnouncementId);
+        await connection.commit();
+      } catch (dbErr) {
+        await connection.rollback();
+        throw dbErr;
+      } finally {
+        connection.release();
+        connection = undefined;
+      }
+    }
+
+    res.json({
+      success: true,
+      message:
+        `已导入 ${items.length} 张图片到「${announcementSlug}」目录，序号 ${startSequence} - ${startSequence + items.length - 1}`
+        + (persistAnnouncementId != null ? `；已写入正式公告明细 ${detailRowsUpdated} 条路径` : ''),
+      data: {
+        upload_dir: PRODUCT_IMAGE_UPLOAD_DIR,
+        announcement_no: normalizeWhitespaceAnnouncementTitle(announcementNo) || null,
+        announcement_slug: announcementSlug,
+        start_sequence: startSequence,
+        count: items.length,
+        persisted_announcement_id: persistAnnouncementId,
+        detail_rows_updated: detailRowsUpdated,
+        items
+      }
+    });
+  } catch (error) {
+    console.error('导入产品图片失败:', error);
+    res.status(500).json({ success: false, message: error.message || '导入产品图片失败' });
   } finally {
     if (connection) {
       connection.release();

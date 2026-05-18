@@ -20,11 +20,11 @@
             <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态">
+        <!-- <el-form-item label="状态">
           <el-select v-model="filters.status" clearable placeholder="全部状态" style="width: 130px" @change="applyFilters">
             <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
-        </el-form-item>
+        </el-form-item> -->
         <el-form-item label="年份">
           <el-date-picker
             v-model="filters.year"
@@ -36,13 +36,13 @@
             @change="applyFilters"
           />
         </el-form-item>
-        <el-form-item label="涉及地区">
+        <!-- <el-form-item label="涉及地区">
           <el-input v-model="filters.location" clearable placeholder="省份/地区" style="width: 150px" @keyup.enter="applyFilters" />
         </el-form-item>
         <el-form-item label="关键词">
           <el-input v-model="filters.keyword" clearable placeholder="标题、编号、内容、检验单位" style="width: 240px" @keyup.enter="applyFilters" />
-        </el-form-item>
-        <el-form-item>
+        </el-form-item>-->
+        <el-form-item> 
           <el-button type="primary" @click="applyFilters">
             <el-icon><Search /></el-icon>
             搜索
@@ -81,12 +81,12 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="产品" width="86" align="center">
+          <!-- <el-table-column label="产品" width="86" align="center">
             <template #default="{ row }">
               <el-tag size="small">{{ getProductTypeLabel(row.product_type) }}</el-tag>
             </template>
-          </el-table-column>
-          <el-table-column prop="inspection_count" label="批次" width="72" align="center" />
+          </el-table-column> -->
+          <!-- <el-table-column prop="inspection_count" label="批次" width="72" align="center" /> -->
         </el-table>
 
         <el-pagination

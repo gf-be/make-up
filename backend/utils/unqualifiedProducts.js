@@ -80,6 +80,8 @@ const UNQUALIFIED_PRODUCT_FIELDS = [
   'inspection_result',
   'requirement',
   'remarks',
+  'picture_url',
+  'food_body_text',
   'product_category',
   'manufacturer_province',
   'manufacturer_city',
@@ -1202,7 +1204,9 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'inspection_result', 'LONGTEXT NULL');
   await ensureColumn(connection, 'requirement', 'LONGTEXT NULL');
   await ensureColumn(connection, 'remarks', 'LONGTEXT NULL');
-  await ensureColumn(connection, 'product_category', 'VARCHAR(100) NULL AFTER remarks');
+  await ensureColumn(connection, 'picture_url', 'VARCHAR(768) NULL AFTER remarks');
+  await ensureColumn(connection, 'food_body_text', 'LONGTEXT NULL AFTER picture_url');
+  await ensureColumn(connection, 'product_category', 'VARCHAR(100) NULL AFTER food_body_text');
   await ensureColumn(connection, 'manufacturer_province', 'VARCHAR(100) NULL AFTER product_category');
   await ensureColumn(connection, 'manufacturer_city', 'VARCHAR(100) NULL AFTER manufacturer_province');
   await ensureColumn(connection, 'sampled_province', 'VARCHAR(100) NULL AFTER manufacturer_city');
@@ -1435,8 +1439,9 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
       SELECT id, sequence_no, product_name, company_names, company_addresses,
              manufacturer_name, manufacturer_address, operator_name, operator_address,
              sample_unit_name, sample_unit_address, package_spec, batch_no, production_date, expiry_date,
-             product_region, registration_no, production_license_no, inspection_institution,
-             unqualified_items, inspection_result, requirement, remarks, is_counterfeit
+             product_region, attachment_sampling_category, registration_no, production_license_no,
+             inspection_institution,
+             unqualified_items, inspection_result, requirement, remarks, picture_url, food_body_text, is_counterfeit
       FROM announcement_product_details
       WHERE announcement_id = ?
       ORDER BY sequence_no ASC, id ASC
@@ -1483,6 +1488,7 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
     production_date: row.production_date,
     expiry_date: row.expiry_date,
     product_region: row.product_region,
+    attachment_sampling_category: row.attachment_sampling_category || null,
     registration_no: row.registration_no,
     production_license_no: row.production_license_no,
     inspection_institution: row.inspection_institution,
@@ -1490,6 +1496,8 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
     inspection_result: row.inspection_result,
     requirement: row.requirement,
     remarks: row.remarks,
+    picture_url: row.picture_url || null,
+    food_body_text: row.food_body_text || null,
     product_type: productType,
     announcement_type: announcementType,
     announcement_id: Number(announcementId),

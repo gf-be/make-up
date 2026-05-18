@@ -268,6 +268,18 @@ function extractIssueItems(unqualifiedItems) {
   return fallback ? [fallback] : [];
 }
 
+/** 抽检附件中的「产品分类」（如食品 xlsx）；与 `announcement_product_details.attachment_sampling_category` 一致 */
+function resolvePrimaryProductCategory(row = {}) {
+  const explicit = normalizeText(
+    row.attachment_sampling_category ?? row.food_category ?? row['食品细类'] ?? row.sampling_category ?? ''
+  );
+  if (!explicit || explicit === '未标注') {
+    return deriveProductCategory(row.product_name);
+  }
+  const maxLen = 100;
+  return explicit.length > maxLen ? explicit.slice(0, maxLen) : explicit;
+}
+
 function buildDerivedAnalyticsFields(row = {}) {
   const manufacturerRegion = extractProvinceCity(row.manufacturer_address || row.company_addresses || row.product_region);
   const productRegionProvince = normalizeProvinceToStandard(row.product_region);
@@ -276,7 +288,7 @@ function buildDerivedAnalyticsFields(row = {}) {
   }
   const sampledRegion = extractProvinceCity(row.operator_address || row.sample_unit_address);
   return {
-    product_category: deriveProductCategory(row.product_name),
+    product_category: resolvePrimaryProductCategory(row),
     manufacturer_province: manufacturerRegion.province,
     manufacturer_city: manufacturerRegion.city,
     sampled_province: sampledRegion.province,
@@ -293,6 +305,7 @@ module.exports = {
   extractProvinceCity,
   COSMETICS_PRODUCT_CATEGORIES,
   deriveProductCategory,
+  resolvePrimaryProductCategory,
   deriveIssueCategory,
   normalizeIssueItem,
   extractIssueItems,

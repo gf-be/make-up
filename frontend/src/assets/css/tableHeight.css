@@ -1,12 +1,13 @@
 /* 全局表格样式。勿在普通 .css 中使用 :deep() — 仅 Vue SFC 的 <style scoped> 会编译它，否则整条规则会被浏览器忽略。 */
 .table-height {
+  color: black!important;
   border: 1px solid #bdd0fb !important;
   /* 外框蓝色实线 */
 }
 
 /* 表头：蓝色背景 + 白色文字 */
 .table-height .el-table__header th {
-  background-color: #9cb9f7 !important;
+  background-color: #6aace2 !important;
   color: #ffffff !important;
   border: 1px solid #c7d5f3 !important;
   font-weight: 600 !important;

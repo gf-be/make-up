@@ -175,6 +175,25 @@ async function ensureFoodInspectionSchema(connection) {
   await ensureColumn(connection, 'food_inspection_products', 'manufacturer_address', 'TEXT NULL AFTER manufacturer_name');
   await ensureColumn(connection, 'food_inspection_products', 'operator_name', 'VARCHAR(500) NULL AFTER manufacturer_address');
   await ensureColumn(connection, 'food_inspection_products', 'operator_address', 'TEXT NULL AFTER operator_name');
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS food_content (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      food_inspection_id INT NOT NULL,
+      food_inspection_product_id INT NOT NULL,
+      ordinal_label VARCHAR(32) NULL,
+      ordinal_index INT NOT NULL DEFAULT 0,
+      paragraph_text LONGTEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_food_content_product (food_inspection_product_id),
+      INDEX idx_food_content_inspection (food_inspection_id),
+      CONSTRAINT fk_food_content_inspection
+        FOREIGN KEY (food_inspection_id) REFERENCES food_inspection(id) ON DELETE CASCADE,
+      CONSTRAINT fk_food_content_product
+        FOREIGN KEY (food_inspection_product_id) REFERENCES food_inspection_products(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
 }
 
 function getPayloadAttachments(payload = {}) {
@@ -211,9 +230,102 @@ function normalizeProductRow(row = {}, sequenceNo = 1) {
     unqualified_items: normalizeNullableMultiline(row.unqualified_items),
     inspection_result: normalizeNullableMultiline(row.inspection_result),
     requirement: normalizeNullableMultiline(row.requirement),
-    remarks: normalizeNullableMultiline(row.remarks) || '/',
+    remarks: normalizeNullableMultiline(row.remarks),
     raw_payload: JSON.stringify(row || {})
   };
+}
+
+function mapSequenceQueuesForProducts(insertedProducts = []) {
+  const queues = new Map();
+  for (const row of insertedProducts) {
+    const seq = Number.parseInt(row.sequence_no, 10);
+    if (!Number.isFinite(seq) || seq <= 0) {
+      continue;
+    }
+    if (!queues.has(seq)) {
+      queues.set(seq, []);
+    }
+    queues.get(seq).push(row.id);
+  }
+  return queues;
+}
+
+async function replaceFoodContentsFromSegments(connection, foodInspectionId, payload, insertedProducts) {
+  await ensureFoodInspectionSchema(connection);
+  const segments = Array.isArray(payload.food_content_segments) ? payload.food_content_segments : [];
+  if (!segments.length || !insertedProducts.length) {
+    return { inserted_content_count: 0 };
+  }
+
+  const queues = mapSequenceQueuesForProducts(insertedProducts);
+  let insertedContentCount = 0;
+  const boundProductIds = new Set();
+
+  const sortedSegments = [...segments].sort(
+    (a, b) => (Number.parseInt(a.ordinal_index, 10) || 0) - (Number.parseInt(b.ordinal_index, 10) || 0)
+  );
+
+  const takeProductIdForOrdinal = (ordinalIndex) => {
+    const seq = Number.parseInt(ordinalIndex, 10);
+    const queue = Number.isFinite(seq) && seq > 0 ? queues.get(seq) : null;
+    if (queue?.length) {
+      const pid = queue.shift();
+      if (pid) {
+        boundProductIds.add(pid);
+        return pid;
+      }
+    }
+    return null;
+  };
+
+  const productByIdAscending = [...insertedProducts].sort((a, b) => a.id - b.id);
+
+  for (let idx = 0; idx < sortedSegments.length; idx += 1) {
+    const segment = sortedSegments[idx];
+    const ordinalIndex = segment.ordinal_index ?? segment.ordinal_seq;
+    let productId = takeProductIdForOrdinal(ordinalIndex);
+    if (
+      !productId
+      && sortedSegments.length === insertedProducts.length
+      && idx < productByIdAscending.length
+    ) {
+      const candidate = productByIdAscending[idx];
+      if (candidate && !boundProductIds.has(candidate.id)) {
+        productId = candidate.id;
+        boundProductIds.add(productId);
+      }
+    }
+
+    const paragraphText = normalizeMultiline(segment.paragraph_text);
+    if (!productId || !paragraphText) {
+      continue;
+    }
+
+    const ordinalLabel = normalizeNullableText(segment.ordinal_label);
+
+    await connection.query(
+      `
+        REPLACE INTO food_content (
+          food_inspection_id,
+          food_inspection_product_id,
+          ordinal_label,
+          ordinal_index,
+          paragraph_text
+        ) VALUES (?, ?, ?, ?, ?)
+      `,
+      [
+        foodInspectionId,
+        productId,
+        ordinalLabel,
+        Number.parseInt(ordinalIndex, 10) || 0,
+        paragraphText
+      ]
+    );
+
+    insertedContentCount += 1;
+  }
+
+  return { inserted_content_count: insertedContentCount };
 }
 
 async function upsertFoodInspectionPayload(connection, payload = {}, sourceJsonFile = null) {
@@ -284,6 +396,7 @@ async function upsertFoodInspectionPayload(connection, payload = {}, sourceJsonF
 
   let insertedAttachmentCount = 0;
   let insertedProductCount = 0;
+  const insertedProductRows = [];
   const attachments = getPayloadAttachments(payload);
 
   for (const [attachmentIndex, attachment] of attachments.entries()) {
@@ -315,7 +428,7 @@ async function upsertFoodInspectionPayload(connection, payload = {}, sourceJsonF
     for (const [rowIndex, row] of rows.entries()) {
       const normalized = normalizeProductRow(row, rowIndex + 1);
       if (!normalized.product_name) continue;
-      await connection.query(
+      const [insertRow] = await connection.query(
         `
           INSERT INTO food_inspection_products (
             food_inspection_id, attachment_id, sequence_no, product_name,
@@ -352,16 +465,28 @@ async function upsertFoodInspectionPayload(connection, payload = {}, sourceJsonF
           normalized.raw_payload
         ]
       );
+      insertedProductRows.push({
+        id: Number(insertRow.insertId),
+        sequence_no: Number.parseInt(normalized.sequence_no, 10) || 0
+      });
       insertedProductCount += 1;
     }
   }
+
+  const foodContentOutcome = await replaceFoodContentsFromSegments(
+    connection,
+    foodInspectionId,
+    payload,
+    insertedProductRows
+  );
 
   return {
     id: Number(foodInspectionId),
     title,
     source_detail_url: sourceDetailUrl,
     attachment_count: insertedAttachmentCount,
-    product_count: insertedProductCount
+    product_count: insertedProductCount,
+    food_content_count: foodContentOutcome.inserted_content_count
   };
 }
 

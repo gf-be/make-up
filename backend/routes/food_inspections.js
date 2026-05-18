@@ -97,12 +97,17 @@ router.get('/:id', async (req, res) => {
       'SELECT * FROM food_inspection_products WHERE food_inspection_id = ? ORDER BY sequence_no ASC, id ASC',
       [id]
     );
+    const [foodContents] = await pool.query(
+      'SELECT * FROM food_content WHERE food_inspection_id = ? ORDER BY ordinal_index ASC, id ASC',
+      [id]
+    );
     res.json({
       success: true,
       data: {
         ...row,
         attachments,
-        products
+        products,
+        food_contents: foodContents
       }
     });
   } catch (error) {

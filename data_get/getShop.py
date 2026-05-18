@@ -4,9 +4,15 @@
 
 输出结构与 getdata.py / get_eatting.py 生成的导入 JSON 保持兼容：
 1. 通报级信息写入 JSON 顶层；
-2. 附件解析结果写入 attachments[].parse_result.rows；
+2. 附件解析结果写入 attachments[].parse_result.rows（Excel 侧 data_get/parse_food_attachment.js：
+   同一附件内以「表格第一列序号」为产品分界，同序号多行的多项不合格拼成一条（字段内换行衔接，检验值/不合格项目等分段去重）；
+   同产品续行也会对样品名称、企业/抽样单位、规格、抽样编号展示类字段做取长与去重合并（互为子串取较长；否则并列去重拼接）；
+   第一列不可用时按表头「序号」列；若多行共用同一抽样编号，即使序号列递增也会并入一条；
+   抽样编号列为合并单元格后续空白时，沿用上一非空抽样编号并按编号并入（如钙铁锌多营养素分行）；
+   食品抽检通报附件不导入「备注」列内容，remarks 恒为 null（解析见 data_get/parse_food_attachment.js）。
 3. 明确标记 product_type=food、announcement_type=sampling；
-4. 可选调用后端接口写入 food_inspection 原始表和 announcement_staging。
+4. 按正文「（一）（二）……」拆分 content_text，生成 food_content_segments，入库时写入 food_content 并绑定 food_inspection_products.id；
+5. 可选调用后端接口写入 food_inspection 原始表和 announcement_staging。
 
 常用命令：
     python data_get/getShop.py --max-pages 1 --max-items 1
@@ -142,17 +148,8 @@ def is_empty_document_no(value: object) -> bool:
     return not text or text in {"无", "/", "-", "—", "暂无"}
 
 
-def resequence_attachment_rows(attachments: List[Dict[str, object]]) -> int:
-    sequence_no = 1
-    for attachment in attachments:
-        rows = attachment.get("parse_result", {}).get("rows", [])
-        if not isinstance(rows, list):
-            continue
-        for row in rows:
-            if isinstance(row, dict) and normalize_text(row.get("product_name")):
-                row["sequence_no"] = sequence_no
-                sequence_no += 1
-    return sequence_no - 1
+def resequence_attachment_rows(attachments: List[Dict[str, object]], announcement_no: Optional[str]) -> int:
+    return food.assign_product_picture_paths(attachments, announcement_no)
 
 
 class SamrFoodShopCrawler(food.SamrFoodCrawler):
@@ -202,7 +199,13 @@ class SamrFoodShopCrawler(food.SamrFoodCrawler):
         html = self.fetch_text(detail_url, referer=source_page)
         soup = BeautifulSoup(html, "html.parser")
         title = food.extract_title(soup) or normalize_text(item.get("title"))
-        content_text = food.extract_content_text(soup)
+        
+        # 正文见 get_eatting.extract_content_text：已合并站内 HTML 在 URL/域名内因块级排版产生的无效换行
+        for sub in soup.find_all("sub"):
+            sub.unwrap()
+        # print(soup)
+        raw_text  = soup.find("div", class_="Three_xilan_07")
+        content_text = food.extract_content_text(raw_text) 
         metadata = extract_page_metadata(soup, title, content_text)
 
         publish_date = metadata.get("publish_date") or food.extract_publish_date(
@@ -215,15 +218,10 @@ class SamrFoodShopCrawler(food.SamrFoodCrawler):
         notice_category = food.classify_food_notice(title, content_text) or item.get("notice_category") or "unqualified_sampling"
         storage_key = food.build_notice_storage_key(title, publish_date, announcement_no, detail_url)
         attachments = self.extract_attachments(soup, detail_url, storage_key)
-        parsed_total = resequence_attachment_rows(attachments)
-        if parsed_total == 0 and content_text:
-            body_rows = food.parse_food_unqualified_body_items(content_text)
-            if body_rows:
-                attachments.append(food.build_body_fallback_attachment(
-                    body_rows,
-                    f"通报正文分项解析，共 {len(body_rows)} 条（附件表格未解析出明细时回填）",
-                ))
-                parsed_total = resequence_attachment_rows(attachments)
+        parsed_total = resequence_attachment_rows(attachments, announcement_no)
+
+        department_for_level = normalize_text(metadata.get("department")) or food.extract_meta_department_hint(soup)
+        ann_level_code, ann_level_label = food.infer_food_announcement_level(detail_url, title, department_for_level)
 
         payload = {
             "sequence": sequence,
@@ -240,6 +238,8 @@ class SamrFoodShopCrawler(food.SamrFoodCrawler):
             "source_page": source_page,
             "product_type": "food",
             "announcement_type": "sampling",
+            "announcement_level": ann_level_code,
+            "announcement_level_label": ann_level_label,
             "notice_category": notice_category,
             "notice_category_label": food.get_food_notice_label(notice_category),
             "classification_status": "identified",
@@ -250,6 +250,8 @@ class SamrFoodShopCrawler(food.SamrFoodCrawler):
                 "product_type_label": "食品",
                 "announcement_type_label": "抽检通告",
                 "notice_category": notice_category,
+                "announcement_level": ann_level_code,
+                "announcement_level_label": ann_level_label,
             },
             "crawl_record": {
                 "product_type": "food",
@@ -262,9 +264,12 @@ class SamrFoodShopCrawler(food.SamrFoodCrawler):
                 "topic_category": metadata.get("topic_category"),
                 "department": metadata.get("department"),
                 "document_date": metadata.get("document_date"),
+                "announcement_level": ann_level_code,
+                "announcement_level_label": ann_level_label,
             },
             "content_text": content_text,
             "content_preview": content_text[:1000],
+            "food_content_segments": food.parse_food_content_text_segments(content_text),
             "attachments": attachments,
             "success": True,
         }

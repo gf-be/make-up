@@ -117,6 +117,14 @@ export const updateAnnouncementContent = (id, data = {}) => {
   return request.patch(`/announcements/${id}/content`, data)
 }
 
+export const updateAnnouncementSamplingBatchStats = (id, data = {}) => {
+  return request.patch(`/announcements/${id}/sampling-batch-stats`, data)
+}
+
+export const updateAnnouncementOverviewFields = (id, data = {}) => {
+  return request.patch(`/announcements/${id}/overview-fields`, data)
+}
+
 export const deleteAnnouncement = (id) => {
 
 
@@ -182,6 +190,15 @@ export const importAnnouncementStagingJson = (data = {}) => {
 
 export const uploadAnnouncementStagingJson = (formData) => {
   return request.post('/announcement-staging/import-json-upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+    timeout: 120000
+  })
+}
+
+export const uploadAnnouncementStagingProductImages = (formData) => {
+  return request.post('/announcement-staging/product-images/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     },

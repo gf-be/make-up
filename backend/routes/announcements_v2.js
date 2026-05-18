@@ -108,6 +108,29 @@ function normalizeNullableText(value) {
   return normalized ? normalized : null;
 }
 
+/** 可选 DATE：`YYYY-MM-DD` 或空 → null；非法则返回 invalid */
+function coerceMysqlDateInput(value) {
+  if (value === undefined || value === null || value === '') {
+    return { ok: true, date: null };
+  }
+  const s = String(value).trim();
+  if (!s) return { ok: true, date: null };
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return { ok: false };
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (
+    dt.getUTCFullYear() !== y ||
+    dt.getUTCMonth() !== mo - 1 ||
+    dt.getUTCDate() !== d
+  ) {
+    return { ok: false };
+  }
+  return { ok: true, date: m[0] };
+}
+
 function normalizeNullableMultilineText(value) {
   if (value === undefined || value === null) {
     return null;
@@ -432,6 +455,8 @@ function buildAnnouncementProductDetailPayload(body = {}) {
     inspection_result: normalizeNullableText(body.inspection_result),
     requirement: normalizeNullableText(body.requirement),
     remarks: normalizeNullableText(body.remarks),
+    picture_url: normalizeNullableText(body.picture_url),
+    food_body_text: normalizeNullableMultilineText(body.food_body_text),
     is_counterfeit: deriveCounterfeitFlag(body.remarks, body.is_counterfeit)
   };
 }
@@ -816,7 +841,7 @@ router.put('/:announcementId/product-details/:detailId', requireRoles(['develope
             sample_unit_name = ?, sample_unit_address = ?, package_spec = ?, batch_no = ?,
             production_date = ?, expiry_date = ?, product_region = ?, registration_no = ?,
             production_license_no = ?, inspection_institution = ?, unqualified_items = ?,
-            inspection_result = ?, requirement = ?, remarks = ?, is_counterfeit = ?
+            inspection_result = ?, requirement = ?, remarks = ?, picture_url = ?, food_body_text = ?, is_counterfeit = ?
         WHERE id = ? AND announcement_id = ?
       `,
       [
@@ -842,6 +867,8 @@ router.put('/:announcementId/product-details/:detailId', requireRoles(['develope
         payload.inspection_result,
         payload.requirement,
         payload.remarks,
+        payload.picture_url,
+        payload.food_body_text,
         payload.is_counterfeit,
         detailId,
         announcementId
@@ -1027,6 +1054,184 @@ router.post('/', upload.single('attachment'), async (req, res) => {
     }
     console.error('创建公告失败:', error);
     res.status(500).json({ success: false, message: '创建公告失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+router.patch('/:id/sampling-batch-stats', requireRoles(['developer', 'data_admin']), async (req, res) => {
+  let connection;
+
+  try {
+    await ensureAnnouncementRouteSchema();
+
+    const { id } = req.params;
+
+    const parseNullableInt = (raw) => {
+      if (raw === null || raw === undefined || raw === '') {
+        return null;
+      }
+      const n = Number.parseInt(String(raw).trim(), 10);
+      return Number.isFinite(n) ? n : NaN;
+    };
+
+    const unq = parseNullableInt(req.body?.sampling_unqualified_batch_count);
+    const tot = parseNullableInt(req.body?.sampling_total_batch_count);
+
+    if (Number.isNaN(unq) || Number.isNaN(tot)) {
+      return res.status(400).json({ success: false, message: '不合格批次 / 总批次须为有效非负整数或留空' });
+    }
+
+    if (unq !== null && unq < 0) {
+      return res.status(400).json({ success: false, message: '不合格批次数不能为负数' });
+    }
+    if (tot !== null && tot < 0) {
+      return res.status(400).json({ success: false, message: '总批次数不能为负数' });
+    }
+
+    if (unq !== null && tot !== null && unq > tot) {
+      return res.status(400).json({
+        success: false,
+        message: '不合格批次数不能大于总批次数'
+      });
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query(
+      'SELECT id FROM announcements WHERE id = ? LIMIT 1',
+      [id]
+    );
+    if (!rows[0]) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '公告不存在' });
+    }
+
+    await connection.query(
+      `
+        UPDATE announcements
+        SET sampling_unqualified_batch_count = ?,
+            sampling_total_batch_count = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [unq, tot, id]
+    );
+
+    await connection.commit();
+
+    const [nextRows] = await pool.query(
+      `
+        SELECT sampling_unqualified_batch_count, sampling_total_batch_count
+        FROM announcements
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [id]
+    );
+
+    res.json({
+      success: true,
+      message: '抽检批次统计已更新',
+      data: {
+        id: Number(id),
+        sampling_unqualified_batch_count: nextRows[0]?.sampling_unqualified_batch_count ?? null,
+        sampling_total_batch_count: nextRows[0]?.sampling_total_batch_count ?? null
+      }
+    });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('更新抽检批次统计失败:', error);
+    res.status(500).json({ success: false, message: error.message || '更新抽检批次统计失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+router.patch('/:id/overview-fields', requireRoles(['developer', 'data_admin']), async (req, res) => {
+  let connection;
+
+  try {
+    await ensureAnnouncementRouteSchema();
+
+    const { id } = req.params;
+
+    const pub = coerceMysqlDateInput(req.body?.publish_date);
+    const is = coerceMysqlDateInput(req.body?.inspection_start_date);
+    const ie = coerceMysqlDateInput(req.body?.inspection_end_date);
+    if (!pub.ok || !is.ok || !ie.ok) {
+      return res.status(400).json({ success: false, message: '日期格式须为 YYYY-MM-DD 或留空' });
+    }
+
+    const inspection_unit = normalizeNullableText(req.body?.inspection_unit);
+
+    if (is.date && ie.date && String(is.date) > String(ie.date)) {
+      return res.status(400).json({ success: false, message: '检验开始日期不能晚于结束日期' });
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query(
+      'SELECT id FROM announcements WHERE id = ? LIMIT 1',
+      [id]
+    );
+    if (!rows[0]) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '公告不存在' });
+    }
+
+    await connection.query(
+      `
+        UPDATE announcements
+        SET publish_date = ?,
+            inspection_unit = ?,
+            inspection_start_date = ?,
+            inspection_end_date = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [pub.date, inspection_unit, is.date, ie.date, id]
+    );
+
+    await connection.commit();
+
+    const [nextRows] = await pool.query(
+      `
+        SELECT publish_date, inspection_unit, inspection_start_date, inspection_end_date
+        FROM announcements
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [id]
+    );
+
+    const row = nextRows[0] || {};
+
+    res.json({
+      success: true,
+      message: '关键信息字段已更新',
+      data: {
+        id: Number(id),
+        publish_date: row.publish_date ?? null,
+        inspection_unit: row.inspection_unit ?? null,
+        inspection_start_date: row.inspection_start_date ?? null,
+        inspection_end_date: row.inspection_end_date ?? null
+      }
+    });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('更新公告关键字段失败:', error);
+    res.status(500).json({ success: false, message: error.message || '更新公告关键字段失败' });
   } finally {
     if (connection) {
       connection.release();
