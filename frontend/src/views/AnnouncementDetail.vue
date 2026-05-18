@@ -57,7 +57,7 @@
                   <span v-else>{{ announcementProductTypeLabel }}</span>
                 </el-descriptions-item>
 
-                <el-descriptions-item label="检验单位">
+                <!-- <el-descriptions-item label="检验单位">
                   <el-input
                     v-if="overviewKeyEditMode"
                     v-model="overviewKeyForm.inspection_unit"
@@ -66,28 +66,9 @@
                     placeholder="检验单位"
                   />
                   <span v-else>{{ announcement.inspection_unit || '暂无' }}</span>
-                </el-descriptions-item>
-                <el-descriptions-item label="抽检批次（不合格/总数）">
-                  <div v-if="overviewKeyEditMode" class="overview-sampling-inline">
-                    <el-input-number
-                      v-model="overviewKeyForm.sampling_unqualified"
-                      :min="0"
-                      :max="999999"
-                      placeholder="不合格"
-                      controls-position="right"
-                    />
-                    <span class="overview-sampling-sep">/</span>
-                    <el-input-number
-                      v-model="overviewKeyForm.sampling_total"
-                      :min="0"
-                      :max="9999999"
-                      placeholder="总数"
-                      controls-position="right"
-                    />
-                  </div>
-                  <span v-else>{{ samplingBatchStatsLabel }}</span>
-                </el-descriptions-item>
-                <el-descriptions-item label="检验时间">
+                </el-descriptions-item> -->
+                
+                <!-- <el-descriptions-item label="检验时间">
                   <div v-if="overviewKeyEditMode" class="overview-date-inline">
                     <el-date-picker
                       v-model="overviewKeyForm.inspection_start_date"
@@ -114,7 +95,7 @@
                         : '暂无'
                     }}
                   </span>
-                </el-descriptions-item>
+                </el-descriptions-item> -->
                 <el-descriptions-item label="发布日期">
                   <el-date-picker
                     v-if="overviewKeyEditMode"
@@ -126,6 +107,42 @@
                     clearable
                   />
                   <span v-else>{{ formatDate(announcement.publish_date) }}</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="抽检不合格批次">
+                  <el-input-number
+                    v-if="overviewKeyEditMode"
+                    v-model="overviewKeyForm.sampling_unqualified"
+                    :min="0"
+                    :max="999999"
+                    placeholder="不合格批次数"
+                    controls-position="right"
+                    class="overview-sampling-input"
+                  />
+                  <span v-else>{{ formatSamplingBatchScalar(announcement.sampling_unqualified_batch_count) }}</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="抽检合格批次">
+                  <el-input-number
+                    v-if="overviewKeyEditMode"
+                    v-model="overviewKeyForm.sampling_qualified"
+                    :min="0"
+                    :max="9999999"
+                    placeholder="合格批次数"
+                    controls-position="right"
+                    class="overview-sampling-input"
+                  />
+                  <span v-else>{{ formatSamplingBatchQualifiedSpan(announcement) }}</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="抽检总批次">
+                  <el-input-number
+                    v-if="overviewKeyEditMode"
+                    v-model="overviewKeyForm.sampling_total"
+                    :min="0"
+                    :max="9999999"
+                    placeholder="抽检总批次数"
+                    controls-position="right"
+                    class="overview-sampling-input"
+                  />
+                  <span v-else>{{ formatSamplingBatchScalar(announcement.sampling_total_batch_count) }}</span>
                 </el-descriptions-item>
               </el-descriptions>
 
@@ -520,17 +537,38 @@
           </el-button>
         </div>
       </template>
+      
       <p class="panel-tip food-body-picker-tip">
-        在左侧通告正文中拖选段落，再点「导入」写入本行「正文文案」并保存到数据库。
+        在左侧通告正文中选择文字。
       </p>
       <div class="food-body-dialog-columns">
         <div class="food-body-dialog-col">
-          <div class="food-body-dialog-col-heading">正文内容</div>
+          <div class="food-body-dialog-col-heading food-body-heading-row">
+            <span>正文内容</span>
+            <FoodBodyTextSearchToolbar
+              v-model="foodBodySearchQuery"
+              :match-total="foodBodyMatchTotal"
+              :active-index="foodBodySearchActiveIndex"
+              :has-source-text="Boolean(foodBodyDialogFullText)"
+              @prev="foodBodySearchGoPrev"
+              @next="foodBodySearchGoNext"
+              @enter-next="foodBodySearchGoNext"
+            />
+          </div>
           <div
             class="food-body-select-surface"
             @mouseup="captureDetailFoodBodySelection"
           >
-            <pre class="food-body-pre">{{ foodBodyDialogFullText || '（当前通告正文为空，请先在概览区编辑公告正文）' }}</pre>
+            <pre
+              v-if="!foodBodyDialogFullText"
+              class="food-body-pre muted-text"
+            >（当前通告正文为空，请先在概览区编辑公告正文）</pre>
+            <pre
+              v-else
+              ref="foodBodyPreRef"
+              class="food-body-pre"
+              v-html="foodBodyHighlightedDisplayHtml"
+            />
           </div>
         </div>
         <div class="food-body-dialog-col">
@@ -556,7 +594,6 @@
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import {
   deleteAnnouncementProductDetail,
@@ -571,6 +608,8 @@ import {
   uploadAnnouncementStagingProductImages
 } from '@/api/index'
 import { canManageAnnouncementProducts } from '@/utils/auth'
+import FoodBodyTextSearchToolbar from '@/components/FoodBodyTextSearchToolbar.vue'
+import { useFoodBodyTextSearch } from '@/composables/useFoodBodyTextSearch.js'
 
 
 import dayjs from 'dayjs'
@@ -630,6 +669,16 @@ const foodBodySelectionPreview = ref('')
 const foodBodyTextTargetRow = ref(null)
 const foodBodyImportSaving = ref(false)
 
+const {
+  searchQuery: foodBodySearchQuery,
+  activeIndex: foodBodySearchActiveIndex,
+  preRef: foodBodyPreRef,
+  matchTotal: foodBodyMatchTotal,
+  highlightedDisplayHtml: foodBodyHighlightedDisplayHtml,
+  goNext: foodBodySearchGoNext,
+  goPrev: foodBodySearchGoPrev,
+  reset: resetFoodBodySearchState
+} = useFoodBodyTextSearch(foodBodyDialogFullText)
 const canManageProductDetails = computed(() => canManageAnnouncementProducts())
 
 const productDetailFilters = ref({
@@ -648,6 +697,7 @@ const overviewKeyForm = reactive({
   product_type: 'unknown',
   inspection_unit: '',
   sampling_unqualified: undefined,
+  sampling_qualified: undefined,
   sampling_total: undefined,
   inspection_start_date: '',
   inspection_end_date: '',
@@ -1027,6 +1077,7 @@ function openDetailFoodBodyTextPicker(row) {
   foodBodyDialogFullText.value = String(
     announcement.value?.content || ''
   ).replace(/\r\n/g, '\n')
+  resetFoodBodySearchState()
   foodBodyTextDialogVisible.value = true
 }
 
@@ -1043,6 +1094,7 @@ function resetDetailFoodBodyTextPicker() {
   foodBodyTextTargetRow.value = null
   foodBodySelectionPreview.value = ''
   foodBodyDialogFullText.value = ''
+  resetFoodBodySearchState()
 }
 
 async function confirmDetailFoodBodyTextImport() {
@@ -1084,21 +1136,6 @@ async function confirmDetailFoodBodyTextImport() {
   }
 }
 
-const samplingBatchStatsLabel = computed(() => {
-  const a = announcement.value
-  if (!a) return '暂无'
-  const u = a.sampling_unqualified_batch_count
-  const t = a.sampling_total_batch_count
-  const hasU = u !== null && u !== undefined && u !== ''
-  const hasT = t !== null && t !== undefined && t !== ''
-  if (!hasU && !hasT) {
-    return '暂无'
-  }
-  const uLabel = hasU ? String(u) : '—'
-  const tLabel = hasT ? String(t) : '—'
-  return `${uLabel} / ${tLabel}`
-})
-
 const activeCounterfeitCount = computed(() => {
 
   return productDetailsSummary.value.has_filters
@@ -1132,6 +1169,28 @@ const formatDate = (date) => {
   if (!date) return '暂无'
   const value = dayjs(date)
   return value.isValid() ? value.format('YYYY年MM月DD日') : date
+}
+
+function hasAnnouncementSamplingScalar(value) {
+  return value !== null && value !== undefined && value !== ''
+}
+
+function formatSamplingBatchScalar(value) {
+  return hasAnnouncementSamplingScalar(value) ? String(value) : '—'
+}
+
+function formatSamplingBatchQualifiedSpan(announcementRow) {
+  const a = announcementRow || {}
+  if (hasAnnouncementSamplingScalar(a.sampling_qualified_batch_count)) {
+    return String(a.sampling_qualified_batch_count)
+  }
+  if (
+    hasAnnouncementSamplingScalar(a.sampling_unqualified_batch_count) &&
+    hasAnnouncementSamplingScalar(a.sampling_total_batch_count)
+  ) {
+    return String(Number(a.sampling_total_batch_count) - Number(a.sampling_unqualified_batch_count))
+  }
+  return '—'
 }
 // 编辑正文
 const openContentDialog = () => {
@@ -1333,11 +1392,26 @@ function fillOverviewKeyFormFromAnnouncement () {
   overviewKeyForm.product_type = a.product_type || 'unknown'
   overviewKeyForm.inspection_unit = a.inspection_unit ? String(a.inspection_unit) : ''
   const u = a.sampling_unqualified_batch_count
+  const q = a.sampling_qualified_batch_count
   const t = a.sampling_total_batch_count
   overviewKeyForm.sampling_unqualified =
     u !== null && u !== undefined && u !== '' ? Number(u) : undefined
   overviewKeyForm.sampling_total =
     t !== null && t !== undefined && t !== '' ? Number(t) : undefined
+  if (q !== null && q !== undefined && q !== '') {
+    overviewKeyForm.sampling_qualified = Number(q)
+  } else if (
+    u !== null &&
+    u !== undefined &&
+    u !== '' &&
+    t !== null &&
+    t !== undefined &&
+    t !== ''
+  ) {
+    overviewKeyForm.sampling_qualified = Number(t) - Number(u)
+  } else {
+    overviewKeyForm.sampling_qualified = undefined
+  }
   overviewKeyForm.inspection_start_date = announceDateToPickerString(a.inspection_start_date)
   overviewKeyForm.inspection_end_date = announceDateToPickerString(a.inspection_end_date)
   overviewKeyForm.publish_date = announceDateToPickerString(a.publish_date)
@@ -1364,33 +1438,49 @@ async function saveOverviewKeyInfo () {
   }
 
   const uRaw = overviewKeyForm.sampling_unqualified
+  const qRaw = overviewKeyForm.sampling_qualified
   const tRaw = overviewKeyForm.sampling_total
   const sampling_unqualified_batch_count =
     uRaw === null || uRaw === undefined || uRaw === '' ? null : Number(uRaw)
+  const sampling_qualified_batch_count =
+    qRaw === null || qRaw === undefined || qRaw === '' ? null : Number(qRaw)
   const sampling_total_batch_count =
     tRaw === null || tRaw === undefined || tRaw === '' ? null : Number(tRaw)
 
-  if (
-    sampling_unqualified_batch_count !== null
-    && (Number.isNaN(sampling_unqualified_batch_count) || sampling_unqualified_batch_count < 0)
-  ) {
-    ElMessage.warning('不合格批次须为非负整数或留空')
-    return
-  }
-  if (
-    sampling_total_batch_count !== null
-    && (Number.isNaN(sampling_total_batch_count) || sampling_total_batch_count < 0)
-  ) {
-    ElMessage.warning('总批次须为非负整数或留空')
-    return
-  }
+  const batchStats = [
+    sampling_unqualified_batch_count,
+    sampling_qualified_batch_count,
+    sampling_total_batch_count
+  ]
+
   if (
     sampling_unqualified_batch_count !== null &&
-    sampling_total_batch_count !== null &&
-    sampling_unqualified_batch_count > sampling_total_batch_count
+    (Number.isNaN(sampling_unqualified_batch_count) || sampling_unqualified_batch_count < 0)
   ) {
-    ElMessage.warning('不合格批次数不能大于总批次数')
+    ElMessage.warning('抽检不合格批次须为非负整数或留空')
     return
+  }
+  if (
+    sampling_qualified_batch_count !== null &&
+    (Number.isNaN(sampling_qualified_batch_count) || sampling_qualified_batch_count < 0)
+  ) {
+    ElMessage.warning('抽检合格批次须为非负整数或留空')
+    return
+  }
+  if (
+    sampling_total_batch_count !== null &&
+    (Number.isNaN(sampling_total_batch_count) || sampling_total_batch_count < 0)
+  ) {
+    ElMessage.warning('抽检总批次须为非负整数或留空')
+    return
+  }
+
+  const filled = batchStats.filter((v) => v !== null).length
+  if (filled === 3) {
+    if (sampling_unqualified_batch_count + sampling_qualified_batch_count !== sampling_total_batch_count) {
+      ElMessage.warning('抽检不合格批次 + 合格批次须等于抽检总批次')
+      return
+    }
   }
 
   savingOverviewKeyInfo.value = true
@@ -1401,6 +1491,7 @@ async function saveOverviewKeyInfo () {
     })
     await updateAnnouncementSamplingBatchStats(id, {
       sampling_unqualified_batch_count,
+      sampling_qualified_batch_count,
       sampling_total_batch_count
     })
     await updateAnnouncementOverviewFields(id, {
@@ -1698,16 +1789,9 @@ watch(resolvedAnnouncementId, (id) => {
   vertical-align: top;
 }
 
-.overview-sampling-inline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.overview-sampling-sep {
-  color: #909399;
-  font-size: 13px;
+.overview-sampling-input {
+  width: 160px;
+  max-width: 100%;
 }
 
 .overview-date-inline {
@@ -1848,6 +1932,26 @@ watch(resolvedAnnouncementId, (id) => {
   font-weight: 600;
   color: #606266;
   flex-shrink: 0;
+}
+
+.food-body-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+:deep(mark.food-body-search-hit) {
+  background: rgba(253, 230, 138, 0.85);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+:deep(mark.food-body-search-hit--active) {
+  background: rgba(251, 191, 36, 0.95);
+  outline: 2px solid rgba(245, 158, 11, 0.75);
 }
 
 .food-body-picker-tip {

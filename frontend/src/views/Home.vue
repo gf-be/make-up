@@ -43,7 +43,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
-import { ElMessage } from 'element-plus'
 import { getOperationLogs, updateCurrentUserPassword } from '@/api'
 import { MODULE_PERMISSIONS, currentUser, getRoleLabel } from '@/utils/auth'
 

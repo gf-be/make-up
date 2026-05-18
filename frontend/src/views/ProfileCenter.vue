@@ -49,7 +49,6 @@
 
 <script setup>
 import { onMounted, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import { updateCurrentUserPassword, updateCurrentUserProfile } from '@/api'
 import { currentUser, getAuthToken, getRoleLabel, setAuthSession } from '@/utils/auth'
 

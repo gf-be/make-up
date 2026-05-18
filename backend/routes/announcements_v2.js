@@ -1077,25 +1077,50 @@ router.patch('/:id/sampling-batch-stats', requireRoles(['developer', 'data_admin
       return Number.isFinite(n) ? n : NaN;
     };
 
-    const unq = parseNullableInt(req.body?.sampling_unqualified_batch_count);
-    const tot = parseNullableInt(req.body?.sampling_total_batch_count);
+    let u = parseNullableInt(req.body?.sampling_unqualified_batch_count);
+    let q = parseNullableInt(req.body?.sampling_qualified_batch_count);
+    let t = parseNullableInt(req.body?.sampling_total_batch_count);
 
-    if (Number.isNaN(unq) || Number.isNaN(tot)) {
-      return res.status(400).json({ success: false, message: '不合格批次 / 总批次须为有效非负整数或留空' });
-    }
-
-    if (unq !== null && unq < 0) {
-      return res.status(400).json({ success: false, message: '不合格批次数不能为负数' });
-    }
-    if (tot !== null && tot < 0) {
-      return res.status(400).json({ success: false, message: '总批次数不能为负数' });
-    }
-
-    if (unq !== null && tot !== null && unq > tot) {
+    if (Number.isNaN(u) || Number.isNaN(q) || Number.isNaN(t)) {
       return res.status(400).json({
         success: false,
-        message: '不合格批次数不能大于总批次数'
+        message: '抽检不合格批次、合格批次、总批次须为有效非负整数或留空'
       });
+    }
+
+    const nonnegative = [u, q, t].every((x) => x === null || x >= 0);
+    if (!nonnegative) {
+      return res.status(400).json({ success: false, message: '抽检批次数不能为负数' });
+    }
+
+    const filled = [u, q, t].filter((x) => x !== null).length;
+    if (filled === 3 && u + q !== t) {
+      return res.status(400).json({
+        success: false,
+        message: '抽检不合格批次 + 合格批次须等于抽检总批次'
+      });
+    }
+
+    if (filled === 2) {
+      if (u !== null && t !== null && q === null) {
+        q = t - u;
+      } else if (u !== null && q !== null && t === null) {
+        t = u + q;
+      } else if (q !== null && t !== null && u === null) {
+        u = t - q;
+      }
+      if (u < 0 || q < 0 || t < 0) {
+        return res.status(400).json({
+          success: false,
+          message: '根据已填两项推算的第三项不能为负数，请检查数字'
+        });
+      }
+      if (u + q !== t) {
+        return res.status(400).json({
+          success: false,
+          message: '抽检不合格批次 + 合格批次须等于抽检总批次'
+        });
+      }
     }
 
     connection = await pool.getConnection();
@@ -1114,18 +1139,19 @@ router.patch('/:id/sampling-batch-stats', requireRoles(['developer', 'data_admin
       `
         UPDATE announcements
         SET sampling_unqualified_batch_count = ?,
+            sampling_qualified_batch_count = ?,
             sampling_total_batch_count = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `,
-      [unq, tot, id]
+      [u, q, t, id]
     );
 
     await connection.commit();
 
     const [nextRows] = await pool.query(
       `
-        SELECT sampling_unqualified_batch_count, sampling_total_batch_count
+        SELECT sampling_unqualified_batch_count, sampling_qualified_batch_count, sampling_total_batch_count
         FROM announcements
         WHERE id = ?
         LIMIT 1
@@ -1139,6 +1165,7 @@ router.patch('/:id/sampling-batch-stats', requireRoles(['developer', 'data_admin
       data: {
         id: Number(id),
         sampling_unqualified_batch_count: nextRows[0]?.sampling_unqualified_batch_count ?? null,
+        sampling_qualified_batch_count: nextRows[0]?.sampling_qualified_batch_count ?? null,
         sampling_total_batch_count: nextRows[0]?.sampling_total_batch_count ?? null
       }
     });

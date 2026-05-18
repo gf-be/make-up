@@ -820,7 +820,8 @@ async function ensureAnnouncementTablePublishColumns(connection) {
   await ensureColumnExists(connection, 'announcements', 'announcement_level', 'VARCHAR(24) NULL AFTER source_json_file');
   await ensureColumnExists(connection, 'announcements', 'announcement_level_label', 'VARCHAR(32) NULL AFTER announcement_level');
   await ensureColumnExists(connection, 'announcements', 'sampling_unqualified_batch_count', 'INT NULL AFTER announcement_level_label');
-  await ensureColumnExists(connection, 'announcements', 'sampling_total_batch_count', 'INT NULL AFTER sampling_unqualified_batch_count');
+  await ensureColumnExists(connection, 'announcements', 'sampling_qualified_batch_count', 'INT NULL AFTER sampling_unqualified_batch_count');
+  await ensureColumnExists(connection, 'announcements', 'sampling_total_batch_count', 'INT NULL AFTER sampling_qualified_batch_count');
   await ensureIndexExists(connection, 'announcements', 'idx_announcements_product_type', 'ALTER TABLE announcements ADD INDEX idx_announcements_product_type (product_type)');
   await ensureIndexExists(connection, 'announcements', 'idx_announcements_announcement_type', 'ALTER TABLE announcements ADD INDEX idx_announcements_announcement_type (announcement_type)');
   await ensureIndexExists(connection, 'announcements', 'idx_announcements_source_detail_url', 'ALTER TABLE announcements ADD INDEX idx_announcements_source_detail_url (source_detail_url(191))');

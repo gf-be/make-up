@@ -1,11 +1,12 @@
 <template>
+  <el-config-provider :locale="zhCn">
   <router-view v-if="route.path === '/login'" />
   <el-container v-else class="layout-container">
     <el-header class="header" height="auto">
       <div class="header-content">
         <div class="logo">
           <el-icon :size="28">
-            <Document />
+            <component :is="MENU_ICONS.Document" />
           </el-icon>
           <span class="logo-title">视频、文案管理系统</span>
         </div>
@@ -13,7 +14,7 @@
           <el-menu :default-active="activeMenu" mode="horizontal" router class="nav-menu">
             <el-menu-item v-for="item in visibleMenus" :key="item.index" :index="item.index">
               <el-icon>
-                <component :is="item.icon" />
+                <component :is="MENU_ICONS[item.icon] || MENU_ICONS.Document" />
               </el-icon>
               <span>{{ item.label }}</span>
             </el-menu-item>
@@ -108,14 +109,16 @@
       <el-button type="primary" :loading="savingPassword" @click="handleUpdatePassword">保存</el-button>
     </template>
   </el-dialog>
+  </el-config-provider>
 </template>
 
 <script setup>
 
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { logout, updateCurrentUserPassword, updateCurrentUserProfile } from '@/api'
+import { MENU_ICONS } from '@/constants/menu-icons'
 import {
   MODULE_PERMISSIONS,
   clearAuthSession,

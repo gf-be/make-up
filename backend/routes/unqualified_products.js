@@ -2561,6 +2561,78 @@ router.post('/save-copy-text', authenticate, async (req, res) => {
   }
 });
 
+/** 导出等场景：仅累加「产品 × 当前用户」在 unqualified_product_usage_records 的 use_count（已存在则不新增） */
+router.post('/record-export-usage', authenticate, async (req, res) => {
+  try {
+    await ensureUnqualifiedProductsReady();
+
+    const rawIds = req.body?.product_ids;
+    const ids = Array.isArray(rawIds)
+      ? [
+          ...new Set(
+            rawIds
+              .map((x) => Number.parseInt(String(x || '').trim(), 10))
+              .filter((n) => Number.isFinite(n) && n > 0)
+          )
+        ]
+      : [];
+
+    if (!ids.length) {
+      return res.status(400).json({ success: false, message: '未提供有效的产品明细 id' });
+    }
+    if (ids.length > 500) {
+      return res.status(400).json({ success: false, message: '单次记录的产品明细过多' });
+    }
+
+    const user = req.user || {};
+    const uid = user.id != null && Number.isFinite(Number(user.id)) && Number(user.id) > 0 ? Number(user.id) : null;
+    if (!uid) {
+      return res.status(400).json({ success: false, message: '需在登录状态下记录导出使用情况' });
+    }
+
+    const username = String(user.username || '');
+    const displayName = String(user.display_name || user.username || '');
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [existingRows] = await connection.query(
+        `SELECT id FROM unqualified_products WHERE id IN (${ids.map(() => '?').join(', ')})`,
+        ids
+      );
+      if (existingRows.length !== ids.length) {
+        await connection.rollback();
+        return res.status(400).json({ success: false, message: '存在无效的产品明细 id' });
+      }
+
+      for (const pid of ids) {
+        await upsertUnqualifiedProductUsageRecord(connection, {
+          productId: pid,
+          userId: uid,
+          username,
+          displayName
+        });
+      }
+
+      await connection.commit();
+      res.json({
+        success: true,
+        message: '已更新导出使用记录',
+        data: { product_count: ids.length }
+      });
+    } catch (innerError) {
+      await connection.rollback();
+      throw innerError;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('记录导出使用情况失败:', error);
+    res.status(500).json({ success: false, message: '记录导出使用情况失败' });
+  }
+});
+
 router.get('/:id/usage-records', async (req, res) => {
   try {
     await ensureUnqualifiedProductsReady();

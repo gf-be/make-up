@@ -143,7 +143,6 @@ import {
   resolveAnnouncementStagingTraceback,
   saveAnnouncementStagingWorkspaceCache
 } from '@/api/index'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 const TRACEBACK_CACHE_KEY = 'announcement-tracebacks-workspace'
 

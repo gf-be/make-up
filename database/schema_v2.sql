@@ -26,7 +26,10 @@ CREATE TABLE IF NOT EXISTS announcements (
     inspection_start_date DATE,  -- 检验开始日期（自动提取）
     inspection_end_date DATE,  -- 检验结束日期（自动提取）
     inspection_unit VARCHAR(500),  -- 检验单位（自动提取）
-    inspection_count INT DEFAULT 0,  -- 抽检批次总数（自动提取）
+    inspection_count INT DEFAULT 0,  -- 抽检批次总数（自动提取，来自正文解析）
+    sampling_unqualified_batch_count INT NULL COMMENT '抽检不合格批次数',
+    sampling_qualified_batch_count INT NULL COMMENT '抽检合格批次数',
+    sampling_total_batch_count INT NULL COMMENT '抽检总批次数',
     attachment_path VARCHAR(500),  -- 附件路径
     attachment_name VARCHAR(200),  -- 附件原名
     product_type VARCHAR(50) NOT NULL DEFAULT 'cosmetics',  -- 产品类型

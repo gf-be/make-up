@@ -274,23 +274,86 @@
             <el-option label="柱状图" value="bar" />
             <el-option label="折线图" value="line" />
           </el-select>
-          <el-select v-model="detailChartDimension" placeholder="统计字段" size="small" style="width: 220px" filterable>
+          <el-select
+            v-model="detailChartExportDimensionKeys"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            :max-collapse-tags="2"
+            filterable
+            placeholder="统计字段（多选）"
+            size="small"
+            class="detail-chart-dimension-select-multiple"
+            style="width: min(380px, 46vw)"
+            title="可多选字段，下拉每项带勾选样式；第一项为当前预览图统计维度，并与「导出压缩包」一致。"
+          >
             <el-option v-for="opt in NODE_DETAIL_CHART_FIELDS" :key="opt.key" :label="opt.label" :value="opt.key" />
           </el-select>
-          <el-button size="small" :loading="detailChartDataLoading" @click="refreshDetailChartFullData">
-            重新加载
+          <el-button
+            size="small"
+            type="success"
+            plain
+            :loading="detailChartBulkExporting"
+            @click="runDetailChartBulkExportFromToolbarChecked"
+          >
+            导出压缩包
           </el-button>
+          <!-- <el-button size="small" :loading="detailChartDataLoading" @click="refreshDetailChartFullData">
+            重新加载
+          </el-button> -->
           <span class="detail-chart-hint">
             <template v-if="detailTableSelectedCount > 0">
               按已勾选的 {{ detailTableSelectedCount }} 条参与统计
             </template>
             <template v-else>
-              未勾选时按当前节点范围内全部 {{ pagination.total || 0 }} 条
+              当前未勾选，展示通告下全部条数 {{ pagination.total || 0 }} 
             </template>
+            <!-- <el-button type="primary" size="small" @click="openDetailChartBulkExportDialog">批量导出…</el-button> -->
           </span>
         </div>
         <div ref="detailChartRef" class="detail-chart-canvas detail-chart-canvas--dialog" />
       </div>
+    </el-dialog>
+
+    <el-dialog
+      v-model="detailChartBulkExportDialogVisible"
+      title="批量导出图表"
+      width="min(520px, 92vw)"
+      align-center
+      append-to-body
+      destroy-on-close
+      class="detail-chart-bulk-export-dialog"
+    >
+      <p class="detail-chart-bulk-export-intro">
+        可多选「图表类型 + 统计字段」组合；统计字段下拉已支持多选（与图表工具栏第一项维度一致）。
+        导出为一张压缩包写入您所选文件夹；统计口径与当前弹窗一致（含表格勾选 subset）。
+      </p>
+      <div class="detail-chart-bulk-export-actions">
+        <el-button size="small" @click="selectAllDetailChartBulkExportChoices">全选</el-button>
+        <el-button size="small" @click="clearDetailChartBulkExportSelections">清空</el-button>
+      </div>
+      <el-checkbox-group v-model="detailChartBulkExportSelectedKeys" class="detail-chart-bulk-export-group">
+        <el-scrollbar max-height="min(420px, 55vh)">
+          <div
+            v-for="opt in detailChartBulkExportChoices"
+            :key="opt.key"
+            class="detail-chart-bulk-export-row"
+          >
+            <el-checkbox :label="opt.key">{{ opt.label }}</el-checkbox>
+          </div>
+        </el-scrollbar>
+      </el-checkbox-group>
+      <template #footer>
+        <el-button @click="detailChartBulkExportDialogVisible = false">关闭</el-button>
+        <el-button
+          type="primary"
+          :loading="detailChartBulkExporting"
+          :disabled="!detailChartBulkExportSelectedKeys.length"
+          @click="runDetailChartBulkExportToFolderZip"
+        >
+          选择文件夹并保存压缩包
+        </el-button>
+      </template>
     </el-dialog>
 
     <el-dialog v-model="categorySettingDialogVisible" title="分类设置" width="min(720px, 96vw)" align-center append-to-body
@@ -385,8 +448,31 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="combinedExportDialogVisible" title="导出" width="min(1200px, 96vw)" align-center
-      append-to-body destroy-on-close>
+    <el-dialog
+      v-model="combinedExportDialogVisible"
+      width="min(1200px, 96vw)"
+      align-center
+      append-to-body
+      destroy-on-close
+      class="combined-export-dialog"
+    >
+      <template #header="{ titleId, titleClass }">
+        <div class="combined-export-dialog-header">
+          <span :id="titleId" :class="titleClass">导出</span>
+          <div class="combined-export-dialog-header-actions">
+            <el-button @click="combinedExportDialogVisible = false">关闭</el-button>
+            <el-button
+              type="primary"
+              :loading="combinedExportPackaging"
+              :disabled="!combinedExportRows.length"
+              title="下载 zip：内含 文案.txt、Excel、商品图片/（文案内容一致）"
+              @click="exportCombinedExportPackageZip"
+            >
+              导出
+            </el-button>
+          </div>
+        </div>
+      </template>
       <div v-loading="combinedExportLoading" class="combined-export-dialog-body">
         <div class="combined-export-summary">
           <el-tag type="success">已勾选明细 {{ combinedExportRows.length }} 条</el-tag>
@@ -462,18 +548,6 @@
           </div>
         </div>
       </div>
-      <template #footer>
-        <el-button @click="combinedExportDialogVisible = false">关闭</el-button>
-        <el-button
-          type="primary"
-          :loading="combinedExportPackaging"
-          :disabled="!combinedExportRows.length"
-          title="下载 zip：内含 文案.txt、Excel、商品图片/（文案内容一致）"
-          @click="exportCombinedExportPackageZip"
-        >
-          导出
-        </el-button>
-      </template>
     </el-dialog>
   </div>
 </template>
@@ -481,7 +555,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close, Rank } from '@element-plus/icons-vue'
 import {
   getUnqualifiedProductFilterOptions,
@@ -496,7 +569,8 @@ import {
   listMyUnqualifiedDimensionPresets,
   createMyUnqualifiedDimensionPreset,
   deleteMyUnqualifiedDimensionPreset,
-  saveUnqualifiedProductCopyText
+  saveUnqualifiedProductCopyText,
+  recordUnqualifiedProductExportUsage
 } from '@/api/index'
 import { currentUser, getAuthToken, getUserScopedStorageKey, setAuthSession } from '@/utils/auth'
 
@@ -553,13 +627,45 @@ const NODE_DETAIL_CHART_FIELDS = [
   { key: 'issue_category', label: '问题类型' }
 ]
 
+const DETAIL_CHART_TYPE_OPTIONS = [
+  { value: 'pie', label: '饼图' },
+  { value: 'bar', label: '柱状图' },
+  { value: 'line', label: '折线图' }
+]
+
+function detailChartExportChoiceKey(chartType, dimensionKey) {
+  return `${chartType}|${dimensionKey}`
+}
+
+const detailChartBulkExportChoices = computed(() => {
+  const rows = []
+  for (const t of DETAIL_CHART_TYPE_OPTIONS) {
+    for (const f of NODE_DETAIL_CHART_FIELDS) {
+      rows.push({
+        key: detailChartExportChoiceKey(t.value, f.key),
+        chartType: t.value,
+        typeLabel: t.label,
+        dimensionKey: f.key,
+        dimensionLabel: f.label,
+        label: `${t.label} · ${f.label}`
+      })
+    }
+  }
+  return rows
+})
+
 const detailChartDialogVisible = ref(false)
 const detailChartType = ref('pie')
 const detailChartDimension = ref('manufacturer_province')
+/** 工具栏勾选：参与「导出压缩包」的统计字段（与当前图表类型组合） */
+const detailChartExportDimensionKeys = ref(['manufacturer_province'])
 const detailChartRef = ref(null)
 /** 图表统计：服务端聚合后的分桶数据 */
 const detailChartBuckets = ref([])
 const detailChartDataLoading = ref(false)
+const detailChartBulkExportDialogVisible = ref(false)
+const detailChartBulkExportSelectedKeys = ref([])
+const detailChartBulkExporting = ref(false)
 let detailChartInstance = null
 let echartsModulePromise = null
 const videoCopyDialogVisible = ref(false)
@@ -707,14 +813,15 @@ function resizeDetailChart() {
   detailChartInstance?.resize()
 }
 
-function buildDetailChartOption() {
-  const dimensionKey = detailChartDimension.value
-  const type = detailChartType.value
-  let items = (detailChartBuckets.value || []).length
-    ? sortDetailChartItems([...detailChartBuckets.value], dimensionKey)
+function buildDetailChartOptionSpec(dimensionKey, chartType, buckets, { forExport = false } = {}) {
+  const type = chartType
+  let items = (buckets || []).length
+    ? sortDetailChartItems([...buckets], dimensionKey)
     : []
+  const animPartial = forExport ? { animation: false, animationDuration: 0 } : {}
   if (!items.length) {
     return {
+      ...animPartial,
       title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: '#909399', fontSize: 14 } },
       xAxis: { show: false },
       yAxis: { show: false },
@@ -732,6 +839,7 @@ function buildDetailChartOption() {
 
   if (type === 'pie') {
     return {
+      ...animPartial,
       color: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
       tooltip: { trigger: 'item', formatter: '{b}<br/>{c} 条 ({d}%)' },
       legend: { type: 'scroll', bottom: 0 },
@@ -752,6 +860,7 @@ function buildDetailChartOption() {
 
   const isLine = type === 'line'
   return {
+    ...animPartial,
     color: ['#5470c6'],
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: '2%', right: '3%', bottom: names.length > 10 ? 64 : 40, top: 48, containLabel: true },
@@ -771,6 +880,61 @@ function buildDetailChartOption() {
         areaStyle: isLine ? { opacity: 0.06 } : undefined
       }
     ]
+  }
+}
+
+function buildDetailChartOption() {
+  return buildDetailChartOptionSpec(
+    detailChartDimension.value,
+    detailChartType.value,
+    detailChartBuckets.value
+  )
+}
+
+function dataUrlToBlob(dataUrl) {
+  const parts = String(dataUrl || '').split(',')
+  if (parts.length < 2) return new Blob([], { type: 'image/png' })
+  const head = parts[0]
+  const base64 = parts.slice(1).join(',')
+  const mimeMatch = head.match(/data:([^;]+)/)
+  const mime = mimeMatch ? mimeMatch[1] : 'image/png'
+  try {
+    const binary = atob(base64)
+    const arr = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i += 1) {
+      arr[i] = binary.charCodeAt(i)
+    }
+    return new Blob([arr], { type: mime })
+  } catch {
+    return new Blob([], { type: mime })
+  }
+}
+
+/** 离屏渲染单张图表 PNG（批量导出） */
+async function renderDetailChartToPngBlob(dimensionKey, chartType, buckets) {
+  const echarts = await loadEchartsModule()
+  const div = document.createElement('div')
+  const W = 1080
+  const H = 640
+  div.style.cssText = `width:${W}px;height:${H}px;position:fixed;left:-12000px;top:0;visibility:hidden`
+  document.body.appendChild(div)
+  let chart = null
+  try {
+    chart = echarts.init(div, null, { renderer: 'canvas', width: W, height: H, devicePixelRatio: 2 })
+    const opt = buildDetailChartOptionSpec(dimensionKey, chartType, buckets, { forExport: true })
+    chart.setOption(opt, true)
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => window.setTimeout(resolve, 140)))
+    })
+    const dataUrl = chart.getDataURL({
+      type: 'png',
+      pixelRatio: 2,
+      backgroundColor: '#ffffff'
+    })
+    return dataUrlToBlob(dataUrl)
+  } finally {
+    chart?.dispose()
+    div.remove()
   }
 }
 
@@ -2516,7 +2680,48 @@ async function refreshDetailChartFullData() {
   }
 }
 
+async function fetchDetailChartBucketsForDimension(chartDimension) {
+  const pathsPayload = getNodeDetailsPathsPayload()
+  if (!pathsPayload.length || !(pagination.value.total > 0)) {
+    return []
+  }
+  const selectedChartIds = Array.from(detailTableSelectedIds.value)
+    .map((id) => Number(id))
+    .filter((n) => Number.isFinite(n) && n > 0)
+  const chartBody = {
+    ...buildTreeRequestParams(),
+    paths: pathsPayload,
+    chart_dimension: chartDimension
+  }
+  if (selectedChartIds.length > 0) {
+    chartBody.product_ids = selectedChartIds
+  }
+  const res = await getUnqualifiedProductNodeDetailChart(chartBody)
+  return res.data || []
+}
+
 async function onDetailChartDialogOpened() {
+  const allowed = new Set(NODE_DETAIL_CHART_FIELDS.map((f) => f.key))
+  let list = [...(detailChartExportDimensionKeys.value || [])]
+    .map(String)
+    .filter((k) => allowed.has(k))
+  const seen = new Set()
+  list = list.filter((k) => (seen.has(k) ? false : seen.add(k)))
+  if (!list.length) {
+    const fb =
+      detailChartDimension.value && allowed.has(String(detailChartDimension.value))
+        ? detailChartDimension.value
+        : 'manufacturer_province'
+    detailChartExportDimensionKeys.value = [fb]
+    detailChartDimension.value = fb
+  } else {
+    if (JSON.stringify(detailChartExportDimensionKeys.value) !== JSON.stringify(list)) {
+      detailChartExportDimensionKeys.value = list
+    }
+    if (!allowed.has(String(detailChartDimension.value)) || detailChartDimension.value !== list[0]) {
+      detailChartDimension.value = list[0]
+    }
+  }
   await refreshDetailChartFullData()
 }
 
@@ -2524,6 +2729,42 @@ function onDetailChartDialogClosed() {
   disposeDetailChart()
   detailChartBuckets.value = []
 }
+
+watch(
+  detailChartExportDimensionKeys,
+  () => {
+    const allowed = new Set(NODE_DETAIL_CHART_FIELDS.map((f) => f.key))
+    let list = [...(detailChartExportDimensionKeys.value || [])]
+      .map(String)
+      .filter((k) => allowed.has(k))
+    const seen = new Set()
+    list = list.filter((k) => (seen.has(k) ? false : seen.add(k)))
+    if (!list.length) {
+      const fb =
+        detailChartDimension.value && allowed.has(String(detailChartDimension.value))
+          ? detailChartDimension.value
+          : 'manufacturer_province'
+      const next = [fb]
+      if (JSON.stringify(detailChartExportDimensionKeys.value) !== JSON.stringify(next)) {
+        detailChartExportDimensionKeys.value = next
+        return
+      }
+      if (detailChartDimension.value !== fb) {
+        detailChartDimension.value = fb
+      }
+      return
+    }
+    if (JSON.stringify(detailChartExportDimensionKeys.value) !== JSON.stringify(list)) {
+      detailChartExportDimensionKeys.value = list
+      return
+    }
+    const primary = list[0]
+    if (detailChartDimension.value !== primary) {
+      detailChartDimension.value = primary
+    }
+  },
+  { deep: true }
+)
 
 watch(
   () => detailChartDimension.value,
@@ -2626,6 +2867,165 @@ function buildNodeDetailsExportFileBase() {
   })()
   const date = new Date().toISOString().slice(0, 10)
   return sanitizeExportFileBase(`不合格产品节点详情_${rowDim}_${pathHint}_${date}`)
+}
+
+function buildChartBulkExportZipBaseName() {
+  const rowDim = (hierarchyRow.value || [])
+    .map((k) => getDimensionLabel(k))
+    .join('·')
+  const checked = treeRef.value?.getCheckedNodes?.() || []
+  const pathHint = (() => {
+    if (checked.length > 1) {
+      return `多选合并${checked.length}个节点`
+    }
+    if (currentNodeBreadcrumb.value) {
+      return currentNodeBreadcrumb.value
+    }
+    return currentNode.value?.label || '节点'
+  })()
+  const date = new Date().toISOString().slice(0, 10)
+  return sanitizeExportFileBase(`统计图表批量导出_${rowDim}_${pathHint}_${date}`)
+}
+
+function buildToolbarDetailChartExportKeys() {
+  const allowed = new Set(NODE_DETAIL_CHART_FIELDS.map((f) => f.key))
+  let dims = (detailChartExportDimensionKeys.value || []).filter((k) => allowed.has(String(k)))
+  if (!dims.length) {
+    dims = [detailChartDimension.value].filter((k) => allowed.has(String(k)))
+  }
+  const t = detailChartType.value
+  return dims.map((dim) => detailChartExportChoiceKey(t, dim))
+}
+
+function runDetailChartBulkExportFromToolbarChecked() {
+  const keys = buildToolbarDetailChartExportKeys()
+  if (!keys.length) {
+    ElMessage.warning('没有可导出的统计字段')
+    return
+  }
+  void runDetailChartBulkExportToFolderZip(keys)
+}
+
+function parseChartExportChoiceKey(key) {
+  const k = String(key || '')
+  const i = k.indexOf('|')
+  if (i <= 0) {
+    return { chartType: 'pie', dimensionKey: '' }
+  }
+  return { chartType: k.slice(0, i), dimensionKey: k.slice(i + 1) }
+}
+
+// function openDetailChartBulkExportDialog() {
+//   detailChartBulkExportSelectedKeys.value = buildToolbarDetailChartExportKeys()
+//   detailChartBulkExportDialogVisible.value = true
+// }
+
+function selectAllDetailChartBulkExportChoices() {
+  detailChartBulkExportSelectedKeys.value = detailChartBulkExportChoices.value.map((c) => c.key)
+}
+
+function clearDetailChartBulkExportSelections() {
+  detailChartBulkExportSelectedKeys.value = []
+}
+
+async function runDetailChartBulkExportToFolderZip(exportKeysOverride = null) {
+  const resolvedKeys =
+    Array.isArray(exportKeysOverride) && exportKeysOverride.length > 0
+      ? [...exportKeysOverride]
+      : [...detailChartBulkExportSelectedKeys.value]
+  if (!resolvedKeys.length || detailChartBulkExporting.value) return
+  if (typeof window.showDirectoryPicker !== 'function') {
+    ElMessage.warning('当前浏览器不支持选择本地文件夹，请使用 Chrome 或 Edge 最新版')
+    return
+  }
+  let dirHandle
+  try {
+    dirHandle = await window.showDirectoryPicker()
+  } catch (e) {
+    if (e?.name === 'AbortError') return
+    ElMessage.error(e?.message || '无法打开文件夹选择器')
+    return
+  }
+
+  const pathsPayload = getNodeDetailsPathsPayload()
+  if (!pathsPayload.length || !(pagination.value.total > 0)) {
+    ElMessage.warning('当前没有可统计的明细范围，无法导出图表')
+    return
+  }
+
+  detailChartBulkExporting.value = true
+  try {
+    const selectedKeys = resolvedKeys
+    const dimSet = new Set()
+    for (const key of selectedKeys) {
+      const { dimensionKey } = parseChartExportChoiceKey(key)
+      if (dimensionKey) dimSet.add(dimensionKey)
+    }
+
+    const bucketCache = new Map()
+    for (const d of dimSet) {
+      try {
+        const buckets = await fetchDetailChartBucketsForDimension(d)
+        bucketCache.set(d, buckets)
+      } catch (err) {
+        console.error(err)
+        ElMessage.error(err?.message || `加载统计字段「${d}」数据失败`)
+        return
+      }
+    }
+
+    const JSZip = await loadJSZipModule()
+    const zip = new JSZip()
+    let okCount = 0
+    let failCount = 0
+    const usedNames = new Set()
+
+    const choiceMap = new Map(detailChartBulkExportChoices.value.map((c) => [c.key, c]))
+
+    for (const key of selectedKeys) {
+      const { chartType, dimensionKey } = parseChartExportChoiceKey(key)
+      const choice = choiceMap.get(key)
+      const typeLabel = choice?.typeLabel || chartType
+      const dimLabel = choice?.dimensionLabel || dimensionKey
+      const buckets = bucketCache.get(dimensionKey) || []
+      try {
+        const blob = await renderDetailChartToPngBlob(dimensionKey, chartType, buckets)
+        let base = sanitizeExportFileBase(`${typeLabel}_${dimLabel}`)
+        let fname = `${base}.png`
+        let suf = 1
+        while (usedNames.has(fname)) {
+          base = sanitizeExportFileBase(`${typeLabel}_${dimLabel}_${suf}`)
+          fname = `${base}.png`
+          suf += 1
+        }
+        usedNames.add(fname)
+        zip.file(fname, blob)
+        okCount += 1
+      } catch (err) {
+        console.warn('导出单张图表失败', key, err)
+        failCount += 1
+      }
+    }
+
+    const zipBlob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    })
+    const zipName = `${buildChartBulkExportZipBaseName()}.zip`
+    const zfh = await dirHandle.getFileHandle(zipName, { create: true })
+    const zw = await zfh.createWritable()
+    await zw.write(zipBlob)
+    await zw.close()
+
+    detailChartBulkExportDialogVisible.value = false
+    ElMessage.success(`已写入 ${zipName}（${okCount} 张 PNG${failCount ? `，${failCount} 张失败` : ''}）`)
+  } catch (error) {
+    console.error('批量导出图表失败:', error)
+    ElMessage.error(error?.message || '导出失败')
+  } finally {
+    detailChartBulkExporting.value = false
+  }
 }
 
 function cellValueForXlsx(value) {
@@ -2857,6 +3257,29 @@ async function buildCombinedExportExcelBuffer() {
 /**
  * 导出弹窗合一：打包为 zip 下载（文案.txt、Excel、商品图片/）
  */
+async function emitCombinedExportUsageRecords() {
+  const uid = currentUser.value?.id
+  if (uid == null || uid === '') {
+    return
+  }
+  const raw = combinedExportRows.value || []
+  const ids = [
+    ...new Set(
+      raw
+        .map((r) => Number.parseInt(String(r?.id ?? '').trim(), 10))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    )
+  ]
+  if (!ids.length) {
+    return
+  }
+  try {
+    await recordUnqualifiedProductExportUsage({ product_ids: ids })
+  } catch (error) {
+    console.warn('导出使用记录写入失败（不影响压缩包下载）:', error?.response?.data || error?.message || error)
+  }
+}
+
 async function exportCombinedExportPackageZip() {
   if (!combinedExportRows.value.length || combinedExportPackaging.value) return
 
@@ -2917,6 +3340,8 @@ async function exportCombinedExportPackageZip() {
     })
     const zipName = `${sanitizeExportFileBase(`${buildNodeDetailsExportFileBase()}_导出包`)}.zip`
     downloadBlobAsFile(zipBlob, zipName)
+    await emitCombinedExportUsageRecords()
+    await loadNodeDetails()
 
     const parts = []
     parts.push(text ? '文案.txt' : '文案为空已跳过 txt')
@@ -2924,6 +3349,7 @@ async function exportCombinedExportPackageZip() {
     parts.push(`商品图片 ${imageOk} 张`)
     if (imageSkip) parts.push(`无图跳过 ${imageSkip}`)
     if (imageFail) parts.push(`下载失败 ${imageFail}`)
+    combinedExportDialogVisible.value = false
     ElMessage.success(`已开始下载压缩包：${parts.join('；')}`)
   } catch (error) {
     console.error('导出压缩包失败:', error)
@@ -3494,6 +3920,15 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
 }
 
+.detail-chart-dimension-select-multiple {
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.detail-chart-dimension-select-multiple :deep(.el-select__tags) {
+  flex-wrap: wrap;
+}
+
 .detail-chart-hint {
   font-size: 12px;
   color: #909399;
@@ -3521,6 +3956,31 @@ onBeforeUnmount(() => {
   min-height: 200px;
 }
 
+.detail-chart-bulk-export-intro {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.55;
+}
+
+.detail-chart-bulk-export-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.detail-chart-bulk-export-group {
+  width: 100%;
+}
+
+.detail-chart-bulk-export-row {
+  padding: 5px 8px 5px 0;
+}
+
+.detail-chart-bulk-export-dialog :deep(.el-dialog__body) {
+  padding-top: 12px;
+}
+
 .video-copy-dialog-body {
   min-height: 260px;
 }
@@ -3528,6 +3988,24 @@ onBeforeUnmount(() => {
 .video-copy-dialog-body :deep(.el-textarea__inner) {
   line-height: 1.8;
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+}
+
+.combined-export-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 36px;
+}
+
+.combined-export-dialog-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .combined-export-dialog-body {

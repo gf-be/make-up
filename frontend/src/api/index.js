@@ -359,6 +359,11 @@ export const saveUnqualifiedProductCopyText = (data) => {
   return request.post('/unqualified-products/save-copy-text', data)
 }
 
+/** 导出等场景：对勾选明细累加 usage_records.use_count（同用户同产品仅更新不累加多余行） */
+export const recordUnqualifiedProductExportUsage = (data) => {
+  return request.post('/unqualified-products/record-export-usage', data)
+}
+
 /** 数据管理员：按产品类型维护产品分类词条 */
 export const getCategoryCatalogProductTypes = () => {
   return request.get('/category-catalog/product-types')

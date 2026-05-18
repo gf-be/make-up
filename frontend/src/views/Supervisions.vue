@@ -217,8 +217,8 @@
 <script setup>
 import { reactive, ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { Search, Upload } from '@element-plus/icons-vue'
 import { createSupervision, getSupervisions, getSupervisionStats, deleteSupervision } from '@/api/index'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 const PRODUCT_TYPE_LABELS = {
   cosmetics: '化妆品',

@@ -503,6 +503,7 @@
                                       >
                                         查看正文
                                       </el-button>
+
                                     </div>
                                   </template>
                                 </el-table-column>
@@ -898,12 +899,32 @@
       </p>
       <div class="food-body-dialog-columns">
         <div class="food-body-dialog-col">
-          <div class="food-body-dialog-col-heading">正文内容</div>
+          <div class="food-body-dialog-col-heading food-body-heading-row">
+            <span>正文内容</span>
+            <FoodBodyTextSearchToolbar
+              v-model="foodBodySearchQuery"
+              :match-total="foodBodyMatchTotal"
+              :active-index="foodBodySearchActiveIndex"
+              :has-source-text="Boolean(foodBodyDialogFullText)"
+              @prev="foodBodySearchGoPrev"
+              @next="foodBodySearchGoNext"
+              @enter-next="foodBodySearchGoNext"
+            />
+          </div>
           <div
             class="food-body-select-surface"
             @mouseup="captureFoodBodySelection"
           >
-            <pre class="food-body-pre">{{ foodBodyDialogFullText || '（当前批次正文为空，请先在「通告正文」页签编辑并暂存正文）' }}</pre>
+            <pre
+              v-if="!foodBodyDialogFullText"
+              class="food-body-pre muted-text"
+            >（当前批次正文为空，请先在「通告正文」页签编辑并暂存正文）</pre>
+            <pre
+              v-else
+              ref="foodBodyPreRef"
+              class="food-body-pre"
+              v-html="foodBodyHighlightedDisplayHtml"
+            />
           </div>
         </div>
         <div class="food-body-dialog-col">
@@ -991,8 +1012,9 @@ import {
 } from '@/api/index'
 
 import AnnouncementTracebacksPanel from '@/components/AnnouncementTracebacksPanel.vue'
+import FoodBodyTextSearchToolbar from '@/components/FoodBodyTextSearchToolbar.vue'
+import { useFoodBodyTextSearch } from '@/composables/useFoodBodyTextSearch.js'
 
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 const productTypeOptions = [
   { label: '化妆品', value: 'cosmetics' },
@@ -1116,6 +1138,17 @@ const foodBodyDialogFullText = ref('')
 const foodBodySelectionPreview = ref('')
 const foodBodyTextTargetRow = ref(null)
 const foodBodyImportSaving = ref(false)
+
+const {
+  searchQuery: foodBodySearchQuery,
+  activeIndex: foodBodySearchActiveIndex,
+  preRef: foodBodyPreRef,
+  matchTotal: foodBodyMatchTotal,
+  highlightedDisplayHtml: foodBodyHighlightedDisplayHtml,
+  goNext: foodBodySearchGoNext,
+  goPrev: foodBodySearchGoPrev,
+  reset: resetFoodBodySearchState
+} = useFoodBodyTextSearch(foodBodyDialogFullText)
 
 /** 按行上传产品图：选中的明细行引用 */
 const stagingRowPictureTargetRow = ref(null)
@@ -2256,6 +2289,7 @@ function openFoodBodyTextPicker(row) {
   foodBodyDialogFullText.value = String(
     bodyEditForm.content || currentBatchBodyText.value || currentBatch.value?.content || ''
   ).replace(/\r\n/g, '\n')
+  resetFoodBodySearchState()
   foodBodyTextDialogVisible.value = true
 }
 
@@ -2272,6 +2306,7 @@ function resetFoodBodyTextPicker() {
   foodBodyTextTargetRow.value = null
   foodBodySelectionPreview.value = ''
   foodBodyDialogFullText.value = ''
+  resetFoodBodySearchState()
 }
 
 async function confirmFoodBodyTextImport() {
@@ -3195,6 +3230,26 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: #606266;
   flex-shrink: 0;
+}
+
+.food-body-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+:deep(mark.food-body-search-hit) {
+  background: rgba(253, 230, 138, 0.85);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+:deep(mark.food-body-search-hit--active) {
+  background: rgba(251, 191, 36, 0.95);
+  outline: 2px solid rgba(245, 158, 11, 0.75);
 }
 .announcement-staging {
   max-width: 1760px;

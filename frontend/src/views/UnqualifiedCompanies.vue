@@ -172,7 +172,14 @@ import {
   getUnqualifiedCompanies,
   getUnqualifiedCompanyFilterOptions
 } from '@/api/index'
-import * as echarts from 'echarts'
+
+let echartsModulePromise = null
+function loadEchartsModule() {
+  if (!echartsModulePromise) {
+    echartsModulePromise = import('echarts').then((mod) => mod.default || mod)
+  }
+  return echartsModulePromise
+}
 
 const router = useRouter()
 const loading = ref(false)
@@ -294,7 +301,8 @@ function viewProducts(row) {
   })
 }
 
-function initCharts() {
+async function initCharts() {
+  const echarts = await loadEchartsModule()
   if (chartRef.value) {
     chart?.dispose()
     chart = echarts.init(chartRef.value)
@@ -345,7 +353,7 @@ function initCharts() {
 onMounted(async () => {
   await Promise.all([loadFilterOptions(), loadStats(), loadData()])
   await nextTick()
-  initCharts()
+  await initCharts()
 
   resizeHandler = () => {
     chart?.resize()

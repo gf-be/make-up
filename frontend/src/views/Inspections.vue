@@ -118,6 +118,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { Search } from '@element-plus/icons-vue'
 import { getInspections, getInspectionStats } from '@/api'
 
 const router = useRouter()

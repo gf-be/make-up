@@ -93,6 +93,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { DataAnalysis, Search } from '@element-plus/icons-vue'
 import { getCompanies, getCompanyFilterOptions, getCompanyStats } from '@/api/index'
 import { currentUser } from '@/utils/auth'
 

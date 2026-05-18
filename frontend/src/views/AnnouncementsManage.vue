@@ -116,7 +116,6 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import AnnouncementDetail from './AnnouncementDetail.vue'
 import { getAnnouncements } from '@/api/index'
 
@@ -138,7 +137,7 @@ const loading = ref(false)
 const announcementRows = ref([])
 const selectedAnnouncementId = ref('')
 const filters = reactive({
-  product_type: '',
+  product_type: PRODUCT_TYPE_LABELS.food,
   status: '',
   year: '',
   location: '',

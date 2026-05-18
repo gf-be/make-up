@@ -310,7 +310,6 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listManageUnqualifiedProducts,
   createManageUnqualifiedProduct,

@@ -46,7 +46,6 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { login, registerNormalUser } from '@/api'
 import { setAuthSession, currentUser, getRoleDefaultPath } from '@/utils/auth'
 

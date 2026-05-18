@@ -115,7 +115,6 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { getInspectionDetail } from '@/api'
 
 const route = useRoute()

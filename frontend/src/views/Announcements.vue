@@ -194,8 +194,8 @@
 // import '@/assets/css/tableHeight.css'
 import { ref, watch, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { Upload, Search } from '@element-plus/icons-vue'
 import { getAnnouncements, createAnnouncement, deleteAnnouncement } from '@/api/index'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 const PRODUCT_TYPE_LABELS = {
   cosmetics: '化妆品',

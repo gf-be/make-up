@@ -94,7 +94,6 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { createAdminUser, deleteAdminUser, listAdminUsers, updateAdminUser } from '@/api'
 import { currentUser } from '@/utils/auth'
 
