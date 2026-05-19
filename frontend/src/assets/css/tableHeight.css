@@ -31,3 +31,9 @@
 .table-height .descending{
   border-top-color: #ffffff!important;
 }
+.el-card__header{
+  padding: 8px 10px 8px!important;
+}
+.el-card__body{
+  padding: 8px 10px 8px!important;
+}

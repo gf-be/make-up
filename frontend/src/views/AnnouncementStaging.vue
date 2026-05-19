@@ -309,11 +309,14 @@
                     <el-tab-pane label="附件解析产品列表" name="attachments">
                       <div class="section-toolbar section-toolbar-wrap" >
                         <div v-if="hasAttachmentSamplingEditableTable" class="attachment-table-edit-actions">
-                          <el-button v-if="!attachmentsListEditing" link @click="enterAttachmentsTableEdit">
+                          <el-button v-if="!attachmentsTableEditingRowKey" link
+                            title="请先在表格左侧展开恰好一行后再编辑该产品"
+                            @click="enterAttachmentsTableEdit">
                             编辑
                           </el-button>
 
-                          <el-button v-else @click="saveAttachmentsTableEdit" link>
+                          <el-button v-else :loading="savingStagingAttachmentsInline" link type="primary"
+                            @click="saveAttachmentsTableEdit">
                             保存
                           </el-button>
                           <el-button type="success" plain :loading="uploadingProductImages" link
@@ -351,10 +354,12 @@
                               <el-table v-else :data="currentMergedJsonAttachmentGroup.filtered_rows" size="small"
                                 stripe :max-height="attachmentTableMaxHeight"
                                 class="table-height staging-attachment-table" style="width: 100%"
-                                :row-key="(row) => stagingSamplingTableRowKey(currentMergedJsonAttachmentGroup, row)">
+                                :row-key="(row) => stagingSamplingTableRowKey(currentMergedJsonAttachmentGroup, row)"
+                                :expand-row-keys="stagingMergedAccordionExpandKeys"
+                                @expand-change="onStagingSamplingMergedTableExpandChange">
                                 <el-table-column type="expand" width="44">
                                   <template #default="{ row }">
-                                    <template v-if="attachmentsListEditing">
+                                    <template v-if="isStagingMergedSamplingRowEditing(row)">
                                       <el-descriptions :column="2" border size="small" class="detail-expanded">
                                         <el-descriptions-item label="生产企业">
                                           <el-input v-model="row.company_names" :autosize="{ minRows: 2, maxRows: 6 }"
@@ -370,6 +375,10 @@
                                         <el-descriptions-item label="被抽样单位地址">
                                           <el-input v-model="row.sample_unit_address" type="textarea"
                                             :autosize="{ minRows: 2, maxRows: 4 }" size="small" placeholder="地址" />
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="正文文案" :span="2">
+                                          <el-input v-model="row.food_body_text" type="textarea"
+                                            :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="正文文案" />
                                         </el-descriptions-item>
                                         <el-descriptions-item label="生产日期">
                                           <el-input v-model="row.production_date" size="small" placeholder="生产日期" />
@@ -442,7 +451,7 @@
                                       <el-descriptions-item label="规定要求">
                                         <span class="attachment-readonly-block">{{ row.requirement || '—' }}</span>
                                       </el-descriptions-item>
-                                      <el-descriptions-item label="备注" :span="2">
+                                      <el-descriptions-item label="备注" >
                                         <span class="attachment-readonly-block">{{ row.remarks || '—' }}</span>
                                       </el-descriptions-item>
                                       <el-descriptions-item label="涉嫌假冒">
@@ -459,14 +468,15 @@
          
                                 <el-table-column label="产品名称" min-width="140" show-overflow-tooltip>
                                   <template #default="{ row }">
-                                    <el-input v-if="attachmentsListEditing" v-model="row.product_name" size="small" />
+                                    <el-input v-if="isStagingMergedSamplingRowEditing(row)" v-model="row.product_name"
+                                      size="small" />
                                     <span v-else>{{ row.product_name || '—' }}</span>
                                   </template>
                                 </el-table-column>
                                 <el-table-column prop="attachment_sampling_category" label="产品分类" min-width="72" show-overflow-tooltip>
                                   <template #default="{ row }">
-                                    <el-input v-if="attachmentsListEditing" v-model="row.attachment_sampling_category"
-                                      size="small" />
+                                    <el-input v-if="isStagingMergedSamplingRowEditing(row)"
+                                      v-model="row.attachment_sampling_category" size="small" />
                                     <span v-else>{{ row.attachment_sampling_category || '—' }}</span>
                                   </template>
                                 </el-table-column>
@@ -480,7 +490,8 @@
                                 
                                 <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="130" show-overflow-tooltip>
                                   <template #default="{ row }">
-                                    <el-input v-if="attachmentsListEditing" v-model="row.unqualified_items" size="small" />
+                                    <el-input v-if="isStagingMergedSamplingRowEditing(row)"
+                                      v-model="row.unqualified_items" size="small" />
                                     <span v-else>{{ row.unqualified_items || '—' }}</span>
                                   </template>
                                 </el-table-column>
@@ -526,8 +537,9 @@
                                           上传图片
                                         </el-button>
                                       </div>
-                                      <div v-if="attachmentsListEditing" class="muted-text staging-picture-edit-tip">
-                                        请先点「保存」退出列表编辑，再为本行上传图片
+                                      <div v-if="isStagingMergedSamplingRowEditing(row)"
+                                        class="muted-text staging-picture-edit-tip">
+                                        请先点「保存」完成本条编辑后，再为本行上传图片
                                       </div>
                                     </div>
                                   </template>
@@ -877,6 +889,7 @@
     <el-dialog
       v-model="foodBodyTextDialogVisible"
       width="960px"
+      draggable
       :close-on-click-modal="false"
       destroy-on-close
       class="food-body-text-dialog"
@@ -930,12 +943,14 @@
         <div class="food-body-dialog-col">
           <div class="food-body-dialog-col-heading">选中预览</div>
           <div class="food-body-preview-panel">
-            <div v-if="foodBodySelectionPreview" class="food-body-preview-body preview-text">
-              {{ foodBodySelectionPreview }}
-            </div>
-            <div v-else class="food-body-preview-placeholder muted-text">
-              在左侧正文中拖选文字后，将在此处显示预览。
-            </div>
+            <el-input
+              v-model="foodBodySelectionPreview"
+              type="textarea"
+              :autosize="{ minRows: 12, maxRows: 28 }"
+              resize="vertical"
+              class="food-body-preview-editor"
+              placeholder="在左侧正文中拖选文字后，将自动填入此处；可直接增删修改后再通过标题栏「导入」保存。"
+            />
           </div>
         </div>
       </div>
@@ -1157,7 +1172,12 @@ const lastImportResult = ref(null)
 const selectedBatchId = ref(null)
 const selectedTreeKey = ref('')
 const activeDetailTab = ref('body')
-const attachmentsListEditing = ref(false)
+/** 抽检合并表中正在内联编辑的产品行 row-key；仅展开行可与「保存」对齐 */
+const attachmentsTableEditingRowKey = ref(null)
+const stagingSamplingAttachmentExpandedRows = ref([])
+/** 合并抽检明细表：手风琴式展开，`expand-row-keys` 至多一项 */
+const stagingMergedAccordionExpandKeys = ref([])
+const savingStagingAttachmentsInline = ref(false)
 /** 通告正文页签：默认只读，点击「编辑」后显示表单与正文编辑器 */
 const bodyTabEditing = ref(false)
 const selectedAttachmentIndex = ref(null)
@@ -2014,6 +2034,78 @@ function stagingSamplingTableRowKey(attachment, row) {
   return `${attIdx}-${r.__row_index ?? 'r'}-${r.sequence_no ?? 's'}`
 }
 
+/** 与 backend `STAGING_DETAIL_FIELDS` 对齐；保存本条时写入 announcement_staging_items（经 persistStagingDetailPayload.replaceStagingItems） */
+const STAGING_SAMPLING_DETAIL_SAVE_KEYS = [
+  'sequence_no',
+  'product_name',
+  'company_names',
+  'company_addresses',
+  'manufacturer_name',
+  'manufacturer_address',
+  'operator_name',
+  'operator_address',
+  'sample_unit_name',
+  'sample_unit_address',
+  'package_spec',
+  'batch_no',
+  'production_date',
+  'expiry_date',
+  'product_region',
+  'attachment_sampling_category',
+  'registration_no',
+  'production_license_no',
+  'inspection_institution',
+  'unqualified_items',
+  'inspection_result',
+  'requirement',
+  'remarks',
+  'picture_url',
+  'food_body_text',
+  'is_counterfeit'
+]
+
+function buildStagingSamplingItemPayloadFromRow(row = {}) {
+  const item = {}
+  for (const key of STAGING_SAMPLING_DETAIL_SAVE_KEYS) {
+    item[key] = row[key]
+  }
+  return item
+}
+
+function isStagingMergedSamplingRowEditing(row) {
+  const key = attachmentsTableEditingRowKey.value
+  if (!key || !row) return false
+  const g = currentMergedJsonAttachmentGroup.value
+  return stagingSamplingTableRowKey(g, row) === key
+}
+
+/** 抽检合并明细表：仅允许一行展开；受控 expand-row-keys 自动收起上一行 */
+function onStagingSamplingMergedTableExpandChange(row, expandedRows) {
+  const g = currentMergedJsonAttachmentGroup.value
+  const list = Array.isArray(expandedRows) ? [...expandedRows] : []
+  const clickedKey = row ? stagingSamplingTableRowKey(g, row) : null
+
+  let nextKeys = []
+  let openRow = null
+  if (clickedKey && row && list.some((r) => stagingSamplingTableRowKey(g, r) === clickedKey)) {
+    nextKeys = [clickedKey]
+    openRow = g.filtered_rows.find((r) => stagingSamplingTableRowKey(g, r) === clickedKey) || row
+    stagingSamplingAttachmentExpandedRows.value = openRow ? [openRow] : []
+  } else {
+    stagingSamplingAttachmentExpandedRows.value = []
+  }
+
+  stagingMergedAccordionExpandKeys.value = nextKeys
+
+  const editKey = attachmentsTableEditingRowKey.value
+  if (!editKey) return
+  const still =
+    stagingSamplingAttachmentExpandedRows.value.some((r) => stagingSamplingTableRowKey(g, r) === editKey)
+  if (!still) {
+    attachmentsTableEditingRowKey.value = null
+  }
+}
+
 function buildWorkspacePayload() {
   return {
     filters: { ...filters },
@@ -2103,9 +2195,9 @@ const isFoodStagingBatch = computed(() => currentTypeInfo.value.product_type ===
 /** 附件产品表：非正文编辑、非列表编辑时允许按行本地上传（与批量导入共用目录规则） */
 const canUploadStagingRowProductPicture = computed(
   () =>
-    Boolean(currentBatchId.value)
+  Boolean(currentBatchId.value)
     && !isFlightBatch.value
-    && !attachmentsListEditing.value
+    && !attachmentsTableEditingRowKey.value
     && !bodyTabEditing.value
 )
 const currentBatchBodyText = computed(() => currentBatch.value?.content || currentBatchDetail.value?.batch?.content || '')
@@ -2344,11 +2436,51 @@ async function confirmFoodBodyTextImport() {
 }
 
 function enterAttachmentsTableEdit() {
-  attachmentsListEditing.value = true
+  const expanded = stagingSamplingAttachmentExpandedRows.value || []
+  if (expanded.length !== 1) {
+    ElMessage.warning('请先在表格左侧展开恰好一行产品，再点击「编辑」')
+    return
+  }
+  const row = expanded[0]
+  const group = currentMergedJsonAttachmentGroup.value
+  attachmentsTableEditingRowKey.value = stagingSamplingTableRowKey(group, row)
 }
 
-function saveAttachmentsTableEdit() {
-  attachmentsListEditing.value = false
+async function saveAttachmentsTableEdit() {
+  const editKey = attachmentsTableEditingRowKey.value
+  const batchId = currentBatchId.value
+  const group = currentMergedJsonAttachmentGroup.value
+  if (!editKey || !batchId || !group?.filtered_rows?.length) {
+    attachmentsTableEditingRowKey.value = null
+    return
+  }
+  const row = group.filtered_rows.find((r) => stagingSamplingTableRowKey(group, r) === editKey)
+  if (!row) {
+    ElMessage.warning('未找到当前编辑行，请重新展开后再试')
+    attachmentsTableEditingRowKey.value = null
+    return
+  }
+  const productName = String(row.product_name || '').trim()
+  if (!productName) {
+    ElMessage.warning('产品名称不能为空')
+    return
+  }
+  savingStagingAttachmentsInline.value = true
+  try {
+    const patchRes = await updateAnnouncementStagingItem(batchId, {
+      locator: buildStagingSamplingRowLocator(row),
+      item: buildStagingSamplingItemPayloadFromRow(row)
+    })
+    updateCurrentBatchDetail(patchRes.data)
+    fillInlineStagingEditors()
+    attachmentsTableEditingRowKey.value = null
+    ElMessage.success('保存成功')
+  } catch (error) {
+    console.error('保存抽检明细编辑失败:', error)
+    ElMessage.error(error?.response?.data?.message || error?.message || '保存失败')
+  } finally {
+    savingStagingAttachmentsInline.value = false
+  }
 }
 
 function enterBodyTabEdit() {
@@ -2728,8 +2860,8 @@ async function handleStagingDraftSave() {
     const syncedPub = infoRes.data?.updated_published_id || bodyRes.data?.updated_published_id
     ElMessage.success(
       syncedPub
-        ? '已暂存，并已同步正式库相关字段；产品明细已写入 announcement_staging_items'
-        : '已暂存：基础信息、正文与临时产品明细表已更新'
+        ? '保存成功'
+        : '已暂存'
     )
   } catch (error) {
     console.error('暂存失败:', error)
@@ -3092,7 +3224,9 @@ const resetFilters = async () => {
 watch(
   [activeDetailTab, currentBatchId],
   () => {
-    attachmentsListEditing.value = false
+    attachmentsTableEditingRowKey.value = null
+    stagingSamplingAttachmentExpandedRows.value = []
+    stagingMergedAccordionExpandKeys.value = []
     bodyTabEditing.value = false
     if (!currentBatchId.value) {
       return
@@ -3257,7 +3391,7 @@ onBeforeUnmount(() => {
 }
 
 .el-card__body {
-  padding: 16px !important;
+  padding: 10px !important;
 }
 
 .page-card,
@@ -3540,7 +3674,7 @@ onBeforeUnmount(() => {
 }
 
 .batch-list-card :deep(.el-card__header) {
-  padding: 10px 14px;
+  padding: 8px 10px;
   /* width: 20vw; */
   display: flex;
   align-items: center;
@@ -4128,16 +4262,13 @@ onBeforeUnmount(() => {
   background: #f5f7fa;
 }
 
-.food-body-preview-body.preview-text {
+
+
+.food-body-preview-editor :deep(.el-textarea__inner) {
   font-size: 13px;
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.food-body-preview-placeholder {
-  font-size: 13px;
-  line-height: 1.55;
 }
 
 

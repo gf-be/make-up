@@ -2,7 +2,7 @@
   <div class="login-page">
     <el-card class="login-card" shadow="always">
       <div class="login-title">视频、文案管理系统</div>
-      <div class="login-subtitle">请选择账号角色登录</div>
+      <!-- <div class="login-subtitle">请选择账号角色登录</div> -->
       <el-form :model="form" label-width="72px" @keyup.enter="handleLogin">
         <el-form-item label="账号">
           <el-input v-model="form.username" placeholder="请输入账号" />

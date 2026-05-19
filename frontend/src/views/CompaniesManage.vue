@@ -89,8 +89,19 @@
 
           <template v-else-if="detail">
             <div class="detail-head">
-              <h2 class="detail-title">{{ detail.company.name }}</h2>
-              <el-tag size="small">ID {{ selectedId }}</el-tag>
+              <div class="detail-head-left">
+                <h2 class="detail-title">{{ detail.company.name }}</h2>
+                <el-tag size="small">ID {{ selectedId }}</el-tag>
+              </div>
+              <el-button
+                type="danger"
+                size="small"
+                plain
+                :loading="deletingCompany"
+                @click="confirmDeleteCompany"
+              >
+                删除企业
+              </el-button>
             </div>
 
             <el-tabs v-model="activeTab" class="detail-tabs">
@@ -139,9 +150,9 @@
                   </el-descriptions-item>
                 </el-descriptions>
 
-                <div class="stats-hint">
+                <!-- <div class="stats-hint">
                   社会信用代码可与中/日/美常见规则一致，填写后不得重复。
-                </div>
+                </div> -->
 
                 <el-form ref="formRef" :model="editForm" label-width="128px" class="edit-form">
                   <el-form-item
@@ -340,6 +351,7 @@ import {
   getCompanyDetail,
   getCompanyFilterOptions,
   updateCompany,
+  deleteCompany,
   bulkImportCompanyCreditCodes,
   confirmImportCompanyNameChange
 } from '@/api/index'
@@ -361,6 +373,7 @@ function userCanNavigateTo(moduleKey) {
 const listLoading = ref(false)
 const detailLoading = ref(false)
 const saving = ref(false)
+const deletingCompany = ref(false)
 const listRows = ref([])
 const selectedId = ref(null)
 const detail = ref(null)
@@ -965,6 +978,38 @@ watch(selectedId, (id) => {
   loadDetail(id)
 })
 
+async function confirmDeleteCompany() {
+  const id = selectedId.value
+  if (!id || !detail.value?.company) return
+  const name = String(detail.value.company.name || '该企业').trim() || `ID ${id}`
+  try {
+    await ElMessageBox.confirm(
+      `确定删除「${name}」（ID ${id}）吗？将删除本条企业及其抽查/飞行检查关联记录（检查明细会解除与该企业的绑定），操作不可撤销。`,
+      '删除确认',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消'
+      }
+    )
+  } catch {
+    return
+  }
+  deletingCompany.value = true
+  try {
+    await deleteCompany(id)
+    ElMessage.success('企业已删除')
+    selectedId.value = null
+    detail.value = null
+    await loadList()
+  } catch (e) {
+    const msg = e?.response?.data?.message || e?.message || '删除失败'
+    ElMessage.error(msg)
+  } finally {
+    deletingCompany.value = false
+  }
+}
+
 async function saveBasic() {
   if (!selectedId.value) return
   const ok = await formRef.value?.validate?.().catch(() => false)
@@ -1139,9 +1184,18 @@ loadList()
 .detail-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
   flex-wrap: wrap;
+}
+
+.detail-head-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .detail-title {

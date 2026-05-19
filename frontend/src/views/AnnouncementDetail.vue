@@ -1724,8 +1724,14 @@ watch(resolvedAnnouncementId, (id) => {
   color: #606266;
   padding: 15px;
   background: #f5f7fa;
+  border: 1px solid #e4e7ed;
   border-radius: 4px;
   white-space: pre-wrap;
+  word-break: break-word;
+  max-height: min(520px, 62vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .attachment {

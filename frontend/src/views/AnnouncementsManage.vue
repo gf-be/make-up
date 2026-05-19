@@ -267,7 +267,7 @@ loadAnnouncements()
 }
 
 .filter-form {
-  margin-bottom: -12px;
+  margin-bottom: -8px;
 }
 
 .manage-layout {

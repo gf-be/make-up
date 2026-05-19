@@ -2,6 +2,9 @@
   "name": "cosmetics-info-frontend",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
