@@ -371,12 +371,12 @@
                     <el-table-column prop="picture_url" label="产品图" width="208" show-overflow-tooltip>
                       <template #default="{ row }">
                         <div class="detail-product-picture-cell">
-                          <template v-if="resolveDetailProductPictureSrc(row.picture_url)">
+                          <template v-if="resolveProductPictureSrc(row.picture_url)">
                             <el-image
                               class="detail-product-thumb"
                               fit="cover"
-                              :src="resolveDetailProductPictureSrc(row.picture_url)"
-                              :preview-src-list="[resolveDetailProductPictureSrc(row.picture_url)]"
+                              :src="resolveProductPictureSrc(row.picture_url)"
+                              :preview-src-list="[resolveProductPictureSrc(row.picture_url)]"
                               preview-teleported
                               hide-on-click-modal
                             />
@@ -608,6 +608,7 @@ import {
   uploadAnnouncementStagingProductImages
 } from '@/api/index'
 import { canManageAnnouncementProducts } from '@/utils/auth'
+import { resolveProductPictureSrc } from '@/utils/productPicture.js'
 import FoodBodyTextSearchToolbar from '@/components/FoodBodyTextSearchToolbar.vue'
 import { useFoodBodyTextSearch } from '@/composables/useFoodBodyTextSearch.js'
 
@@ -779,23 +780,6 @@ function resolveAnnouncementNoForDetailProductImages() {
 function resolveAnnouncementTitleForDetailProductImages() {
   const ann = announcement.value
   return normalizeDetailAnnouncementWhitespace(ann?.title || '')
-}
-
-/** 开发与 Vite 代理下与 `AnnouncementStaging` 一致 */
-const DETAIL_PRODUCT_IMAGE_PUBLIC_BASE = '/upload/products'
-
-function resolveDetailProductPictureSrc(raw) {
-  // console.log(raw)
-  const s = String(raw || '').trim()
-  if (!s) return ''
-  if (/^https?:\/\//i.test(s)) return s
-  const normalizedPath = s.replace(/\\/g, '/').replace(/^\/+/, '')
-  if (normalizedPath.startsWith('upload/')) return `/${normalizedPath}`
-  const localProductPrefix = 'backend/public/upload/products/'
-  if (normalizedPath.startsWith(localProductPrefix)) {
-    return `/${normalizedPath.slice('backend/public/'.length)}`
-  }
-  return `${DETAIL_PRODUCT_IMAGE_PUBLIC_BASE.replace(/\/$/, '')}/${normalizedPath}`
 }
 
 /** 与后端上传接口约定一致：`/upload/products/{slug}/{序号}.png` */

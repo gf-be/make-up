@@ -521,10 +521,10 @@
                                 <el-table-column prop="picture_url" label="产品图" min-width="108" align="center" show-overflow-tooltip>
                                   <template #default="{ row }">
                                     <div class="staging-product-picture-cell staging-product-picture-cell-col">
-                                      <template v-if="resolveStagingProductPictureSrc(row.picture_url)">
+                                      <template v-if="resolveProductPictureSrc(row.picture_url)">
                                         <el-image class="staging-product-thumb" fit="cover"
-                                          :src="resolveStagingProductPictureSrc(row.picture_url)"
-                                          :preview-src-list="[resolveStagingProductPictureSrc(row.picture_url)]"
+                                          :src="resolveProductPictureSrc(row.picture_url)"
+                                          :preview-src-list="[resolveProductPictureSrc(row.picture_url)]"
                                           preview-teleported hide-on-click-modal />
                                         <!-- <span class="staging-picture-meta muted-text">{{ row.picture_url }}</span> -->
                                       </template>
@@ -1029,6 +1029,7 @@ import {
 import AnnouncementTracebacksPanel from '@/components/AnnouncementTracebacksPanel.vue'
 import FoodBodyTextSearchToolbar from '@/components/FoodBodyTextSearchToolbar.vue'
 import { useFoodBodyTextSearch } from '@/composables/useFoodBodyTextSearch.js'
+import { resolveProductPictureSrc } from '@/utils/productPicture.js'
 
 
 const productTypeOptions = [
@@ -1305,22 +1306,6 @@ const productImageAnnouncementTitlePreview = computed(() => resolveAnnouncementT
 const productImageAnnouncementSlug = computed(() =>
   sanitizeAnnouncementNoPictureFolderStaging(productImageAnnouncementNoPreview.value)
 )
-
-/** 与 backend/public/upload/products 对应；开发环境经 Vite 代理到后端 */
-const STAGING_LOCAL_PRODUCT_IMAGE_BASE = '/upload/products'
-
-function resolveStagingProductPictureSrc(raw) {
-  const s = String(raw || '').trim()
-  if (!s) return ''
-  if (/^https?:\/\//i.test(s)) return s
-  const normalizedPath = s.replace(/\\/g, '/').replace(/^\/+/, '')
-  if (normalizedPath.startsWith('upload/')) return `/${normalizedPath}`
-  const localProductPrefix = 'backend/public/upload/products/'
-  if (normalizedPath.startsWith(localProductPrefix)) {
-    return `/${normalizedPath.slice('backend/public/'.length)}`
-  }
-  return `${STAGING_LOCAL_PRODUCT_IMAGE_BASE.replace(/\/$/, '')}/${normalizedPath}`
-}
 
 function createEmptyStagingItemForm() {
   return {

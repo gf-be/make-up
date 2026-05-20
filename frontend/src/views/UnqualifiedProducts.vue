@@ -184,8 +184,8 @@
                       }}</el-descriptions-item>
                       <el-descriptions-item label="商品图片" >
                         <el-image
-                          :src="pictureSrcFromRow(row)"
-                          :preview-src-list="[pictureSrcFromRow(row)]"
+                          :src="resolveProductPictureSrcFromRow(row)"
+                          :preview-src-list="[resolveProductPictureSrcFromRow(row)]"
                           style="height: 70px; width: 70px;"
                         />
                       </el-descriptions-item>
@@ -538,8 +538,8 @@
               <el-table-column prop="picture_url" label="商品图片" min-width="150" show-overflow-tooltip>
                 <template #default="{ row }">
                   <el-image
-                    :src="pictureSrcFromRow(row)"
-                    :preview-src-list="[pictureSrcFromRow(row)]"
+                    :src="resolveProductPictureSrcFromRow(row)"
+                    :preview-src-list="[resolveProductPictureSrcFromRow(row)]"
                     style="height: 50px; width: 50px;"
                   />
                 </template>
@@ -573,6 +573,11 @@ import {
   recordUnqualifiedProductExportUsage
 } from '@/api/index'
 import { currentUser, getAuthToken, getUserScopedStorageKey, setAuthSession } from '@/utils/auth'
+import {
+  getProductPictureStoredPath,
+  resolveProductPictureAbsoluteUrl,
+  resolveProductPictureSrcFromRow
+} from '@/utils/productPicture.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -727,61 +732,6 @@ function formatDate(dateStr) {
 /** 食品抽检不合格记录：与详情页一致，不展示化妆品式注册/备案、生产许可等字段 */
 function isUnqualifiedFoodRow(row) {
   return String(row?.product_type || '').toLowerCase() === 'food'
-}
-
-function decodeURIComponentSafe(segment) {
-  try {
-    return decodeURIComponent(segment)
-  } catch {
-    return segment
-  }
-}
-
-/** 明细行存储字段（工作台入库可能与 picture_url 并存 public_url） */
-function getUnqualifiedProductPictureStoredPath(row) {
-  return String(row?.picture_url ?? row?.public_url ?? '').trim()
-}
-
-/**
- * 列表/导出预览：本地相对路径解析规则与 AnnouncementStaging、AnnouncementDetail 一致。
- */
-function resolveUnqualifiedProductPictureSrc(raw) {
-  const s = String(raw || '').trim()
-  if (!s) return ''
-  if (/^https?:\/\//i.test(s)) return s
-  if (/^\/\//.test(s)) {
-    return `${typeof window !== 'undefined' ? window.location.protocol : 'https:'}${s}`
-  }
-  const normalizedPath = s.replace(/\\/g, '/').replace(/^\/+/, '')
-  if (normalizedPath.startsWith('upload/')) return `/${normalizedPath}`
-  const localProductPrefix = 'backend/public/upload/products/'
-  if (normalizedPath.startsWith(localProductPrefix)) {
-    return `/${normalizedPath.slice('backend/public/'.length)}`
-  }
-  return `/upload/products/${normalizedPath}`
-}
-
-/** 打包下载 fetch 用：同源路径分段编码（中文目录名），并与浏览器加载静态资源的语义对齐 */
-function resolveUnqualifiedProductPictureAbsoluteUrl(raw) {
-  const browserSrc = resolveUnqualifiedProductPictureSrc(raw)
-  if (!browserSrc) return ''
-  if (/^https?:\/\//i.test(browserSrc)) return browserSrc
-  try {
-    const pathOnly = browserSrc.startsWith('/') ? browserSrc : `/${browserSrc}`
-    const u = new URL(pathOnly, window.location.origin)
-    const encodedPath =
-      u.pathname
-        .split('/')
-        .map((seg) => (seg ? encodeURIComponent(decodeURIComponentSafe(seg)) : ''))
-        .join('/') || '/'
-    return `${u.origin}${encodedPath}${u.search}${u.hash}`
-  } catch {
-    return ''
-  }
-}
-
-function pictureSrcFromRow(row) {
-  return resolveUnqualifiedProductPictureSrc(getUnqualifiedProductPictureStoredPath(row))
 }
 
 const DETAIL_CHART_MAX_CATEGORIES = 24
@@ -3304,7 +3254,7 @@ async function exportCombinedExportPackageZip() {
     const imgPrefix = '商品图片/'
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i]
-      const fetchUrl = resolveUnqualifiedProductPictureAbsoluteUrl(getUnqualifiedProductPictureStoredPath(row))
+      const fetchUrl = resolveProductPictureAbsoluteUrl(getProductPictureStoredPath(row))
       if (!fetchUrl) {
         imageSkip += 1
         continue
@@ -3328,7 +3278,7 @@ async function exportCombinedExportPackageZip() {
         zip.file(`${imgPrefix}${fname}`, blob)
         imageOk += 1
       } catch (err) {
-        console.warn('打包商品图片失败:', getUnqualifiedProductPictureStoredPath(row), err)
+        console.warn('打包商品图片失败:', getProductPictureStoredPath(row), err)
         imageFail += 1
       }
     }
