@@ -853,7 +853,14 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="productImageUploadDialogVisible" width="760px" :title="`导入图片`" :close-on-click-modal="false">
+    
+<el-dialog
+      v-model="productImageUploadDialogVisible"
+      width="760px"
+      title="导入图片"
+      draggable
+      :close-on-click-modal="false"
+    >
       <el-alert type="success" :closable="false" show-icon class="mb-16">
         <template #title>
           当前已选中{{ productImageFileRows.length }}个图片
@@ -881,11 +888,10 @@
       <template #footer>
         <el-button @click="clearProductImageSelection">清空</el-button>
         <el-button type="primary" :loading="uploadingProductImages" @click="handleUploadProductImages">
-          导入到后端目录
+          上传图片
         </el-button>
       </template>
     </el-dialog>
-
     <el-dialog
       v-model="foodBodyTextDialogVisible"
       width="960px"
@@ -1016,7 +1022,6 @@ import {
   getAnnouncementStagingWorkspaceCache,
   saveAnnouncementStagingWorkspaceCache,
   uploadAnnouncementStagingJson,
-  uploadAnnouncementStagingProductImages,
   confirmAnnouncementStaging,
   updateAnnouncementStagingBody,
   updateAnnouncementStagingInfo,
@@ -1029,7 +1034,11 @@ import {
 import AnnouncementTracebacksPanel from '@/components/AnnouncementTracebacksPanel.vue'
 import FoodBodyTextSearchToolbar from '@/components/FoodBodyTextSearchToolbar.vue'
 import { useFoodBodyTextSearch } from '@/composables/useFoodBodyTextSearch.js'
-import { resolveProductPictureSrc } from '@/utils/productPicture.js'
+import { resolveProductPictureSrc, buildProductPictureUploadPreviewRows } from '@/utils/productPicture.js'
+import {
+  getFirstAnnouncementStagingUploadedPictureStoredPath,
+  postAnnouncementStagingProductImages
+} from '@/utils/announcementStagingProductPictureUpload.js'
 
 
 const productTypeOptions = [
@@ -1424,17 +1433,7 @@ const productImageFileRows = computed(() => {
   const start = Math.max(Number(productImageStartSequence.value || 1), 1)
   const slug = productImageAnnouncementSlug.value
   const list = Array.isArray(selectedProductImageFiles.value) ? selectedProductImageFiles.value : []
-  return list.map((item, index) => {
-    const sequenceNo = start + index
-    const targetName = `${sequenceNo}.png`
-    return {
-      ...item,
-      sequenceNo,
-      targetName,
-      targetPath: `backend\\public\\upload\\products\\${slug}\\${targetName}`,
-      sizeLabel: formatFileSize(item.size)
-    }
-  })
+  return buildProductPictureUploadPreviewRows(list, { startSequence: start, folderSlug: slug })
 })
 
 
@@ -1714,9 +1713,6 @@ async function handleUploadProductImages() {
   }
 
   const end = start + rows.length - 1
-  const slug = productImageAnnouncementSlug.value
-  // const pathExample =
-  //   slug && start ? `backend\\public\\upload\\products\\${slug}\\${start}.png` : ''
   try {
     await ElMessageBox.confirm(
 
@@ -1737,21 +1733,18 @@ async function handleUploadProductImages() {
 
   uploadingProductImages.value = true
   try {
-    const formData = new FormData()
-    rows.forEach((row) => {
-      formData.append('files', row.file, row.name)
-    })
-    formData.append('start_sequence', String(start))
-    formData.append('announcement_no', resolveAnnouncementNoForProductImages())
     const publishedAid = Number(currentBatch.value?.published_announcement_id ?? 0)
-    if (Number.isInteger(publishedAid) && publishedAid > 0) {
-      formData.append('announcement_id', String(publishedAid))
-    }
-    const res = await uploadAnnouncementStagingProductImages(formData)
+    const res = await postAnnouncementStagingProductImages(rows, {
+      startSequence: start,
+      announcementNo: resolveAnnouncementNoForProductImages(),
+      announcementId: Number.isInteger(publishedAid) && publishedAid > 0 ? publishedAid : null,
+      stagingBatchId: currentBatchId.value || null
+    })
     const data = res.data || {}
     ElMessage.success(res.message || data.message || `已导入 ${rows.length} 张图片`)
     selectedProductImageFiles.value = []
     productImageUploadDialogVisible.value = false
+    await refreshAll({ preferredKey: selectedTreeKey.value, force: true })
   } catch (error) {
     console.error('导入产品图片失败:', error)
     ElMessage.error(error?.response?.data?.message || error?.message || '导入产品图片失败')
@@ -2303,19 +2296,17 @@ async function handleStagingRowPictureInputChange(event) {
   stagingRowPictureUploadingKey.value = rowKey
 
   try {
-    const formData = new FormData()
-    formData.append('files', file, file.name || 'image.png')
-    formData.append('start_sequence', String(seq))
-    formData.append('announcement_no', resolveAnnouncementNoForProductImages())
     const publishedAid = Number(currentBatch.value?.published_announcement_id ?? 0)
-    if (Number.isInteger(publishedAid) && publishedAid > 0) {
-      formData.append('announcement_id', String(publishedAid))
-    }
-
-    const upRes = await uploadAnnouncementStagingProductImages(formData)
-    const upData = upRes.data || {}
-    const first = Array.isArray(upData.items) ? upData.items[0] : null
-    const pictureUrlStored = String(first?.picture_url || first?.public_url || '').trim()
+    const upRes = await postAnnouncementStagingProductImages(
+      [{ file, name: file.name }],
+      {
+        startSequence: seq,
+        announcementNo: resolveAnnouncementNoForProductImages(),
+        announcementId: Number.isInteger(publishedAid) && publishedAid > 0 ? publishedAid : null,
+        stagingBatchId: batchId
+      }
+    )
+    const pictureUrlStored = getFirstAnnouncementStagingUploadedPictureStoredPath(upRes)
     if (!pictureUrlStored) {
       ElMessage.warning('上传成功但未返回图片路径')
       return

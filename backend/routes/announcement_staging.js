@@ -16,6 +16,7 @@ const {
   updateAnnouncementStagingItem,
   deleteAnnouncementStagingItem,
   resyncAnnouncementStagingItemsTable,
+  persistStagingUploadedProductPicturesToSamplingBatch,
   publishAnnouncementStagingBatch,
   deleteAnnouncementStagingBatch,
   deletePublishedAnnouncementStagingBatch,
@@ -366,6 +367,15 @@ router.post('/product-images/upload', authenticate, uploadProductImages.array('f
       ? announcementIdParsed
       : null;
 
+    /** 核验工作台：同步写入抽检临时批次的 raw_payload / announcement_staging_items */
+    const stagingBatchIdRaw = req.body?.staging_batch_id ?? req.body?.stagingBatchId;
+    const stagingBatchParsed = stagingBatchIdRaw != null && String(stagingBatchIdRaw).trim() !== ''
+      ? Number.parseInt(String(stagingBatchIdRaw).trim(), 10)
+      : NaN;
+    const persistStagingBatchId = Number.isInteger(stagingBatchParsed) && stagingBatchParsed > 0
+      ? stagingBatchParsed
+      : null;
+
     if (persistAnnouncementId !== null) {
       connection = await pool.getConnection();
       const [annRows] = await connection.query('SELECT id FROM announcements WHERE id = ? LIMIT 1', [persistAnnouncementId]);
@@ -373,6 +383,13 @@ router.post('/product-images/upload', authenticate, uploadProductImages.array('f
       connection = undefined;
       if (!annRows || !annRows.length) {
         return res.status(404).json({ success: false, message: `公告不存在：id=${persistAnnouncementId}` });
+      }
+    }
+
+    if (persistStagingBatchId !== null) {
+      const [sbRows] = await pool.query('SELECT id FROM announcement_staging_batches WHERE id = ? LIMIT 1', [persistStagingBatchId]);
+      if (!sbRows || !sbRows.length) {
+        return res.status(404).json({ success: false, message: `临时批次不存在：id=${persistStagingBatchId}` });
       }
     }
 
@@ -428,11 +445,40 @@ router.post('/product-images/upload', authenticate, uploadProductImages.array('f
       }
     }
 
+    let stagingDetailPictureRowsUpdated = 0;
+    let stagingPersistSkippedBatch = false;
+    if (persistStagingBatchId !== null && items.length > 0) {
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+      try {
+        const r = await persistStagingUploadedProductPicturesToSamplingBatch(connection, persistStagingBatchId, items);
+        stagingDetailPictureRowsUpdated = Number(r.updated_row_count || 0);
+        stagingPersistSkippedBatch = Boolean(r.skipped);
+        await connection.commit();
+      } catch (dbErr) {
+        await connection.rollback();
+        throw dbErr;
+      } finally {
+        connection.release();
+        connection = undefined;
+      }
+    }
+
+    const msgStaging =
+      persistStagingBatchId !== null && stagingDetailPictureRowsUpdated > 0
+        ? `；已将 ${stagingDetailPictureRowsUpdated} 条 picture_url 写入临时批次明细（announcement_staging_items）`
+        : persistStagingBatchId !== null && stagingPersistSkippedBatch
+          ? '；当前为非抽检明细结构，已跳过临时库写入（磁盘文件已保存）'
+          : persistStagingBatchId !== null
+            ? '；未匹配到对应序号的抽检明细，未改写临时库（磁盘文件已保存）'
+            : '';
+
     res.json({
       success: true,
       message:
-        `已导入 ${items.length} 张图片到「${announcementSlug}」目录，序号 ${startSequence} - ${startSequence + items.length - 1}`
-        + (persistAnnouncementId != null ? `；已写入正式公告明细 ${detailRowsUpdated} 条路径` : ''),
+        `已导入 ${items.length} 张图片到目录「backend/public/upload/products/${announcementSlug}」，序号 ${startSequence} - ${startSequence + items.length - 1}`
+        + (persistAnnouncementId != null ? `；已写入正式公告明细 picture_url ${detailRowsUpdated} 条` : '')
+        + msgStaging,
       data: {
         upload_dir: PRODUCT_IMAGE_UPLOAD_DIR,
         announcement_no: normalizeWhitespaceAnnouncementTitle(announcementNo) || null,
@@ -441,6 +487,8 @@ router.post('/product-images/upload', authenticate, uploadProductImages.array('f
         count: items.length,
         persisted_announcement_id: persistAnnouncementId,
         detail_rows_updated: detailRowsUpdated,
+        persisted_staging_batch_id: persistStagingBatchId,
+        staging_detail_picture_rows_updated: stagingDetailPictureRowsUpdated,
         items
       }
     });

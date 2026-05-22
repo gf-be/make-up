@@ -111,3 +111,51 @@ export function getProductPictureStoredPath(row) {
 export function resolveProductPictureSrcFromRow(row) {
   return resolveProductPictureSrc(getProductPictureStoredPath(row))
 }
+
+/** 抽象产品等场景：picture_url / image_url 均可解析 */
+export function resolveProductPictureSrcFromImageFields(row) {
+  const raw = String(row?.picture_url ?? row?.image_url ?? row?.public_url ?? '').trim()
+  return resolveProductPictureSrc(raw)
+}
+
+export function formatProductPictureFileSize(bytes) {
+  const n = Number(bytes) || 0
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/** 与 data_get/get_eatting announcement_picture_folder_slug / 后端 upload 接口对齐 */
+export function normalizeProductPictureFolderWhitespace(value) {
+  return String(value ?? '').replace(/\u0007/g, ' ').replace(/[ \t]+/g, ' ').trim()
+}
+
+export function sanitizeProductPictureFolderSlug(folderKeyRaw) {
+  const raw = normalizeProductPictureFolderWhitespace(folderKeyRaw)
+  if (!raw) return 'misc'
+  let text = raw.replace(/[/\\:*?"<>|]+/g, '_')
+  text = text.replace(/_+/g, '_').replace(/^[.\s_]+|[.\s_]+$/g, '')
+  if (!text) return 'misc'
+  const limited = text.slice(0, 120)
+  const slug = limited || 'announcement'
+  if (slug === 'announcement') return 'misc'
+  return slug
+}
+
+/** 构建批量上传预览行（与核验工作台 productImageFileRows 一致） */
+export function buildProductPictureUploadPreviewRows(files, { startSequence = 1, folderSlug = 'misc' } = {}) {
+  const start = Math.max(Number(startSequence || 1), 1)
+  const slug = String(folderSlug || 'misc')
+  const list = Array.isArray(files) ? files : []
+  return list.map((item, index) => {
+    const sequenceNo = start + index
+    const targetName = `${sequenceNo}.png`
+    return {
+      ...item,
+      sequenceNo,
+      targetName,
+      targetPath: `backend\\public\\upload\\products\\${slug}\\${targetName}`,
+      sizeLabel: formatProductPictureFileSize(item.size)
+    }
+  })
+}

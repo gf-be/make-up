@@ -2291,6 +2291,61 @@ async function persistStagingDetailPayload(connection, stagingBatchId, rawPayloa
   return getAnnouncementStagingDetail(connection, stagingBatchId);
 }
 
+function applyPictureUrlsByGlobalSamplingSequence(rawPayload = {}, uploadedItems = []) {
+  /** 与 collectParsedRows 一致的「全局序号」：仅对有产品名称的行递增 */
+  const urlBySeq = new Map();
+  uploadedItems.forEach((it) => {
+    const sn = Number(it?.sequence_no);
+    if (!Number.isInteger(sn) || sn < 1) return;
+    const u = normalizeNullableText(it?.picture_url);
+    if (u) urlBySeq.set(sn, u);
+  });
+  if (!urlBySeq.size) {
+    return 0;
+  }
+
+  let runningSeq = 0;
+  let updated = 0;
+  const attachments = Array.isArray(rawPayload.attachments) ? rawPayload.attachments : [];
+
+  attachments.forEach((attachment) => {
+    const parsedRows = Array.isArray(attachment?.parse_result?.rows) ? attachment.parse_result.rows : [];
+    parsedRows.forEach((row, rowIndex) => {
+      const normalized = normalizeDetailRow(row, rowIndex);
+      if (!String(normalized.product_name || '').trim()) return;
+      runningSeq += 1;
+      const url = urlBySeq.get(runningSeq);
+      if (!url) return;
+      row.picture_url = url;
+      updated += 1;
+    });
+  });
+  return updated;
+}
+
+/**
+ * 核验工作台产品图批量/顺序上传成功后：将 picture_url 写入 raw_payload 并刷新 announcement_staging_items。
+ *
+ * @param {{ sequence_no:number, picture_url?:string|null }[]} uploadedItems
+ */
+async function persistStagingUploadedProductPicturesToSamplingBatch(connection, stagingBatchId, uploadedItems = []) {
+  const batch = await getStagingBatchForItemEdit(connection, stagingBatchId);
+  let rawPayload;
+  try {
+    ({ rawPayload } = getEditableSamplingPayload(batch));
+  } catch {
+    return { updated_row_count: 0, skipped: true };
+  }
+
+  const updated = applyPictureUrlsByGlobalSamplingSequence(rawPayload, uploadedItems);
+  if (updated === 0) {
+    return { updated_row_count: 0, skipped: false };
+  }
+
+  await persistStagingDetailPayload(connection, stagingBatchId, rawPayload);
+  return { updated_row_count: updated, skipped: false };
+}
+
 async function createAnnouncementStagingItem(connection, stagingBatchId, payload = {}) {
   const batch = await getStagingBatchForItemEdit(connection, stagingBatchId);
   const { rawPayload } = getEditableSamplingPayload(batch);
@@ -3887,6 +3942,7 @@ module.exports = {
   updateAnnouncementStagingItem,
   deleteAnnouncementStagingItem,
   resyncAnnouncementStagingItemsTable,
+  persistStagingUploadedProductPicturesToSamplingBatch,
   publishAnnouncementStagingBatch,
   deleteAnnouncementStagingBatch,
   deletePublishedAnnouncementStagingBatch,
