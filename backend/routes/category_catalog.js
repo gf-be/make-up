@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const pool = require('../config/database');
 const { requireRoles } = require('../utils/auth');
@@ -7,8 +8,51 @@ const {
   normalizeProductType,
   getProductTypeLabel
 } = require('../utils/unqualifiedProducts');
+const {
+  buildAbstractProductCategoryFolderKey,
+  normalizeFolderWhitespace,
+  sanitizeProductPictureFileName,
+  saveProductPictureFiles
+} = require('../utils/productPictureUpload');
 
 const requireCategoryManagers = () => requireRoles(['developer', 'data_admin']);
+
+const uploadAbstractProductImages = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024, files: 50 }
+});
+
+function parsePositiveInt(value, fallback = 1) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function resolveAbstractProductFolderKeyFromRow(row) {
+  return buildAbstractProductCategoryFolderKey(row?.category_name);
+}
+
+function resolveAbstractProductFileNameFromRow(row) {
+  return sanitizeProductPictureFileName(row?.abstract_name);
+}
+
+function parseAbstractProductImageUploadRequest(req) {
+  const files = req.files || [];
+  if (!files.length) {
+    const error = new Error('请选择需要上传的图片文件');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const startSequence = parsePositiveInt(req.body?.start_sequence, 1);
+  const folderKeyRaw = req.body?.folder_key ?? req.body?.category_name ?? req.body?.announcement_no ?? '';
+  const fileNameRaw = req.body?.file_name ?? req.body?.abstract_name ?? '';
+  return {
+    files,
+    startSequence,
+    folderKeyRaw: normalizeFolderWhitespace(folderKeyRaw),
+    fileNameRaw: normalizeFolderWhitespace(fileNameRaw)
+  };
+}
 
 async function ensureReady() {
   await ensureUnqualifiedProductsTable(pool);
@@ -195,6 +239,140 @@ router.get('/abstract-products', requireCategoryManagers(), async (req, res) => 
     res.status(500).json({ success: false, message: '获取抽象产品列表失败' });
   }
 });
+
+router.post(
+  '/abstract-products/image-upload',
+  requireCategoryManagers(),
+  uploadAbstractProductImages.array('files', 50),
+  async (req, res) => {
+    try {
+      await ensureReady();
+      const { files, startSequence, folderKeyRaw, fileNameRaw } = parseAbstractProductImageUploadRequest(req);
+      if (!folderKeyRaw) {
+        return res.status(400).json({ success: false, message: '缺少分类目录 folder_key' });
+      }
+      if (!fileNameRaw) {
+        return res.status(400).json({ success: false, message: '缺少产品文件名 file_name' });
+      }
+
+      const saved = saveProductPictureFiles({
+        folderKey: folderKeyRaw,
+        files,
+        startSequence,
+        fileNames: [fileNameRaw]
+      });
+      const first = saved.items[0] || null;
+      if (!first?.image_url) {
+        return res.status(500).json({ success: false, message: '图片保存失败' });
+      }
+
+      res.json({
+        success: true,
+        message: `已保存图片到 ${first.image_url}`,
+        data: {
+          folder_key: saved.folder_key,
+          folder_slug: saved.folder_slug,
+          image_url: first.image_url,
+          picture_url: first.picture_url,
+          items: saved.items
+        }
+      });
+    } catch (error) {
+      console.error('上传抽象产品图片失败:', error);
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.statusCode ? error.message : '上传抽象产品图片失败'
+      });
+    }
+  }
+);
+
+router.post(
+  '/abstract-products/:id/image-upload',
+  requireCategoryManagers(),
+  uploadAbstractProductImages.array('files', 50),
+  async (req, res) => {
+    try {
+      await ensureReady();
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isFinite(id) || id <= 0) {
+        return res.status(400).json({ success: false, message: '无效的 id' });
+      }
+
+      const { files, startSequence, folderKeyRaw, fileNameRaw } = parseAbstractProductImageUploadRequest(req);
+
+      const [[row]] = await pool.query(
+        `
+          SELECT id, product_type, category_name, abstract_name, image_url
+          FROM unqualified_product_abstract_catalog
+          WHERE id = ?
+          LIMIT 1
+        `,
+        [id]
+      );
+      if (!row) {
+        return res.status(404).json({ success: false, message: '抽象产品不存在或已删除' });
+      }
+
+      const folderKey = folderKeyRaw || resolveAbstractProductFolderKeyFromRow(row);
+      const fileName = fileNameRaw || row.abstract_name;
+      if (!folderKey) {
+        return res.status(400).json({ success: false, message: '无法解析分类目录，请检查所属分类' });
+      }
+      if (!fileName) {
+        return res.status(400).json({ success: false, message: '无法解析产品文件名，请检查产品名称' });
+      }
+
+      const saved = saveProductPictureFiles({
+        folderKey,
+        files,
+        startSequence,
+        fileNames: [fileName]
+      });
+      const first = saved.items[0] || null;
+      const imageUrl = String(first?.image_url || '').trim();
+      if (!imageUrl) {
+        return res.status(500).json({ success: false, message: '图片保存失败' });
+      }
+
+      await pool.query(
+        `
+          UPDATE unqualified_product_abstract_catalog
+          SET image_url = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `,
+        [imageUrl, id]
+      );
+
+      const [[updated]] = await pool.query(
+        `
+          SELECT id, product_type, category_name, abstract_name, image_url, created_at, updated_at
+          FROM unqualified_product_abstract_catalog
+          WHERE id = ?
+          LIMIT 1
+        `,
+        [id]
+      );
+
+      res.json({
+        success: true,
+        message: `已上传图片并写入 image_url：${imageUrl}`,
+        data: {
+          ...updated,
+          folder_key: saved.folder_key,
+          folder_slug: saved.folder_slug,
+          items: saved.items
+        }
+      });
+    } catch (error) {
+      console.error('上传并更新抽象产品图片失败:', error);
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.statusCode ? error.message : '上传并更新抽象产品图片失败'
+      });
+    }
+  }
+);
 
 router.post('/abstract-products', requireCategoryManagers(), async (req, res) => {
   try {
@@ -455,10 +633,10 @@ router.post('/assign-product-category', requireCategoryManagers(), async (req, r
       await connection.query(
         `
           UPDATE unqualified_products
-          SET product_category = ?
+          SET product_category = ?, product_category_id = ?
           WHERE id = ?
         `,
-        [toCategory, productId]
+        [toCategory, targetCatalog.id, productId]
       );
     }
 

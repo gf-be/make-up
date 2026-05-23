@@ -142,6 +142,43 @@ export function sanitizeProductPictureFolderSlug(folderKeyRaw) {
   return slug
 }
 
+/** 抽象产品配图：按产品名称命名文件（固定 .png） */
+export function sanitizeProductPictureFileName(nameRaw) {
+  const raw = normalizeProductPictureFolderWhitespace(nameRaw)
+  if (!raw) return ''
+  let text = raw.replace(/[/\\:*?"<>|]+/g, '_')
+  text = text.replace(/_+/g, '_').replace(/^[.\s_]+|[.\s_]+$/g, '')
+  if (!text) return ''
+  return `${text.slice(0, 120)}.png`
+}
+
+/** 分类目录 + 产品文件名 → 预览/入库路径片段 */
+export function buildAbstractCatalogProductPictureTargetPath(categoryName, abstractName) {
+  const folderSlug = sanitizeProductPictureFolderSlug(categoryName)
+  const targetName = sanitizeProductPictureFileName(abstractName)
+  if (!targetName) {
+    return {
+      folderSlug,
+      targetName: '—',
+      targetPath: '—',
+      storedPath: '',
+      publicPath: ''
+    }
+  }
+  return {
+    folderSlug,
+    targetName,
+    targetPath: `backend\\public\\upload\\products\\${folderSlug}\\${targetName}`,
+    storedPath: `backend/public/upload/products/${folderSlug}/${targetName}`,
+    publicPath: `/upload/products/${folderSlug}/${targetName}`
+  }
+}
+
+/** 新增抽象产品：按分类与名称生成待填入的本地存储路径 */
+export function buildAbstractCatalogProductPictureStoredPath(categoryName, abstractName) {
+  return buildAbstractCatalogProductPictureTargetPath(categoryName, abstractName).storedPath || ''
+}
+
 /** 构建批量上传预览行（与核验工作台 productImageFileRows 一致） */
 export function buildProductPictureUploadPreviewRows(files, { startSequence = 1, folderSlug = 'misc' } = {}) {
   const start = Math.max(Number(startSequence || 1), 1)

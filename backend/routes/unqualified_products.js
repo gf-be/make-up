@@ -49,6 +49,7 @@ const MANAGE_WRITABLE_COLUMNS = [
   'requirement',
   'remarks',
   'product_category',
+  'product_category_id',
   'manufacturer_province',
   'manufacturer_city',
   'sampled_province',
@@ -206,6 +207,22 @@ async function verifyManageForeignKeys(connection, row) {
         .then(([r]) => {
           if (!r[0]) {
             const e = new Error('company_id 在库中不存在');
+            e.statusCode = 400;
+            throw e;
+          }
+        })
+    );
+
+  }
+
+  if (row.product_category_id != null) {
+
+    tasks.push(
+      connection
+        .query('SELECT id FROM unqualified_product_category_catalog WHERE id = ? LIMIT 1', [row.product_category_id])
+        .then(([r]) => {
+          if (!r[0]) {
+            const e = new Error('product_category_id 在库中不存在');
             e.statusCode = 400;
             throw e;
           }
@@ -475,7 +492,8 @@ function assembleManageRowFromBody(body, { forCreate }) {
     'announcement_detail_id',
     'supervision_id',
     'supervision_detail_id',
-    'company_id'
+    'company_id',
+    'product_category_id'
 
   ];
 
@@ -2630,6 +2648,89 @@ router.post('/record-export-usage', authenticate, async (req, res) => {
   } catch (error) {
     console.error('记录导出使用情况失败:', error);
     res.status(500).json({ success: false, message: '记录导出使用情况失败' });
+  }
+});
+
+/** 按 product_category_id + 产品名称匹配抽象产品目录图（只读，供导出预览） */
+router.post('/resolve-category-product-images', authenticate, async (req, res) => {
+  try {
+    await ensureUnqualifiedProductsReady();
+
+    const rawItems = req.body?.items;
+    const items = Array.isArray(rawItems) ? rawItems : [];
+    if (!items.length) {
+      return res.status(400).json({ success: false, message: '未提供查询项' });
+    }
+    if (items.length > 500) {
+      return res.status(400).json({ success: false, message: '单次查询项过多' });
+    }
+
+    const data = [];
+    for (const item of items) {
+      const productCategoryId = Number.parseInt(String(item?.product_category_id ?? '').trim(), 10);
+      const productName = String(item?.product_name ?? '').trim();
+      if (!Number.isFinite(productCategoryId) || productCategoryId <= 0 || !productName) {
+        data.push({
+          product_category_id: item?.product_category_id ?? null,
+          product_name: productName,
+          found: false,
+          matches: []
+        });
+        continue;
+      }
+
+      const [matchRows] = await pool.query(
+        `
+          SELECT
+            c.id AS product_category_id,
+            c.category_name,
+            c.product_type,
+            a.id AS abstract_product_id,
+            a.abstract_name,
+            a.image_url
+          FROM unqualified_product_category_catalog c
+          INNER JOIN unqualified_product_abstract_catalog a
+            ON a.product_type = c.product_type
+           AND TRIM(a.category_name) = TRIM(c.category_name)
+           AND TRIM(COALESCE(a.image_url, '')) <> ''
+           AND (
+             TRIM(a.abstract_name) LIKE CONCAT('%', ?, '%')
+             OR ? LIKE CONCAT('%', TRIM(a.abstract_name), '%')
+           )
+          WHERE c.id = ?
+          ORDER BY
+            CASE
+              WHEN TRIM(a.abstract_name) = ? THEN 0
+              WHEN TRIM(a.abstract_name) LIKE CONCAT('%', ?, '%') THEN 1
+              ELSE 2
+            END,
+            CHAR_LENGTH(a.abstract_name) ASC,
+            a.abstract_name ASC,
+            a.id ASC
+          LIMIT 50
+        `,
+        [productName, productName, productCategoryId, productName, productName]
+      );
+
+      const matches = (matchRows || []).map((row) => ({
+        abstract_product_id: row?.abstract_product_id ?? null,
+        abstract_name: String(row?.abstract_name || '').trim(),
+        image_url: String(row?.image_url || '').trim(),
+        category_name: String(row?.category_name || '').trim()
+      }));
+
+      data.push({
+        product_category_id: productCategoryId,
+        product_name: productName,
+        found: matches.length > 0,
+        matches
+      });
+    }
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('解析产品分类图片失败:', error);
+    res.status(500).json({ success: false, message: '解析产品分类图片失败' });
   }
 });
 

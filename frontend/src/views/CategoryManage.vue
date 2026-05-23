@@ -45,7 +45,7 @@
                   </span> -->
                 </div>
                 <div class="panel-actions">
-                  <el-button
+                  <!-- <el-button
                     type="success"
                     plain
                     :disabled="!selectedCategoryName || !abstractRows.length"
@@ -53,7 +53,7 @@
                     @click="triggerAbstractProductBatchImageUpload"
                   >
                     上传图片
-                  </el-button>
+                  </el-button> -->
                   <el-button type="primary" :disabled="!selectedCategoryName" @click="openAbstractDialog()">
                     新增
                   </el-button>
@@ -138,7 +138,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="分类名称" required>
-          <el-input v-model="newCategoryName" placeholder="如 保湿、修护、染发" maxlength="100" show-word-limit clearable
+          <el-input v-model="newCategoryName" placeholder="" maxlength="100" show-word-limit clearable
             @keyup.enter="handleCreateCategory" />
         </el-form-item>
       </el-form>
@@ -152,20 +152,19 @@
     </el-dialog>
 
     <el-dialog
-      v-model="abstractDialogVisible"
-      :title="editingAbstractId ? '编辑抽象产品' : '批量新增抽象产品'"
-      :width="editingAbstractId ? 'min(620px, 94vw)' : 'min(920px, 96vw)'"
+      v-model="abstractEditDialogVisible"
+      title="编辑产品"
+      width="min(620px, 94vw)"
       align-center
       append-to-body
       draggable
       destroy-on-close
     >
-      <template v-if="editingAbstractId">
         <el-form label-width="96px" class="abstract-form">
           <el-form-item label="名称" required>
             <el-input
               v-model="abstractForm.abstract_name"
-              placeholder="如：染发膏"
+              placeholder="产品名称"
               maxlength="150"
               show-word-limit
               clearable
@@ -174,19 +173,18 @@
           <el-form-item label="产品图片">
             <div class="abstract-edit-image-field">
               <el-input
-                v-model="abstractForm.image_url"
-                placeholder="选择本地图片后将上传至静态目录并自动填入路径"
+                :model-value="abstractFormEditImageDisplay"
+                placeholder="选择图片后显示本地路径，保存时上传"
                 maxlength="1000"
                 readonly
               />
               <el-button
                 type="primary"
                 plain
-                :loading="uploadingAbstractEditImage"
                 :disabled="!canUploadAbstractEditForm"
                 @click="triggerAbstractEditFormImageUpload"
               >
-                {{ abstractForm.image_url ? '替换图片' : '选择图片' }}
+                {{ abstractFormEditImageDisplay ? '替换图片' : '选择图片' }}
               </el-button>
             </div>
           </el-form-item>
@@ -215,10 +213,10 @@
               />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="resolveAbstractProductPictureSrc(abstractForm.image_url)" label="预览">
+          <el-form-item v-if="abstractFormEditImagePreviewSrc" label="预览">
             <el-image
               class="abstract-preview"
-              :src="resolveAbstractProductPictureSrc(abstractForm.image_url)"
+              :src="abstractFormEditImagePreviewSrc"
               fit="cover"
             >
               <template #error>
@@ -227,9 +225,23 @@
             </el-image>
           </el-form-item>
         </el-form>
+      <template #footer>
+        <el-button @click="abstractEditDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingAbstract" @click="saveAbstractProduct">
+          保存
+        </el-button>
       </template>
+    </el-dialog>
 
-      <template v-else>
+    <el-dialog
+      v-model="abstractCreateDialogVisible"
+      title="新增产品"
+      width="min(920px, 96vw)"
+      align-center
+      append-to-body
+      draggable
+      destroy-on-close
+    >
         <el-form label-width="96px" class="abstract-form abstract-create-form">
           <el-row :gutter="16">
             <el-col :xs="24" :md="12">
@@ -279,13 +291,13 @@
           </div>
         </div>
 
-        <el-table :data="abstractCreateDrafts" size="small" border max-height="420" empty-text="请点击「添加产品」">
+        <el-table :data="abstractCreateDrafts" row-key="key" size="small" border max-height="420" empty-text="请点击「添加产品」">
           <el-table-column type="index" label="#" width="50" align="center" />
           <el-table-column label="产品名称" min-width="180">
             <template #default="{ row }">
               <el-input
                 v-model="row.abstract_name"
-                placeholder="如：染发膏"
+                placeholder=""
                 maxlength="150"
                 clearable
               />
@@ -295,11 +307,12 @@
             <template #default="{ row }">
               <div class="abstract-product-picture-cell">
                 <el-image
-                  v-if="resolveAbstractProductPictureSrc(row.image_url)"
+                  v-if="resolveAbstractCreateDraftPictureSrc(row)"
+                  :key="`${row.key}-${row.pendingPreviewUrl || row.image_url || ''}`"
                   class="abstract-thumb"
-                  :src="resolveAbstractProductPictureSrc(row.image_url)"
+                  :src="resolveAbstractCreateDraftPictureSrc(row)"
                   fit="cover"
-                  :preview-src-list="[resolveAbstractProductPictureSrc(row.image_url)]"
+                  :preview-src-list="[resolveAbstractCreateDraftPictureSrc(row)]"
                   preview-teleported
                 >
                   <template #error>
@@ -331,28 +344,35 @@
             </template>
           </el-table-column>
         </el-table>
-      </template>
-
       <template #footer>
-        <el-button @click="abstractDialogVisible = false">取消</el-button>
+        <el-button @click="abstractCreateDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="savingAbstract" @click="saveAbstractProduct">
-          {{ editingAbstractId ? '保存' : '保存全部' }}
+          保存全部
         </el-button>
       </template>
     </el-dialog>
     <input
-      ref="abstractProductImageInputRef"
+      ref="abstractProductImageSingleInputRef"
       type="file"
       class="hidden-file-input"
       accept="image/png,image/jpeg,image/webp,image/*"
-      :multiple="abstractProductImageUploadMode === 'batch' || abstractProductImageUploadMode === 'create-batch'"
-      @change="handleAbstractProductImageInputChange"
+      @change="handleAbstractProductImageSingleInputChange"
+    >
+    <input
+      ref="abstractProductImageMultipleInputRef"
+      type="file"
+      class="hidden-file-input"
+      multiple
+      accept="image/png,image/jpeg,image/webp,image/*"
+      @change="handleAbstractProductImageMultipleInputChange"
     >
 
     <el-dialog
       v-model="abstractProductImageUploadDialogVisible"
       width="760px"
       :title="abstractProductImageUploadDialogTitle"
+      align-center
+      append-to-body
       draggable
       :close-on-click-modal="false"
     >
@@ -369,12 +389,15 @@
       </el-alert>
       <el-descriptions :column="1" border size="small" class="mb-16 abstract-product-folder-desc">
         <template v-if="abstractProductImageUploadMode === 'edit-single' || abstractProductImageUploadMode === 'create-single'">
-          <el-descriptions-item label="目录标识">
+          <el-descriptions-item label="所属分类">
             {{ abstractProductImageFolderKeyPreview || '—' }}
           </el-descriptions-item>
           <el-descriptions-item label="目录名">{{ abstractProductImageFolderSlug }}</el-descriptions-item>
-          <el-descriptions-item label="抽象产品">
+          <el-descriptions-item label="产品名称">
             {{ abstractProductImageNamePreview || '—' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="保存为">
+            {{ abstractProductImageFileNamePreview || '—' }}
           </el-descriptions-item>
         </template>
         <template v-else-if="abstractProductImageUploadMode === 'batch'">
@@ -394,6 +417,23 @@
       </el-descriptions>
       <el-table :data="abstractProductImageFileRows" size="small" max-height="360">
         <el-table-column type="index" label="#" width="50" />
+        <el-table-column label="预览" width="88" align="center">
+          <template #default="{ row }">
+            <el-image
+              v-if="row.previewUrl"
+              class="abstract-upload-preview-thumb"
+              :src="row.previewUrl"
+              fit="cover"
+              :preview-src-list="[row.previewUrl]"
+              preview-teleported
+            >
+              <template #error>
+                <div class="image-fallback">无图</div>
+              </template>
+            </el-image>
+            <div v-else class="image-fallback abstract-upload-preview-thumb">无图</div>
+          </template>
+        </el-table-column>
         <el-table-column prop="name" label="原文件名" min-width="180" show-overflow-tooltip />
         <el-table-column
           v-if="abstractProductImageUploadMode === 'batch' || abstractProductImageUploadMode === 'create-batch'"
@@ -416,7 +456,7 @@
         <el-button @click="clearAbstractProductImageSelection">清空</el-button>
         <el-button
           type="primary"
-          :loading="uploadingAbstractProductImageBatch || uploadingAbstractEditImage"
+          :loading="uploadingAbstractProductImageBatch"
           @click="handleUploadAbstractProductImage"
         >
           {{ abstractProductImageUploadConfirmLabel }}
@@ -427,7 +467,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import {
   createCategoryAbstractProduct,
   createCategoryCatalog,
@@ -436,19 +476,19 @@ import {
   getCategoryCatalogProductTypes,
   listCategoryAbstractProducts,
   listCategoryCatalog,
-  updateCategoryAbstractProduct
+  updateCategoryAbstractProduct,
+  uploadCategoryAbstractProductImage,
+  uploadCategoryAbstractProductImageOnly
 } from '@/api/index'
 import {
-  buildProductPictureUploadPreviewRows,
+  buildAbstractCatalogProductPictureStoredPath,
+  buildAbstractCatalogProductPictureTargetPath,
   formatProductPictureFileSize,
   normalizeProductPictureFolderWhitespace,
   resolveProductPictureSrc,
+  sanitizeProductPictureFileName,
   sanitizeProductPictureFolderSlug
 } from '@/utils/productPicture.js'
-import {
-  getFirstAnnouncementStagingUploadedPictureStoredPath,
-  postAnnouncementStagingProductImages
-} from '@/utils/announcementStagingProductPictureUpload.js'
 
 const treeProps = {
   label: 'label',
@@ -473,7 +513,8 @@ const newTypeLabel = ref('')
 const newCategoryName = ref('')
 const typeDialogVisible = ref(false)
 const categoryDialogVisible = ref(false)
-const abstractDialogVisible = ref(false)
+const abstractEditDialogVisible = ref(false)
+const abstractCreateDialogVisible = ref(false)
 const editingAbstractId = ref(null)
 const abstractForm = reactive({
   product_type: '',
@@ -487,14 +528,17 @@ const abstractCreateForm = reactive({
 })
 const abstractCreateDrafts = ref([])
 
-const abstractProductImageInputRef = ref(null)
+const abstractProductImageSingleInputRef = ref(null)
+const abstractProductImageMultipleInputRef = ref(null)
 const abstractProductImageUploadMode = ref('batch')
 const abstractProductImageTargetRow = ref(null)
 const abstractProductImageTargetDraft = ref(null)
 const selectedAbstractProductImageFiles = ref([])
 const abstractProductImageUploadDialogVisible = ref(false)
 const uploadingAbstractProductImageBatch = ref(false)
-const uploadingAbstractEditImage = ref(false)
+const abstractEditPendingImageFile = ref(null)
+const abstractEditLocalImagePath = ref('')
+const abstractEditPendingImagePreview = ref('')
 
 const currentTypeLabel = computed(() => getTypeLabel(selectedProductType.value))
 
@@ -519,7 +563,7 @@ const abstractProductImageUploadConfirmLabel = computed(() => {
   if (abstractProductImageUploadMode.value === 'batch') return '开始顺序上传'
   if (abstractProductImageUploadMode.value === 'create-batch') return '上传并填入路径'
   if (abstractProductImageUploadMode.value === 'create-single') return '上传并填入'
-  if (abstractProductImageUploadMode.value === 'edit-single') return '上传并保存'
+  if (abstractProductImageUploadMode.value === 'edit-single') return '确认选图'
   return '上传并保存'
 })
 
@@ -532,6 +576,24 @@ const canUploadAbstractEditForm = computed(() =>
   )
 )
 
+const abstractFormEditImageDisplay = computed(() => {
+  if (abstractEditPendingImageFile.value) {
+    const targetPath = buildAbstractCatalogProductPictureStoredPath(
+      abstractForm.category_name,
+      abstractForm.abstract_name
+    )
+    if (targetPath) return targetPath
+  }
+  return abstractEditLocalImagePath.value || abstractForm.image_url || ''
+})
+
+const abstractFormEditImagePreviewSrc = computed(() => {
+  if (abstractEditPendingImagePreview.value) {
+    return abstractEditPendingImagePreview.value
+  }
+  return resolveAbstractProductPictureSrc(abstractForm.image_url)
+})
+
 const abstractCreateBatchCategoryPreview = computed(() => {
   const typeLabel = getTypeLabel(abstractCreateForm.product_type) || abstractCreateForm.product_type
   const categoryName = abstractCreateForm.category_name
@@ -543,39 +605,167 @@ function resolveAbstractProductPictureSrc(raw) {
   return resolveProductPictureSrc(raw)
 }
 
-function resolveAbstractProductImageFolderKeyFromRow(row) {
+function resolveAbstractCreateDraftTargetImagePath(draft) {
+  const categoryName = abstractCreateForm.category_name
+  const abstractName = normalizeProductPictureFolderWhitespace(draft?.abstract_name)
+  if (!categoryName || !abstractName) return ''
+  return buildAbstractCatalogProductPictureStoredPath(categoryName, abstractName)
+}
+
+function syncAbstractCreateDraftImagePath(draft) {
+  if (!draft) return
+  draft.image_url = resolveAbstractCreateDraftTargetImagePath(draft)
+}
+
+function syncAllAbstractCreateDraftImagePaths() {
+  for (const draft of abstractCreateDrafts.value) {
+    syncAbstractCreateDraftImagePath(draft)
+  }
+}
+
+function revokeAbstractCreateDraftPendingPreview(draft) {
+  if (!draft?.pendingPreviewUrl) return
+  URL.revokeObjectURL(draft.pendingPreviewUrl)
+  draft.pendingPreviewUrl = ''
+}
+
+function clearAbstractCreateDraftPendingImage(draft) {
+  revokeAbstractCreateDraftPendingPreview(draft)
+  if (draft) {
+    draft.pendingImageFile = null
+  }
+}
+
+function setAbstractCreateDraftPendingImage(draft, fileItem) {
+  if (!draft || !fileItem?.file) return
+  clearAbstractCreateDraftPendingImage(draft)
+  draft.pendingImageFile = fileItem
+  draft.pendingPreviewUrl = URL.createObjectURL(fileItem.file)
+}
+
+function syncAbstractCreateDraftPendingImagesFromFiles(files) {
+  for (const draft of abstractCreateDrafts.value) {
+    clearAbstractCreateDraftPendingImage(draft)
+  }
+  const list = Array.isArray(files) ? files : []
+  list.forEach((item, index) => {
+    const draft = abstractCreateDrafts.value[index]
+    if (!draft) return
+    if (!normalizeProductPictureFolderWhitespace(draft.abstract_name)) return
+    setAbstractCreateDraftPendingImage(draft, item)
+  })
+}
+
+function resolveAbstractCreateDraftPictureSrc(draft) {
+  if (draft?.pendingPreviewUrl) {
+    return draft.pendingPreviewUrl
+  }
+  return resolveAbstractProductPictureSrc(draft?.image_url)
+}
+
+function revokeAbstractProductImageFilePreviews(files) {
+  for (const item of files || []) {
+    if (item.previewUrl) {
+      URL.revokeObjectURL(item.previewUrl)
+      item.previewUrl = ''
+    }
+  }
+}
+
+function assignAbstractProductImageFiles(files) {
+  revokeAbstractProductImageFilePreviews(selectedAbstractProductImageFiles.value)
+  selectedAbstractProductImageFiles.value = (Array.isArray(files) ? files : []).map((item) => ({
+    ...item,
+    previewUrl: item.file ? URL.createObjectURL(item.file) : ''
+  }))
+}
+
+function revokeAbstractEditPendingImagePreview() {
+  if (abstractEditPendingImagePreview.value) {
+    URL.revokeObjectURL(abstractEditPendingImagePreview.value)
+    abstractEditPendingImagePreview.value = ''
+  }
+}
+
+function clearAbstractEditPendingImage() {
+  revokeAbstractEditPendingImagePreview()
+  abstractEditPendingImageFile.value = null
+  abstractEditLocalImagePath.value = ''
+}
+
+function resolveLocalImageFilePath(file) {
+  if (!file) return ''
+  return String(file.path || file.webkitRelativePath || file.name || '').trim()
+}
+
+function setAbstractEditPendingImage(fileItem) {
+  clearAbstractEditPendingImage()
+  abstractEditPendingImageFile.value = fileItem
+  const targetPath = buildAbstractCatalogProductPictureStoredPath(
+    abstractForm.category_name,
+    abstractForm.abstract_name
+  )
+  abstractEditLocalImagePath.value = targetPath || resolveLocalImageFilePath(fileItem.file)
+  abstractEditPendingImagePreview.value = URL.createObjectURL(fileItem.file)
+}
+
+async function openAbstractProductImagePicker(multiple = false) {
+  await nextTick()
+  const input = multiple ? abstractProductImageMultipleInputRef.value : abstractProductImageSingleInputRef.value
+  if (!input) return
+  input.value = ''
+  input.click()
+}
+
+function triggerAbstractEditFormImageUpload() {
+  if (!canUploadAbstractEditForm.value) {
+    ElMessage.warning('请先填写产品名称、产品类型和所属分类')
+    return
+  }
+  abstractProductImageUploadMode.value = 'edit-single'
+  abstractProductImageTargetRow.value = null
+  abstractProductImageTargetDraft.value = null
+  openAbstractProductImagePicker(false)
+}
+
+function resolveAbstractProductImageCategoryKeyFromRow(row) {
   if (!row) return ''
-  const productType = normalizeProductPictureFolderWhitespace(getTypeLabel(row.product_type) || row.product_type)
-  const categoryName = normalizeProductPictureFolderWhitespace(row.category_name)
-  const abstractName = normalizeProductPictureFolderWhitespace(row.abstract_name)
-  if (!productType || !categoryName || !abstractName) return ''
-  return `${productType} / ${categoryName} / ${abstractName}`
+  return normalizeProductPictureFolderWhitespace(row.category_name)
 }
 
-function resolveAbstractProductImageFolderKeyFromForm(form) {
+function resolveAbstractProductImageCategoryKeyFromForm(form) {
   if (!form) return ''
-  return resolveAbstractProductImageFolderKeyFromRow({
-    product_type: form.product_type,
-    category_name: form.category_name,
-    abstract_name: form.abstract_name
-  })
+  return resolveAbstractProductImageCategoryKeyFromRow(form)
 }
 
-function resolveAbstractProductImageFolderKeyFromDraft(draft) {
+function resolveAbstractProductImageCategoryKeyFromDraft(draft) {
   if (!draft) return ''
-  return resolveAbstractProductImageFolderKeyFromRow({
-    product_type: abstractCreateForm.product_type,
-    category_name: abstractCreateForm.category_name,
-    abstract_name: draft.abstract_name
-  })
+  return normalizeProductPictureFolderWhitespace(abstractCreateForm.category_name)
 }
 
-function getAbstractEditFormUploadTarget() {
+function resolveAbstractProductImageFileNameFromRow(row) {
+  if (!row) return ''
+  return sanitizeProductPictureFileName(row.abstract_name)
+}
+
+function resolveAbstractProductImageFileNameFromForm(form) {
+  if (!form) return ''
+  return sanitizeProductPictureFileName(form.abstract_name)
+}
+
+function resolveAbstractProductImageFileNameFromDraft(draft) {
+  if (!draft) return ''
+  return sanitizeProductPictureFileName(draft.abstract_name)
+}
+
+function buildAbstractProductImagePreviewRow(item, categoryName, abstractName, extra = {}) {
+  const target = buildAbstractCatalogProductPictureTargetPath(categoryName, abstractName)
   return {
-    id: editingAbstractId.value,
-    product_type: abstractForm.product_type,
-    category_name: abstractForm.category_name,
-    abstract_name: String(abstractForm.abstract_name || '').trim()
+    ...item,
+    ...extra,
+    targetName: target.targetName,
+    targetPath: target.targetPath,
+    sizeLabel: formatProductPictureFileSize(item.size)
   }
 }
 
@@ -584,6 +774,8 @@ function createEmptyAbstractDraft() {
     key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     abstract_name: '',
     image_url: '',
+    pendingPreviewUrl: '',
+    pendingImageFile: null,
     uploading: false
   }
 }
@@ -597,6 +789,8 @@ function addAbstractCreateDraft() {
 }
 
 function removeAbstractCreateDraft(index) {
+  const draft = abstractCreateDrafts.value[index]
+  clearAbstractCreateDraftPendingImage(draft)
   abstractCreateDrafts.value.splice(index, 1)
 }
 
@@ -610,12 +804,12 @@ function canUploadAbstractCreateDraft(draft) {
 
 const abstractProductImageFolderKeyPreview = computed(() => {
   if (abstractProductImageUploadMode.value === 'create-single') {
-    return resolveAbstractProductImageFolderKeyFromDraft(abstractProductImageTargetDraft.value)
+    return resolveAbstractProductImageCategoryKeyFromDraft(abstractProductImageTargetDraft.value)
   }
   if (abstractProductImageUploadMode.value === 'edit-single') {
-    return resolveAbstractProductImageFolderKeyFromForm(abstractForm)
+    return resolveAbstractProductImageCategoryKeyFromForm(abstractForm)
   }
-  return resolveAbstractProductImageFolderKeyFromRow(abstractProductImageTargetRow.value)
+  return resolveAbstractProductImageCategoryKeyFromRow(abstractProductImageTargetRow.value)
 })
 
 const abstractProductImageFolderSlug = computed(() =>
@@ -630,6 +824,16 @@ const abstractProductImageNamePreview = computed(() => {
     return normalizeProductPictureFolderWhitespace(abstractForm.abstract_name)
   }
   return normalizeProductPictureFolderWhitespace(abstractProductImageTargetRow.value?.abstract_name)
+})
+
+const abstractProductImageFileNamePreview = computed(() => {
+  if (abstractProductImageUploadMode.value === 'create-single') {
+    return resolveAbstractProductImageFileNameFromDraft(abstractProductImageTargetDraft.value)
+  }
+  if (abstractProductImageUploadMode.value === 'edit-single') {
+    return resolveAbstractProductImageFileNameFromForm(abstractForm)
+  }
+  return resolveAbstractProductImageFileNameFromRow(abstractProductImageTargetRow.value)
 })
 
 const abstractProductImageBatchCategoryPreview = computed(() => {
@@ -667,84 +871,63 @@ function buildAbstractProductImagePreviewRows() {
     return files.map((item, index) => {
       const draft = abstractCreateDrafts.value[index]
       const hasName = draft && normalizeProductPictureFolderWhitespace(draft.abstract_name)
-      const folderSlug = hasName
-        ? sanitizeProductPictureFolderSlug(resolveAbstractProductImageFolderKeyFromDraft(draft))
-        : ''
-      return {
-        ...item,
+      const categoryName = abstractCreateForm.category_name
+      return buildAbstractProductImagePreviewRow(item, categoryName, hasName ? draft.abstract_name : '', {
         targetProductName: hasName
           ? draft.abstract_name
           : draft
             ? '（未填名称，跳过）'
             : '（无对应行，跳过）',
-        targetName: hasName ? '1.png' : '—',
-        targetPath: hasName ? `backend\\public\\upload\\products\\${folderSlug}\\1.png` : '—',
-        sizeLabel: formatProductPictureFileSize(item.size),
         targetDraft: hasName ? draft : null
-      }
+      })
     })
   }
 
   if (abstractProductImageUploadMode.value === 'batch') {
     return files.map((item, index) => {
       const product = abstractRows.value[index]
-      const folderSlug = product
-        ? sanitizeProductPictureFolderSlug(resolveAbstractProductImageFolderKeyFromRow(product))
-        : ''
-      return {
-        ...item,
-        targetProductName: product?.abstract_name || '（无对应产品，跳过）',
-        targetName: product ? '1.png' : '—',
-        targetPath: product ? `backend\\public\\upload\\products\\${folderSlug}\\1.png` : '—',
-        sizeLabel: formatProductPictureFileSize(item.size),
-        targetRow: product || null
-      }
+      return buildAbstractProductImagePreviewRow(
+        item,
+        product?.category_name || selectedCategoryName.value,
+        product?.abstract_name || '',
+        {
+          targetProductName: product?.abstract_name || '（无对应产品，跳过）',
+          targetRow: product || null
+        }
+      )
     })
   }
 
   if (abstractProductImageUploadMode.value === 'create-single') {
     const draft = abstractProductImageTargetDraft.value
-    const folderSlug = sanitizeProductPictureFolderSlug(resolveAbstractProductImageFolderKeyFromDraft(draft))
-    return buildProductPictureUploadPreviewRows(files, {
-      startSequence: 1,
-      folderSlug
-    }).map((item) => ({
-      ...item,
-      targetDraft: draft
-    }))
+    return files.map((item) => buildAbstractProductImagePreviewRow(
+      item,
+      abstractCreateForm.category_name,
+      draft?.abstract_name || '',
+      { targetDraft: draft }
+    ))
   }
 
   if (abstractProductImageUploadMode.value === 'edit-single') {
-    const folderSlug = sanitizeProductPictureFolderSlug(resolveAbstractProductImageFolderKeyFromForm(abstractForm))
-    return buildProductPictureUploadPreviewRows(files, {
-      startSequence: 1,
-      folderSlug
-    })
+    return files.map((item) => buildAbstractProductImagePreviewRow(
+      item,
+      abstractForm.category_name,
+      abstractForm.abstract_name
+    ))
   }
 
   const targetRow = abstractProductImageTargetRow.value
-  const folderSlug = sanitizeProductPictureFolderSlug(resolveAbstractProductImageFolderKeyFromRow(targetRow))
-  return buildProductPictureUploadPreviewRows(files, {
-    startSequence: 1,
-    folderSlug
-  }).map((item) => ({
-    ...item,
-    targetRow
-  }))
+  return files.map((item) => buildAbstractProductImagePreviewRow(
+    item,
+    targetRow?.category_name || '',
+    targetRow?.abstract_name || '',
+    { targetRow }
+  ))
 }
 
 const abstractProductImageFileRows = computed(() => buildAbstractProductImagePreviewRows())
 
-function triggerAbstractEditFormImageUpload() {
-  if (!canUploadAbstractEditForm.value) {
-    ElMessage.warning('请先填写产品名称、产品类型和所属分类')
-    return
-  }
-  abstractProductImageUploadMode.value = 'edit-single'
-  abstractProductImageTargetRow.value = null
-  abstractProductImageTargetDraft.value = null
-  abstractProductImageInputRef.value?.click()
-}
+
 
 const categoryTree = computed(() => productTypeOptions.value.map((type) => ({
   key: `type:${type.value}`,
@@ -927,12 +1110,13 @@ async function onAbstractCreateFormTypeChange(value) {
 async function openAbstractDialog(row = null) {
   if (row?.id) {
     editingAbstractId.value = row.id
+    clearAbstractEditPendingImage()
     abstractForm.product_type = row.product_type || selectedProductType.value || productTypeOptions.value[0]?.value || ''
     await ensureCatalogForType(abstractForm.product_type)
     abstractForm.category_name = row.category_name || selectedCategoryName.value || formCategoryOptions.value[0]?.category_name || ''
     abstractForm.abstract_name = row.abstract_name || ''
     abstractForm.image_url = row.image_url || ''
-    abstractDialogVisible.value = true
+    abstractEditDialogVisible.value = true
     return
   }
 
@@ -940,8 +1124,8 @@ async function openAbstractDialog(row = null) {
   abstractCreateForm.product_type = selectedProductType.value || productTypeOptions.value[0]?.value || ''
   await ensureCatalogForType(abstractCreateForm.product_type)
   abstractCreateForm.category_name = selectedCategoryName.value || abstractCreateCategoryOptions.value[0]?.category_name || ''
-  resetAbstractCreateDrafts(3)
-  abstractDialogVisible.value = true
+  resetAbstractCreateDrafts(1)
+  abstractCreateDialogVisible.value = true
 }
 
 function triggerAbstractCreateDraftImageUpload(draft) {
@@ -952,7 +1136,7 @@ function triggerAbstractCreateDraftImageUpload(draft) {
   abstractProductImageUploadMode.value = 'create-single'
   abstractProductImageTargetDraft.value = draft
   abstractProductImageTargetRow.value = null
-  abstractProductImageInputRef.value?.click()
+  openAbstractProductImagePicker(false)
 }
 
 function triggerAbstractCreateBatchImageUpload() {
@@ -971,7 +1155,7 @@ function triggerAbstractCreateBatchImageUpload() {
   abstractProductImageUploadMode.value = 'create-batch'
   abstractProductImageTargetDraft.value = null
   abstractProductImageTargetRow.value = null
-  abstractProductImageInputRef.value?.click()
+  openAbstractProductImagePicker(true)
 }
 
 function triggerAbstractProductBatchImageUpload() {
@@ -981,7 +1165,7 @@ function triggerAbstractProductBatchImageUpload() {
   }
   abstractProductImageUploadMode.value = 'batch'
   abstractProductImageTargetRow.value = null
-  abstractProductImageInputRef.value?.click()
+  openAbstractProductImagePicker(true)
 }
 
 function collectAbstractProductImageFiles(fileList) {
@@ -1004,25 +1188,62 @@ function collectAbstractProductImageFiles(fileList) {
   return next
 }
 
-function handleAbstractProductImageInputChange(event) {
+function handleAbstractProductImageMultipleInputChange(event) {
   const input = event.target
-  const files = input?.files
-  if (input) input.value = ''
-
-  if (!files?.length) return
-
-  if (abstractProductImageUploadMode.value === 'batch' || abstractProductImageUploadMode.value === 'create-batch') {
-    const next = collectAbstractProductImageFiles(files)
-    if (!next.length) {
-      ElMessage.warning('所选内容中未包含可导入的图片文件')
-      return
-    }
-    selectedAbstractProductImageFiles.value = next
-    abstractProductImageUploadDialogVisible.value = true
+  const files = input?.files ? Array.from(input.files) : []
+  if (!files.length) {
+    if (input) input.value = ''
     return
   }
 
-  const file = files[0]
+  if (abstractProductImageUploadMode.value !== 'batch' && abstractProductImageUploadMode.value !== 'create-batch') {
+    if (input) input.value = ''
+    return
+  }
+
+  const next = collectAbstractProductImageFiles(files)
+  if (input) input.value = ''
+  if (!next.length) {
+    ElMessage.warning('所选内容中未包含可导入的图片文件')
+    return
+  }
+  assignAbstractProductImageFiles(next)
+  if (abstractProductImageUploadMode.value === 'create-batch') {
+    syncAbstractCreateDraftPendingImagesFromFiles(selectedAbstractProductImageFiles.value)
+  }
+  abstractProductImageUploadDialogVisible.value = true
+}
+
+function resetAbstractProductImageUploadState() {
+  revokeAbstractProductImageFilePreviews(selectedAbstractProductImageFiles.value)
+  selectedAbstractProductImageFiles.value = []
+  abstractProductImageTargetDraft.value = null
+  abstractProductImageUploadMode.value = 'batch'
+}
+
+async function applyAbstractProductImageCreateSingle(draft, fileItem) {
+  setAbstractCreateDraftPendingImage(draft, fileItem)
+  try {
+    await uploadAbstractProductImageForDraft(draft, fileItem)
+    resetAbstractProductImageUploadState()
+  } catch (error) {
+    clearAbstractCreateDraftPendingImage(draft)
+    console.error('上传新增产品图片失败:', error)
+    ElMessage.error(error?.response?.data?.message || error?.message || '上传失败')
+  }
+}
+
+function applyAbstractProductImageEditSingle(fileItem) {
+  setAbstractEditPendingImage(fileItem)
+  resetAbstractProductImageUploadState()
+  ElMessage.success('已选中图片，保存时将上传')
+}
+
+function handleAbstractProductImageSingleInputChange(event) {
+  const input = event.target
+  const file = input?.files?.[0]
+  if (input) input.value = ''
+
   if (!file) return
 
   if (abstractProductImageUploadMode.value === 'create-single') {
@@ -1037,8 +1258,7 @@ function handleAbstractProductImageInputChange(event) {
       ElMessage.warning('请选择 PNG、JPEG 或 WebP 图片')
       return
     }
-    selectedAbstractProductImageFiles.value = next
-    abstractProductImageUploadDialogVisible.value = true
+    applyAbstractProductImageCreateSingle(draft, next[0])
     return
   }
 
@@ -1052,13 +1272,15 @@ function handleAbstractProductImageInputChange(event) {
       ElMessage.warning('请选择 PNG、JPEG 或 WebP 图片')
       return
     }
-    selectedAbstractProductImageFiles.value = next
-    abstractProductImageUploadDialogVisible.value = true
-    return
+    applyAbstractProductImageEditSingle(next[0])
   }
 }
 
 function clearAbstractProductImageSelection() {
+  if (abstractProductImageTargetDraft.value) {
+    clearAbstractCreateDraftPendingImage(abstractProductImageTargetDraft.value)
+  }
+  revokeAbstractProductImageFilePreviews(selectedAbstractProductImageFiles.value)
   selectedAbstractProductImageFiles.value = []
   abstractProductImageUploadDialogVisible.value = false
   abstractProductImageTargetRow.value = null
@@ -1066,28 +1288,68 @@ function clearAbstractProductImageSelection() {
   abstractProductImageUploadMode.value = 'batch'
 }
 
-async function uploadAbstractProductImageFile(folderKey, fileItem, productLabel) {
-  const res = await postAnnouncementStagingProductImages([fileItem], {
-    startSequence: 1,
-    announcementNo: folderKey
-  })
-  const pictureUrlStored = getFirstAnnouncementStagingUploadedPictureStoredPath(res)
+function buildCategoryAbstractProductImageFormData(categoryName, abstractName, fileItem) {
+  const formData = new FormData()
+  const fileName = sanitizeProductPictureFileName(abstractName)
+  formData.append('files', fileItem.file, fileItem.name || fileItem.file?.name || fileName || 'image.png')
+  formData.append('folder_key', categoryName)
+  formData.append('category_name', categoryName)
+  formData.append('file_name', abstractName)
+  formData.append('abstract_name', abstractName)
+  return formData
+}
+
+function extractUploadedAbstractProductImageUrl(res) {
+  return String(
+    res?.data?.image_url
+    || res?.data?.picture_url
+    || res?.data?.items?.[0]?.image_url
+    || res?.data?.items?.[0]?.picture_url
+    || ''
+  ).trim()
+}
+
+async function uploadAbstractProductImageFile(categoryName, abstractName, fileItem, abstractProductId = null) {
+  const formData = buildCategoryAbstractProductImageFormData(categoryName, abstractName, fileItem)
+
+  if (abstractProductId != null && Number(abstractProductId) > 0) {
+    const res = await uploadCategoryAbstractProductImage(abstractProductId, formData)
+    const pictureUrlStored = extractUploadedAbstractProductImageUrl(res)
+    if (!pictureUrlStored) {
+      throw new Error(`产品「${abstractName}」上传成功但未返回图片路径`)
+    }
+    return pictureUrlStored
+  }
+
+  const res = await uploadCategoryAbstractProductImageOnly(formData)
+  const pictureUrlStored = extractUploadedAbstractProductImageUrl(res)
   if (!pictureUrlStored) {
-    throw new Error(`产品「${productLabel}」上传成功但未返回图片路径`)
+    throw new Error(`产品「${abstractName}」上传成功但未返回图片路径`)
   }
   return pictureUrlStored
 }
 
+function markAbstractCreateDraftUploadedImage(draft, fileItem, pictureUrlStored) {
+  if (!draft) return
+  draft.image_url = pictureUrlStored
+  draft.pendingImageFile = null
+  if (fileItem?.file) {
+    revokeAbstractCreateDraftPendingPreview(draft)
+    draft.pendingPreviewUrl = URL.createObjectURL(fileItem.file)
+  }
+}
+
 async function uploadAbstractProductImageForDraft(draft, fileItem) {
-  const folderKey = resolveAbstractProductImageFolderKeyFromDraft(draft)
-  if (!folderKey) {
+  const categoryName = resolveAbstractProductImageCategoryKeyFromDraft(draft)
+  const abstractName = normalizeProductPictureFolderWhitespace(draft?.abstract_name)
+  if (!categoryName || !abstractName) {
     throw new Error(`产品「${draft.abstract_name}」信息不完整，无法上传`)
   }
 
   draft.uploading = true
   try {
-    const pictureUrlStored = await uploadAbstractProductImageFile(folderKey, fileItem, draft.abstract_name)
-    draft.image_url = pictureUrlStored
+    const pictureUrlStored = await uploadAbstractProductImageFile(categoryName, abstractName, fileItem)
+    markAbstractCreateDraftUploadedImage(draft, fileItem, pictureUrlStored)
     return pictureUrlStored
   } finally {
     draft.uploading = false
@@ -1095,21 +1357,20 @@ async function uploadAbstractProductImageForDraft(draft, fileItem) {
 }
 
 async function uploadAbstractProductImageForRow(targetRow, fileItem) {
-  const folderKey = resolveAbstractProductImageFolderKeyFromRow(targetRow)
-  if (!folderKey) {
+  const categoryName = resolveAbstractProductImageCategoryKeyFromRow(targetRow)
+  const abstractName = normalizeProductPictureFolderWhitespace(targetRow?.abstract_name)
+  if (!categoryName || !abstractName) {
     throw new Error(`产品「${targetRow.abstract_name}」信息不完整，无法上传`)
   }
 
-  const pictureUrlStored = await uploadAbstractProductImageFile(folderKey, fileItem, targetRow.abstract_name)
+  const pictureUrlStored = await uploadAbstractProductImageFile(
+    categoryName,
+    abstractName,
+    fileItem,
+    targetRow.id
+  )
 
-  await updateCategoryAbstractProduct(targetRow.id, {
-    product_type: targetRow.product_type,
-    category_name: targetRow.category_name,
-    abstract_name: targetRow.abstract_name,
-    image_url: pictureUrlStored
-  })
-
-  if (editingAbstractId.value === targetRow.id) {
+  if (Number(editingAbstractId.value) === Number(targetRow.id)) {
     abstractForm.image_url = pictureUrlStored
   }
 
@@ -1117,7 +1378,7 @@ async function uploadAbstractProductImageForRow(targetRow, fileItem) {
 }
 
 async function handleUploadAbstractProductImage() {
-  if (uploadingAbstractProductImageBatch.value || uploadingAbstractEditImage.value) return
+  if (uploadingAbstractProductImageBatch.value) return
 
   const previewRows = abstractProductImageFileRows.value
   if (!previewRows.length) {
@@ -1155,6 +1416,7 @@ async function handleUploadAbstractProductImage() {
         await uploadAbstractProductImageForDraft(item.targetDraft, item)
         successCount += 1
       }
+      revokeAbstractProductImageFilePreviews(selectedAbstractProductImageFiles.value)
       selectedAbstractProductImageFiles.value = []
       abstractProductImageUploadDialogVisible.value = false
       abstractProductImageTargetDraft.value = null
@@ -1165,40 +1427,6 @@ async function handleUploadAbstractProductImage() {
       ElMessage.error(error?.response?.data?.message || error?.message || '批量上传失败')
     } finally {
       uploadingAbstractProductImageBatch.value = false
-    }
-    return
-  }
-
-  if (abstractProductImageUploadMode.value === 'create-single') {
-    const targetDraft = abstractProductImageTargetDraft.value
-    const fileItem = previewRows[0]
-    if (!targetDraft || !fileItem) return
-
-    try {
-      await ElMessageBox.confirm(
-        `上传后将填入「${targetDraft.abstract_name}」的图片路径。`,
-        '确认上传',
-        {
-          type: 'success',
-          confirmButtonText: '确认',
-          cancelButtonText: '取消'
-        }
-      )
-    } catch (error) {
-      if (error === 'cancel' || error === 'close') return
-      throw error
-    }
-
-    try {
-      await uploadAbstractProductImageForDraft(targetDraft, fileItem)
-      selectedAbstractProductImageFiles.value = []
-      abstractProductImageUploadDialogVisible.value = false
-      abstractProductImageTargetDraft.value = null
-      abstractProductImageUploadMode.value = 'batch'
-      ElMessage.success('图片路径已填入')
-    } catch (error) {
-      console.error('上传新增产品图片失败:', error)
-      ElMessage.error(error?.response?.data?.message || error?.message || '上传失败')
     }
     return
   }
@@ -1233,6 +1461,7 @@ async function handleUploadAbstractProductImage() {
         await uploadAbstractProductImageForRow(item.targetRow, item)
         successCount += 1
       }
+      revokeAbstractProductImageFilePreviews(selectedAbstractProductImageFiles.value)
       selectedAbstractProductImageFiles.value = []
       abstractProductImageUploadDialogVisible.value = false
       abstractProductImageTargetRow.value = null
@@ -1248,43 +1477,6 @@ async function handleUploadAbstractProductImage() {
     }
     return
   }
-
-  if (abstractProductImageUploadMode.value === 'edit-single') {
-    const fileItem = previewRows[0]
-    if (!canUploadAbstractEditForm.value || !fileItem) return
-
-    const target = getAbstractEditFormUploadTarget()
-    try {
-      await ElMessageBox.confirm(
-        `上传后将保存到「${target.abstract_name}」的静态目录，同名文件会被覆盖。`,
-        '确认上传',
-        {
-          type: 'success',
-          confirmButtonText: '确认',
-          cancelButtonText: '取消'
-        }
-      )
-    } catch (error) {
-      if (error === 'cancel' || error === 'close') return
-      throw error
-    }
-
-    uploadingAbstractEditImage.value = true
-    try {
-      await uploadAbstractProductImageForRow(target, fileItem)
-      selectedAbstractProductImageFiles.value = []
-      abstractProductImageUploadDialogVisible.value = false
-      abstractProductImageUploadMode.value = 'batch'
-      await loadAbstractProducts()
-      ElMessage.success('产品图已上传并保存')
-    } catch (error) {
-      console.error('编辑窗口上传产品图失败:', error)
-      ElMessage.error(error?.response?.data?.message || error?.message || '上传失败')
-    } finally {
-      uploadingAbstractEditImage.value = false
-    }
-    return
-  }
 }
 
 async function saveAbstractProduct() {
@@ -1295,16 +1487,27 @@ async function saveAbstractProduct() {
       return
     }
     savingAbstract.value = true
-    const payload = {
-      product_type: abstractForm.product_type,
-      category_name: abstractForm.category_name,
-      abstract_name: name,
-      image_url: abstractForm.image_url.trim()
-    }
     try {
+      let imageUrl = String(abstractForm.image_url || '').trim()
+      if (abstractEditPendingImageFile.value) {
+        imageUrl = await uploadAbstractProductImageFile(
+          abstractForm.category_name,
+          name,
+          abstractEditPendingImageFile.value,
+          editingAbstractId.value
+        )
+      }
+      const payload = {
+        product_type: abstractForm.product_type,
+        category_name: abstractForm.category_name,
+        abstract_name: name,
+        image_url: imageUrl
+      }
       await updateCategoryAbstractProduct(editingAbstractId.value, payload)
+      clearAbstractEditPendingImage()
+      abstractForm.image_url = imageUrl
       ElMessage.success('已更新抽象产品')
-      abstractDialogVisible.value = false
+      abstractEditDialogVisible.value = false
       selectedProductType.value = payload.product_type
       selectedCategoryName.value = payload.category_name
       await loadAbstractProducts()
@@ -1323,13 +1526,10 @@ async function saveAbstractProduct() {
     return
   }
 
-  const drafts = abstractCreateDrafts.value
-    .map((item) => ({
-      ...item,
-      abstract_name: String(item.abstract_name || '').trim(),
-      image_url: String(item.image_url || '').trim()
-    }))
-    .filter((item) => item.abstract_name)
+  const drafts = abstractCreateDrafts.value.filter((item) => {
+    item.abstract_name = String(item.abstract_name || '').trim()
+    return item.abstract_name
+  })
 
   if (!drafts.length) {
     ElMessage.warning('请至少填写一个产品名称')
@@ -1339,14 +1539,26 @@ async function saveAbstractProduct() {
   savingAbstract.value = true
   try {
     for (const draft of drafts) {
+      let imageUrl = String(draft.image_url || '').trim()
+      if (draft.pendingImageFile) {
+        imageUrl = await uploadAbstractProductImageFile(
+          categoryName,
+          draft.abstract_name,
+          draft.pendingImageFile
+        )
+        clearAbstractCreateDraftPendingImage(draft)
+      }
       await createCategoryAbstractProduct({
         product_type: productType,
         category_name: categoryName,
         abstract_name: draft.abstract_name,
-        image_url: draft.image_url
+        image_url: imageUrl
       })
     }
-    abstractDialogVisible.value = false
+    revokeAbstractProductImageFilePreviews(selectedAbstractProductImageFiles.value)
+    selectedAbstractProductImageFiles.value = []
+    abstractProductImageUploadDialogVisible.value = false
+    abstractCreateDialogVisible.value = false
     selectedProductType.value = productType
     selectedCategoryName.value = categoryName
     await loadAbstractProducts()
@@ -1390,6 +1602,42 @@ watch(
     if (!rows.some((cat) => cat.category_name === selectedCategoryName.value)) {
       selectedCategoryName.value = rows[0]?.category_name || ''
     }
+  }
+)
+
+watch(
+  () => abstractEditDialogVisible.value,
+  (visible) => {
+    if (visible) return
+    clearAbstractEditPendingImage()
+    revokeAbstractProductImageFilePreviews(selectedAbstractProductImageFiles.value)
+    selectedAbstractProductImageFiles.value = []
+    abstractProductImageUploadDialogVisible.value = false
+    editingAbstractId.value = null
+  }
+)
+
+watch(
+  () => abstractCreateDialogVisible.value,
+  (visible) => {
+    if (visible) return
+    for (const draft of abstractCreateDrafts.value) {
+      clearAbstractCreateDraftPendingImage(draft)
+    }
+    revokeAbstractProductImageFilePreviews(selectedAbstractProductImageFiles.value)
+    selectedAbstractProductImageFiles.value = []
+    abstractProductImageUploadDialogVisible.value = false
+  }
+)
+
+watch(
+  () => [
+    abstractCreateForm.category_name,
+    abstractCreateDrafts.value.map((draft) => draft.abstract_name)
+  ],
+  () => {
+    if (!abstractCreateDialogVisible.value) return
+    syncAllAbstractCreateDraftImagePaths()
   }
 )
 
@@ -1492,7 +1740,8 @@ onMounted(async () => {
 }
 
 .abstract-thumb,
-.abstract-preview {
+.abstract-preview,
+.abstract-upload-preview-thumb {
   width: 56px;
   height: 56px;
   border-radius: 8px;

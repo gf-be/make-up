@@ -410,6 +410,7 @@ CREATE TABLE IF NOT EXISTS unqualified_products (
     requirement LONGTEXT,
     remarks LONGTEXT,
     product_category VARCHAR(100) NULL,
+    product_category_id INT NULL,
     manufacturer_province VARCHAR(100) NULL,
     manufacturer_city VARCHAR(100) NULL,
     sampled_province VARCHAR(100) NULL,
@@ -434,6 +435,7 @@ CREATE TABLE IF NOT EXISTS unqualified_products (
     INDEX idx_unqualified_products_inspection_institution (inspection_institution),
     INDEX idx_unqualified_products_product_region (product_region),
     INDEX idx_unqualified_products_product_category (product_category),
+    INDEX idx_unqualified_products_product_category_id (product_category_id),
     INDEX idx_unqualified_products_manufacturer_province (manufacturer_province),
     INDEX idx_unqualified_products_manufacturer_city (manufacturer_city),
     INDEX idx_unqualified_products_sampled_province (sampled_province),
@@ -477,6 +479,10 @@ CREATE TABLE IF NOT EXISTS unqualified_product_category_catalog (
     UNIQUE KEY uk_upccc_type_category (product_type, category_name),
     INDEX idx_upccc_product_type (product_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE unqualified_products
+    ADD CONSTRAINT fk_unqualified_products_product_category
+        FOREIGN KEY (product_category_id) REFERENCES unqualified_product_category_catalog(id) ON DELETE SET NULL;
 
 -- 分类管理页：手动扩充的产品类型
 CREATE TABLE IF NOT EXISTS unqualified_product_type_catalog (

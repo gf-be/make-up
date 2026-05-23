@@ -364,6 +364,11 @@ export const recordUnqualifiedProductExportUsage = (data) => {
   return request.post('/unqualified-products/record-export-usage', data)
 }
 
+/** 按 product_category_id + 产品名称解析抽象产品目录图（只读） */
+export const resolveUnqualifiedCategoryProductImages = (data) => {
+  return request.post('/unqualified-products/resolve-category-product-images', data)
+}
+
 /** 数据管理员：按产品类型维护产品分类词条 */
 export const getCategoryCatalogProductTypes = () => {
   return request.get('/category-catalog/product-types')
@@ -403,6 +408,24 @@ export const createCategoryAbstractProduct = (data) => {
 
 export const updateCategoryAbstractProduct = (id, data) => {
   return request.put(`/category-catalog/abstract-products/${id}`, data)
+}
+
+export const uploadCategoryAbstractProductImage = (id, formData) => {
+  return request.post(`/category-catalog/abstract-products/${id}/image-upload`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+    timeout: 120000
+  })
+}
+
+export const uploadCategoryAbstractProductImageOnly = (formData) => {
+  return request.post('/category-catalog/abstract-products/image-upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+    timeout: 120000
+  })
 }
 
 export const deleteCategoryAbstractProduct = (id) => {

@@ -7,8 +7,8 @@
             <div class="title">数据导入</div>
           </div>
           <div class="header-actions">
-            <input ref="folderInputRef" type="file" class="hidden-file-input" multiple webkitdirectory
-              accept=".json,application/json" @change="handleUploadInputChange">
+            <!-- <input ref="folderInputRef" type="file" class="hidden-file-input" multiple webkitdirectory
+              accept=".json,application/json" @change="handleUploadInputChange"> -->
             <input ref="fileInputRef" type="file" class="hidden-file-input" multiple accept=".json,application/json"
               @change="handleUploadInputChange">
             <input ref="productImageInputRef" type="file" class="hidden-file-input" multiple accept="image/*"

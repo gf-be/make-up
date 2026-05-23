@@ -83,6 +83,7 @@ const UNQUALIFIED_PRODUCT_FIELDS = [
   'picture_url',
   'food_body_text',
   'product_category',
+  'product_category_id',
   'manufacturer_province',
   'manufacturer_city',
   'sampled_province',
@@ -819,6 +820,23 @@ async function syncProductCategoryItemsForSource(connection, filter = {}) {
   return { synced_product_category_count: insertValues.length };
 }
 
+async function backfillProductCategoryIdIfNeeded(connection) {
+  if (!(await tableExists(connection, 'unqualified_product_category_catalog'))) {
+    return;
+  }
+
+  await connection.query(`
+    UPDATE unqualified_products up
+    INNER JOIN unqualified_product_category_catalog c
+      ON c.product_type = up.product_type
+     AND TRIM(c.category_name) = TRIM(up.product_category)
+    SET up.product_category_id = c.id
+    WHERE up.product_category_id IS NULL
+      AND up.product_category IS NOT NULL
+      AND TRIM(up.product_category) <> ''
+  `);
+}
+
 async function backfillDerivedFields(connection) {
   const [rows] = await connection.query(`
     SELECT id, product_name, company_addresses, manufacturer_address, product_region,
@@ -1143,6 +1161,7 @@ async function ensureUnqualifiedProductsTable(connection) {
       requirement LONGTEXT,
       remarks LONGTEXT,
       product_category VARCHAR(100) NULL,
+      product_category_id INT NULL,
       manufacturer_province VARCHAR(100) NULL,
       manufacturer_city VARCHAR(100) NULL,
       sampled_province VARCHAR(100) NULL,
@@ -1207,7 +1226,8 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'picture_url', 'VARCHAR(768) NULL AFTER remarks');
   await ensureColumn(connection, 'food_body_text', 'LONGTEXT NULL AFTER picture_url');
   await ensureColumn(connection, 'product_category', 'VARCHAR(100) NULL AFTER food_body_text');
-  await ensureColumn(connection, 'manufacturer_province', 'VARCHAR(100) NULL AFTER product_category');
+  await ensureColumn(connection, 'product_category_id', 'INT NULL AFTER product_category');
+  await ensureColumn(connection, 'manufacturer_province', 'VARCHAR(100) NULL AFTER product_category_id');
   await ensureColumn(connection, 'manufacturer_city', 'VARCHAR(100) NULL AFTER manufacturer_province');
   await ensureColumn(connection, 'sampled_province', 'VARCHAR(100) NULL AFTER manufacturer_city');
   await ensureColumn(connection, 'sampled_city', 'VARCHAR(100) NULL AFTER sampled_province');
@@ -1242,6 +1262,7 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_list_order', 'INDEX idx_unqualified_products_list_order (announcement_id, sequence_no, id)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_product_region', 'INDEX idx_unqualified_products_product_region (product_region)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_product_category', 'INDEX idx_unqualified_products_product_category (product_category)');
+  await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_product_category_id', 'INDEX idx_unqualified_products_product_category_id (product_category_id)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_manufacturer_province', 'INDEX idx_unqualified_products_manufacturer_province (manufacturer_province)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_manufacturer_city', 'INDEX idx_unqualified_products_manufacturer_city (manufacturer_city)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_sampled_province', 'INDEX idx_unqualified_products_sampled_province (sampled_province)');
@@ -1303,6 +1324,15 @@ async function ensureUnqualifiedProductsTable(connection) {
 
   await ensureUnqualifiedProductCategoryCatalogTable(connection);
 
+  if (await tableExists(connection, 'unqualified_product_category_catalog')) {
+    await ensureForeignKey(
+      connection,
+      'unqualified_products',
+      'fk_unqualified_products_product_category',
+      'FOREIGN KEY (product_category_id) REFERENCES unqualified_product_category_catalog(id) ON DELETE SET NULL'
+    );
+  }
+
   await ensureUnqualifiedProductTypeCatalogTable(connection);
 
   await ensureUnqualifiedProductAbstractCatalogTable(connection);
@@ -1314,6 +1344,7 @@ async function ensureUnqualifiedProductsTable(connection) {
   await dropTableColumnIfExists(connection, 'unqualified_products', 'usage_count');
   await ensureUnqualifiedProductTreeRollupTable(connection);
   await backfillDerivedFields(connection);
+  await backfillProductCategoryIdIfNeeded(connection);
   await backfillSearchHotFields(connection);
   await backfillProductCategoryItemsIfNeeded(connection);
   await backfillIssueItemsIfNeeded(connection);

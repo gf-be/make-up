@@ -476,55 +476,49 @@
       <div v-loading="combinedExportLoading" class="combined-export-dialog-body">
         <div class="combined-export-summary">
           <el-tag type="success">已勾选明细 {{ combinedExportRows.length }} 条</el-tag>
-          <!-- <el-tag type="info">预览与 Excel 均为表格内已勾选条目</el-tag> -->
         </div>
-        <div class="combined-export-stack">
-          <div class="combined-export-panel combined-export-panel--tabs">
-            <el-tabs v-model="combinedExportCopyTab" class="combined-export-copy-tabs">
-              <el-tab-pane label="当前文案生成方案" name="scheme">
-                <el-input
-                  v-model="combinedExportCopyText"
-                  class="combined-export-copy-textarea"
-                  type="textarea"
-                  :rows="14"
-                  readonly
-                  resize="vertical"
-                  placeholder="打开弹窗后自动生成文案"
-                />
-              </el-tab-pane>
-              <el-tab-pane
-                v-if="showCombinedExportFoodBodyTab"
-                name="food_body"
-              >
-                <template #label>
-                  <span title="前两段与「当前文案生成方案」一致；其后一行「以下为勾选的 N 个产品：」（N 为有 food_body_text 的食品条数），再接序号明细">食品正文</span>
-                </template>
-                <!-- <p class="combined-export-tab-hint">
-                  开头两段统计口径与「当前文案生成方案」相同（勾选范围内全体记录）；其后按<strong>序号 1.、2.…</strong>列出<strong>食品类</strong>明细已保存的 <code>food_body_text</code>（顺序与导出表格一致），条目之间仅单行换行、不留空行。
-                </p> -->
-                <el-alert
-                  v-if="combinedExportFoodBodySegmentCount === 0"
-                  type="info"
-                  :closable="false"
-                  show-icon
-                  class="combined-export-food-alert"
-                  title="当前勾选结果中暂无食品类明细的正文文案（food_body_text）；仍将展示开头两段统计说明。"
-                />
-                <el-input
-                  :model-value="combinedExportFoodBodyConcatText"
-                  class="combined-export-copy-textarea"
-                  type="textarea"
-                  :rows="14"
-                  readonly
-                  resize="vertical"
-                  placeholder="勾选食品产品且已维护正文文案后，将在此按顺序展示"
-                />
-              </el-tab-pane>
-            </el-tabs>
-          </div>
-          <div class="combined-export-panel">
-            <div class="combined-export-panel-title">表格预览</div>
-            <el-table :data="combinedExportRows" size="small" border stripe max-height="430">
+        <el-tabs v-model="combinedExportMainTab" class="combined-export-main-tabs">
+          <el-tab-pane label="文案" name="copy">
+            <div class="combined-export-copy-panel">
+              <div class="combined-export-copy-theme-row">
+                <span class="combined-export-copy-theme-label">文案主题</span>
+                <el-select
+                  v-model="combinedExportCopyTab"
+                  class="combined-export-copy-theme-select"
+                  placeholder="选择文案主题"
+                >
+                  <el-option label="当前文案生成方案" value="scheme" />
+                  <el-option
+                    v-if="showCombinedExportFoodBodyTab"
+                    label="食品正文"
+                    value="food_body"
+                  />
+                </el-select>
+                <el-button type="primary" plain @click="toggleCombinedExportCopyEdit">
+                  {{ combinedExportCopyEditMode ? '完成' : '编辑' }}
+                </el-button>
+              </div>
+              <el-alert
+                v-if="combinedExportCopyTab === 'food_body' && combinedExportFoodBodySegmentCount === 0"
+                type="info"
+                :closable="false"
+                show-icon
+                class="combined-export-food-alert"
+                title="当前勾选结果中暂无食品类明细的正文文案（food_body_text）；仍将展示开头两段统计说明。"
+              />
+              <el-input
+                v-model="combinedExportActiveCopyModel"
+                class="combined-export-copy-textarea"
+                type="textarea"
+                :rows="18"
+                :readonly="!combinedExportCopyEditMode"
+                resize="vertical"
+                placeholder="打开弹窗后自动生成文案"
+              />
+            </div>
+          </el-tab-pane>
+          <el-tab-pane label="详情" name="detail">
+            <el-table :data="combinedExportRows" size="small" border stripe max-height="520">
               <el-table-column type="index" label="#" width="52" align="center" />
               <el-table-column label="日期" width="105" show-overflow-tooltip>
                 <template #default="{ row }">{{ formatDate(row.source_publish_date) }}</template>
@@ -532,22 +526,142 @@
               <el-table-column prop="source_title" label="来源通告" min-width="220" show-overflow-tooltip />
               <el-table-column prop="product_name" label="问题对象/标题" min-width="160" show-overflow-tooltip />
               <el-table-column prop="manufacturer_name" label="生产企业" min-width="150" show-overflow-tooltip />
-              <!-- <el-table-column prop="operator_name" label="经营企业" min-width="150" show-overflow-tooltip /> -->
               <el-table-column prop="unqualified_items" label="不符合规定项目/检查问题" min-width="180" show-overflow-tooltip />
               <el-table-column prop="product_category" label="产品分类" width="120" show-overflow-tooltip />
               <el-table-column prop="picture_url" label="商品图片" min-width="150" show-overflow-tooltip>
                 <template #default="{ row }">
-                  <el-image
-                    :src="resolveProductPictureSrcFromRow(row)"
-                    :preview-src-list="[resolveProductPictureSrcFromRow(row)]"
-                    style="height: 50px; width: 50px;"
-                  />
+                  <div
+                    class="combined-export-picture-cell"
+                    title="点击更换本次导出使用的图片"
+                    @click="openCombinedExportPictureDialog(row)"
+                  >
+                    <el-image
+                      v-if="resolveCombinedExportRowPictureSrc(row)"
+                      :key="resolveCombinedExportRowPictureSrc(row)"
+                      class="combined-export-picture-thumb"
+                      :src="resolveCombinedExportRowPictureSrc(row)"
+                      fit="cover"
+                    >
+                      <template #error>
+                        <div class="image-fallback combined-export-picture-thumb">无图</div>
+                      </template>
+                    </el-image>
+                    <div v-else class="image-fallback combined-export-picture-thumb">无图</div>
+                  </div>
                 </template>
               </el-table-column>
             </el-table>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+    </el-dialog>
+
+    <el-dialog
+      v-model="combinedExportPictureDialogVisible"
+      title="更换导出图片"
+      width="min(760px, 94vw)"
+      align-center
+      append-to-body
+      destroy-on-close
+      class="combined-export-picture-dialog"
+      @closed="resetCombinedExportPictureDialog"
+    >
+      <p class="combined-export-picture-hint">仅影响本次导出压缩包，不会修改数据库中的产品图片。</p>
+      <div v-if="combinedExportPictureTargetRow" class="combined-export-picture-meta">
+        <span>{{ combinedExportPictureTargetRow.product_name || '—' }}</span>
+        <span v-if="combinedExportPictureTargetRow.product_category" class="combined-export-picture-meta-sub">
+          · {{ combinedExportPictureTargetRow.product_category }}
+        </span>
+      </div>
+      <div v-loading="combinedExportPictureDialogLoading" class="combined-export-picture-options">
+        <div
+          class="combined-export-picture-option"
+          :class="{ 'is-active': combinedExportPictureDraftSource === 'original' }"
+          @click="combinedExportPictureDraftSource = 'original'"
+        >
+          <div class="combined-export-picture-option-title">当前图片</div>
+          <el-image
+            v-if="combinedExportPictureOriginalSrc"
+            class="combined-export-picture-option-image"
+            :src="combinedExportPictureOriginalSrc"
+            fit="contain"
+          >
+            <template #error>
+              <div class="image-fallback combined-export-picture-option-image">无图</div>
+            </template>
+          </el-image>
+          <div v-else class="image-fallback combined-export-picture-option-image">无图</div>
+        </div>
+        <div
+          class="combined-export-picture-option"
+          :class="{
+            'is-active': combinedExportPictureDraftSource === 'category',
+            'is-disabled': !combinedExportPictureCategoryMatches.length
+          }"
+          @click="selectCombinedExportPictureCategory"
+        >
+          <div class="combined-export-picture-option-title">产品分类图片</div>
+          <el-image
+            v-if="combinedExportPictureCategorySrc"
+            class="combined-export-picture-option-image"
+            :src="combinedExportPictureCategorySrc"
+            fit="contain"
+          >
+            <template #error>
+              <div class="image-fallback combined-export-picture-option-image">无图</div>
+            </template>
+          </el-image>
+          <div v-else class="image-fallback combined-export-picture-option-image">暂无分类图片</div>
+          <div
+            v-if="combinedExportPictureCategoryMatches.length"
+            class="combined-export-picture-category-meta"
+          >
+            <span class="combined-export-picture-category-name">
+              {{ combinedExportPictureCategoryMatchLabel || '—' }}
+            </span>
+            <span class="combined-export-picture-category-counter">
+              {{ combinedExportPictureCategoryIndex + 1 }} / {{ combinedExportPictureCategoryMatches.length }}
+            </span>
           </div>
+          <el-button
+            v-if="combinedExportPictureCategoryMatches.length > 1"
+            type="primary"
+            plain
+            size="small"
+            @click.stop="showNextCombinedExportCategoryPicture"
+          >
+            下一张
+          </el-button>
+        </div>
+        <div
+          class="combined-export-picture-option"
+          :class="{ 'is-active': combinedExportPictureDraftSource === 'upload' }"
+          @click="combinedExportPictureDraftSource = 'upload'"
+        >
+          <div class="combined-export-picture-option-title">上传图片</div>
+          <el-image
+            v-if="combinedExportPictureUploadPreview"
+            class="combined-export-picture-option-image"
+            :src="combinedExportPictureUploadPreview"
+            fit="contain"
+          />
+          <div v-else class="image-fallback combined-export-picture-option-image">未选择</div>
+          <el-button type="primary" plain size="small" @click.stop="triggerCombinedExportPictureUpload">
+            选择图片
+          </el-button>
         </div>
       </div>
+      <input
+        ref="combinedExportPictureUploadInputRef"
+        type="file"
+        class="hidden-file-input"
+        accept="image/png,image/jpeg,image/webp,image/*"
+        @change="handleCombinedExportPictureUploadChange"
+      >
+      <template #footer>
+        <el-button @click="combinedExportPictureDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmCombinedExportPictureSelection">确定</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -570,12 +684,14 @@ import {
   createMyUnqualifiedDimensionPreset,
   deleteMyUnqualifiedDimensionPreset,
   saveUnqualifiedProductCopyText,
-  recordUnqualifiedProductExportUsage
+  recordUnqualifiedProductExportUsage,
+  resolveUnqualifiedCategoryProductImages
 } from '@/api/index'
 import { currentUser, getAuthToken, getUserScopedStorageKey, setAuthSession } from '@/utils/auth'
 import {
   getProductPictureStoredPath,
   resolveProductPictureAbsoluteUrl,
+  resolveProductPictureSrc,
   resolveProductPictureSrcFromRow
 } from '@/utils/productPicture.js'
 
@@ -684,11 +800,19 @@ const combinedExportLoading = ref(false)
 const combinedExportRows = ref([])
 const combinedExportCheckedNodes = ref([])
 const combinedExportCopyText = ref('')
+const combinedExportFoodBodyCopyText = ref('')
+const combinedExportCopyEditMode = ref(false)
 const combinedExportCopyTab = ref('scheme')
-
-const combinedExportFoodBodyConcatText = computed(() =>
-  buildCombinedExportFoodBodyFullCopy(combinedExportRows.value)
-)
+const combinedExportMainTab = ref('copy')
+const combinedExportCategoryPictureMap = ref({})
+const combinedExportPictureDialogVisible = ref(false)
+const combinedExportPictureDialogLoading = ref(false)
+const combinedExportPictureTargetRow = ref(null)
+const combinedExportPictureDraftSource = ref('original')
+const combinedExportPictureUploadFile = ref(null)
+const combinedExportPictureUploadPreview = ref('')
+const combinedExportPictureUploadInputRef = ref(null)
+const combinedExportPictureCategoryIndex = ref(0)
 
 const combinedExportFoodBodySegmentCount = computed(() => {
   const rows = combinedExportRows.value || []
@@ -697,11 +821,334 @@ const combinedExportFoodBodySegmentCount = computed(() => {
   ).length
 })
 
-const activeCombinedExportCopyText = computed(() =>
-  combinedExportCopyTab.value === 'food_body'
-    ? combinedExportFoodBodyConcatText.value
-    : combinedExportCopyText.value
+const combinedExportActiveCopyModel = computed({
+  get() {
+    return combinedExportCopyTab.value === 'food_body'
+      ? combinedExportFoodBodyCopyText.value
+      : combinedExportCopyText.value
+  },
+  set(value) {
+    if (combinedExportCopyTab.value === 'food_body') {
+      combinedExportFoodBodyCopyText.value = value
+    } else {
+      combinedExportCopyText.value = value
+    }
+  }
+})
+
+const activeCombinedExportCopyText = computed(() => combinedExportActiveCopyModel.value)
+
+function toggleCombinedExportCopyEdit() {
+  combinedExportCopyEditMode.value = !combinedExportCopyEditMode.value
+}
+
+function buildCombinedExportCategoryPictureKey(productCategoryId, productName) {
+  const id = Number.parseInt(String(productCategoryId ?? '').trim(), 10)
+  const name = String(productName ?? '').trim()
+  if (!Number.isFinite(id) || id <= 0 || !name) return ''
+  return `${id}::${name}`
+}
+
+function getCombinedExportRowOriginalPictureStoredPath(row) {
+  return getProductPictureStoredPath(row)
+}
+
+function getCombinedExportCategoryPictureEntry(row) {
+  const key = buildCombinedExportCategoryPictureKey(row?.product_category_id, row?.product_name)
+  if (!key) return null
+  return combinedExportCategoryPictureMap.value[key] || null
+}
+
+function getCombinedExportCategoryPictureMatches(row) {
+  const entry = getCombinedExportCategoryPictureEntry(row)
+  const matches = Array.isArray(entry?.matches) ? entry.matches : []
+  return matches.filter((item) => String(item?.image_url || '').trim())
+}
+
+function getCombinedExportCategoryPictureMatch(row, index = 0) {
+  const matches = getCombinedExportCategoryPictureMatches(row)
+  if (!matches.length) return null
+  const safeIndex = ((Number(index) || 0) % matches.length + matches.length) % matches.length
+  return matches[safeIndex] || matches[0]
+}
+
+function getCombinedExportCategoryPictureStoredPath(row, index = combinedExportPictureCategoryIndex.value) {
+  const match = getCombinedExportCategoryPictureMatch(row, index)
+  return String(match?.image_url || '').trim()
+}
+
+function resolveCombinedExportRowPictureSrc(row) {
+  const overridePreview = String(row?.export_picture_override?.previewUrl || '').trim()
+  if (overridePreview) return overridePreview
+  return resolveProductPictureSrcFromRow(row)
+}
+
+const combinedExportPictureOriginalSrc = computed(() => {
+  const row = combinedExportPictureTargetRow.value
+  if (!row) return ''
+  return resolveProductPictureSrc(getCombinedExportRowOriginalPictureStoredPath(row))
+})
+
+const combinedExportPictureCategoryMatches = computed(() =>
+  getCombinedExportCategoryPictureMatches(combinedExportPictureTargetRow.value)
 )
+
+const combinedExportPictureCategorySrc = computed(() => {
+  const match = getCombinedExportCategoryPictureMatch(
+    combinedExportPictureTargetRow.value,
+    combinedExportPictureCategoryIndex.value
+  )
+  return resolveProductPictureSrc(match?.image_url)
+})
+
+const combinedExportPictureCategoryMatchLabel = computed(() => {
+  const match = getCombinedExportCategoryPictureMatch(
+    combinedExportPictureTargetRow.value,
+    combinedExportPictureCategoryIndex.value
+  )
+  return String(match?.abstract_name || '').trim()
+})
+
+function revokeCombinedExportPictureOverridePreview(override) {
+  const previewUrl = String(override?.previewUrl || '').trim()
+  if (previewUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(previewUrl)
+  }
+}
+
+function clearCombinedExportRowPictureOverride(row) {
+  if (!row?.export_picture_override) return
+  revokeCombinedExportPictureOverridePreview(row.export_picture_override)
+  delete row.export_picture_override
+}
+
+function clearCombinedExportPictureUploadDraft() {
+  const rowPreview = combinedExportPictureTargetRow.value?.export_picture_override?.previewUrl
+  if (
+    combinedExportPictureUploadPreview.value
+    && combinedExportPictureUploadPreview.value !== rowPreview
+  ) {
+    URL.revokeObjectURL(combinedExportPictureUploadPreview.value)
+  }
+  combinedExportPictureUploadPreview.value = ''
+  combinedExportPictureUploadFile.value = null
+}
+
+function resetCombinedExportPictureDialog() {
+  combinedExportPictureTargetRow.value = null
+  combinedExportPictureDraftSource.value = 'original'
+  combinedExportPictureDialogLoading.value = false
+  combinedExportPictureCategoryIndex.value = 0
+  clearCombinedExportPictureUploadDraft()
+  if (combinedExportPictureUploadInputRef.value) {
+    combinedExportPictureUploadInputRef.value.value = ''
+  }
+}
+
+function showNextCombinedExportCategoryPicture() {
+  const matches = combinedExportPictureCategoryMatches.value
+  if (matches.length <= 1) return
+  combinedExportPictureCategoryIndex.value = (combinedExportPictureCategoryIndex.value + 1) % matches.length
+  combinedExportPictureDraftSource.value = 'category'
+}
+
+function clearCombinedExportPictureSession() {
+  for (const row of combinedExportRows.value || []) {
+    clearCombinedExportRowPictureOverride(row)
+  }
+  combinedExportCategoryPictureMap.value = {}
+  resetCombinedExportPictureDialog()
+}
+
+async function loadCombinedExportCategoryPictures(rows) {
+  const list = Array.isArray(rows) ? rows : []
+  const items = []
+  const seen = new Set()
+  for (const row of list) {
+    const key = buildCombinedExportCategoryPictureKey(row?.product_category_id, row?.product_name)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    items.push({
+      product_category_id: row.product_category_id,
+      product_name: row.product_name
+    })
+  }
+  if (!items.length) {
+    combinedExportCategoryPictureMap.value = {}
+    return
+  }
+
+  const res = await resolveUnqualifiedCategoryProductImages({ items })
+  const next = {}
+  for (const item of res.data || []) {
+    const key = buildCombinedExportCategoryPictureKey(item?.product_category_id, item?.product_name)
+    if (!key) continue
+    next[key] = item
+  }
+  combinedExportCategoryPictureMap.value = next
+}
+
+async function ensureCombinedExportCategoryPictureForRow(row) {
+  const key = buildCombinedExportCategoryPictureKey(row?.product_category_id, row?.product_name)
+  if (!key || combinedExportCategoryPictureMap.value[key]) return
+  combinedExportPictureDialogLoading.value = true
+  try {
+    const res = await resolveUnqualifiedCategoryProductImages({
+      items: [{
+        product_category_id: row.product_category_id,
+        product_name: row.product_name
+      }]
+    })
+    const item = Array.isArray(res.data) ? res.data[0] : null
+    if (item) {
+      combinedExportCategoryPictureMap.value = {
+        ...combinedExportCategoryPictureMap.value,
+        [key]: item
+      }
+    }
+  } finally {
+    combinedExportPictureDialogLoading.value = false
+  }
+}
+
+async function openCombinedExportPictureDialog(row) {
+  if (!row) return
+  combinedExportPictureTargetRow.value = row
+  combinedExportPictureDraftSource.value = row.export_picture_override?.source || 'original'
+  combinedExportPictureCategoryIndex.value = Number.isFinite(row.export_picture_override?.categoryMatchIndex)
+    ? row.export_picture_override.categoryMatchIndex
+    : 0
+  clearCombinedExportPictureUploadDraft()
+  if (combinedExportPictureDraftSource.value === 'upload' && row.export_picture_override?.blob) {
+    combinedExportPictureUploadFile.value = row.export_picture_override.blob
+    combinedExportPictureUploadPreview.value = row.export_picture_override.previewUrl
+      || URL.createObjectURL(row.export_picture_override.blob)
+  }
+  combinedExportPictureDialogVisible.value = true
+  await ensureCombinedExportCategoryPictureForRow(row)
+  const matches = getCombinedExportCategoryPictureMatches(row)
+  if (matches.length) {
+    const savedIndex = Number(row.export_picture_override?.categoryMatchIndex)
+    combinedExportPictureCategoryIndex.value = Number.isFinite(savedIndex)
+      ? ((savedIndex % matches.length) + matches.length) % matches.length
+      : 0
+  } else {
+    combinedExportPictureCategoryIndex.value = 0
+  }
+}
+
+function selectCombinedExportPictureCategory() {
+  if (!combinedExportPictureCategoryMatches.value.length) {
+    ElMessage.warning('当前产品暂无匹配的分类目录图片')
+    return
+  }
+  combinedExportPictureDraftSource.value = 'category'
+}
+
+function triggerCombinedExportPictureUpload() {
+  combinedExportPictureDraftSource.value = 'upload'
+  combinedExportPictureUploadInputRef.value?.click()
+}
+
+function handleCombinedExportPictureUploadChange(event) {
+  const input = event.target
+  const file = input?.files?.[0]
+  if (input) input.value = ''
+  if (!file) return
+
+  const nameLower = String(file.name || '').toLowerCase()
+  if (!file.type?.startsWith('image/') && !/\.(png|jpe?g|webp)$/i.test(nameLower)) {
+    ElMessage.warning('请选择 PNG、JPEG 或 WebP 图片')
+    return
+  }
+
+  clearCombinedExportPictureUploadDraft()
+  combinedExportPictureUploadFile.value = file
+  combinedExportPictureUploadPreview.value = URL.createObjectURL(file)
+  combinedExportPictureDraftSource.value = 'upload'
+}
+
+function buildCombinedExportRowPictureOverride(row, source) {
+  if (source === 'original') {
+    return null
+  }
+  if (source === 'category') {
+    const match = getCombinedExportCategoryPictureMatch(row, combinedExportPictureCategoryIndex.value)
+    const storedPath = String(match?.image_url || '').trim()
+    if (!storedPath) return null
+    return {
+      source: 'category',
+      storedPath,
+      previewUrl: resolveProductPictureSrc(storedPath),
+      categoryMatchIndex: combinedExportPictureCategoryIndex.value,
+      abstractName: match?.abstract_name || '',
+      blob: null
+    }
+  }
+  if (source === 'upload') {
+    const file = combinedExportPictureUploadFile.value
+    if (!file) return null
+    return {
+      source: 'upload',
+      storedPath: '',
+      previewUrl: URL.createObjectURL(file),
+      blob: file
+    }
+  }
+  return null
+}
+
+function confirmCombinedExportPictureSelection() {
+  const row = combinedExportPictureTargetRow.value
+  if (!row) return
+
+  const source = combinedExportPictureDraftSource.value
+  if (source === 'category' && !combinedExportPictureCategoryMatches.value.length) {
+    ElMessage.warning('当前产品暂无匹配的分类目录图片')
+    return
+  }
+  if (source === 'upload' && !combinedExportPictureUploadFile.value) {
+    ElMessage.warning('请先选择要上传的图片')
+    return
+  }
+
+  clearCombinedExportRowPictureOverride(row)
+  const override = buildCombinedExportRowPictureOverride(row, source)
+  if (override) {
+    row.export_picture_override = override
+  }
+
+  const idx = combinedExportRows.value.findIndex((item) => item?.id === row.id)
+  if (idx >= 0) {
+    combinedExportRows.value[idx] = { ...combinedExportRows.value[idx], export_picture_override: row.export_picture_override }
+  }
+
+  combinedExportPictureDialogVisible.value = false
+}
+
+async function fetchCombinedExportRowImageBlob(row) {
+  const override = row?.export_picture_override
+  if (override?.blob instanceof Blob) {
+    return override.blob
+  }
+
+  const storedPath = String(override?.storedPath || getProductPictureStoredPath(row) || '').trim()
+  const fetchUrl = resolveProductPictureAbsoluteUrl(storedPath)
+  if (!fetchUrl) return null
+
+  const sameOrigin = fetchUrl.startsWith(window.location.origin)
+  const res = await fetch(fetchUrl, {
+    cache: 'no-store',
+    credentials: sameOrigin ? 'same-origin' : 'omit',
+    mode: 'cors'
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const blob = await res.blob()
+  if (!String(blob?.type || '').startsWith('image/')) {
+    throw new Error('响应非图片类型')
+  }
+  return blob
+}
 
 function loadEchartsModule() {
   if (!echartsModulePromise) {
@@ -970,6 +1417,17 @@ const showCombinedExportFoodBodyTab = computed(() => {
 watch(showCombinedExportFoodBodyTab, (visible) => {
   if (!visible && combinedExportCopyTab.value === 'food_body') {
     combinedExportCopyTab.value = 'scheme'
+  }
+})
+
+watch(combinedExportCopyTab, () => {
+  combinedExportCopyEditMode.value = false
+})
+
+watch(combinedExportDialogVisible, (visible) => {
+  if (!visible) {
+    combinedExportCopyEditMode.value = false
+    clearCombinedExportPictureSession()
   }
 })
 
@@ -1488,6 +1946,7 @@ function buildDetailSortParams() {
 }
 
 const DEFAULT_FILTER_YEAR_START = '2026'
+const DEFAULT_FILTER_FOOD_TYPE = 'food'
 
 function createDefaultFilters() {
   return {
@@ -1497,7 +1956,7 @@ function createDefaultFilters() {
     unqualified_item: '',
     issue_items: [],
     product_category: '',
-    product_type: '',
+    product_type: DEFAULT_FILTER_FOOD_TYPE,
     announcement_type: '',
     province: '',
     manufacturer_province: '',
@@ -1529,7 +1988,7 @@ function applyRouteFilters() {
     unqualified_item: String(route.query.unqualified_item || ''),
     issue_items: parseIssueItemsQuery(route.query.issue_items),
     product_category: String(route.query.product_category || ''),
-    product_type: String(route.query.product_type || ''),
+    product_type: String(route.query.product_type || DEFAULT_FILTER_FOOD_TYPE),
     announcement_type: String(route.query.announcement_type || ''),
     province: String(route.query.province || ''),
     manufacturer_province: normalizeProvinceToStandard(route.query.manufacturer_province ?? '') || '',
@@ -1559,14 +2018,14 @@ const hasActiveFilters = computed(() => Boolean(
   || filters.value.supervision_id
 ))
 
-const activeYearLabel = computed(() => {
-  const start = filters.value.year_start
-  const end = filters.value.year_end
-  if (start && end) return `${start}年 - ${end}年`
-  if (start) return `${start}年起`
-  if (end) return `截至${end}年`
-  return ''
-})
+// const activeYearLabel = computed(() => {
+//   const start = filters.value.year_start
+//   const end = filters.value.year_end
+//   if (start && end) return `${start}年 - ${end}年`
+//   if (start) return `${start}年起`
+//   if (end) return `截至${end}年`
+//   return ''
+// })
 
 const currentNodeBreadcrumb = computed(() => {
   const node = currentNode.value
@@ -2266,7 +2725,11 @@ async function openCombinedExportDialog() {
   combinedExportRows.value = []
   combinedExportCheckedNodes.value = []
   combinedExportCopyText.value = ''
+  combinedExportFoodBodyCopyText.value = ''
+  combinedExportCopyEditMode.value = false
   combinedExportCopyTab.value = 'scheme'
+  combinedExportMainTab.value = 'copy'
+  clearCombinedExportPictureSession()
 
   try {
     const payload = await buildCombinedExportPayload()
@@ -2277,6 +2740,8 @@ async function openCombinedExportDialog() {
     combinedExportRows.value = payload.exportRows
     combinedExportCheckedNodes.value = payload.checked
     combinedExportCopyText.value = payload.copyText
+    combinedExportFoodBodyCopyText.value = buildCombinedExportFoodBodyFullCopy(payload.exportRows)
+    await loadCombinedExportCategoryPictures(payload.exportRows)
     await recordVideoCopyLog(payload.rowsForCopy, payload.copyText)
   } catch (error) {
     console.error('打开导出弹窗失败:', error)
@@ -3254,26 +3719,13 @@ async function exportCombinedExportPackageZip() {
     const imgPrefix = '商品图片/'
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i]
-      const fetchUrl = resolveProductPictureAbsoluteUrl(getProductPictureStoredPath(row))
-      if (!fetchUrl) {
-        imageSkip += 1
-        continue
-      }
       try {
-        const sameOrigin = fetchUrl.startsWith(window.location.origin)
-        const res = await fetch(fetchUrl, {
-          cache: 'no-store',
-          credentials: sameOrigin ? 'same-origin' : 'omit',
-          mode: 'cors'
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const blob = await res.blob()
-        if (!String(blob?.type || '').startsWith('image/')) {
-          console.warn('导出商品图片：响应非图片类型', blob.type, fetchUrl)
-          imageFail += 1
+        const blob = await fetchCombinedExportRowImageBlob(row)
+        if (!blob) {
+          imageSkip += 1
           continue
         }
-        const ext = guessImageExtensionFromMimeOrUrl(blob.type, fetchUrl)
+        const ext = guessImageExtensionFromMimeOrUrl(blob.type, row?.export_picture_override?.storedPath || getProductPictureStoredPath(row))
         const fname = buildCombinedExportImageFilename(row, i + 1, ext)
         zip.file(`${imgPrefix}${fname}`, blob)
         imageOk += 1
@@ -3970,14 +4422,140 @@ onBeforeUnmount(() => {
   margin-bottom: 12px;
 }
 
-.combined-export-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.combined-export-main-tabs :deep(.el-tabs__content) {
+  padding-top: 12px;
 }
 
-.combined-export-copy-tabs :deep(.el-tabs__content) {
-  padding-top: 8px;
+.combined-export-copy-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 420px;
+}
+
+.combined-export-copy-theme-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.combined-export-copy-theme-row .el-button {
+  margin-left: auto;
+}
+
+.combined-export-copy-theme-label {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: #606266;
+}
+
+.combined-export-copy-theme-select {
+  width: min(320px, 100%);
+}
+
+.combined-export-picture-cell {
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.combined-export-picture-thumb,
+.combined-export-picture-cell .image-fallback.combined-export-picture-thumb {
+  width: 50px;
+  height: 50px;
+  border-radius: 6px;
+}
+
+.combined-export-picture-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #909399;
+}
+
+.combined-export-picture-meta {
+  margin-bottom: 14px;
+  font-size: 14px;
+  color: #303133;
+}
+
+.combined-export-picture-meta-sub {
+  color: #909399;
+}
+
+.combined-export-picture-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.combined-export-picture-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.combined-export-picture-option.is-active {
+  border-color: #409eff;
+  box-shadow: 0 0 0 1px rgba(64, 158, 255, 0.15);
+}
+
+.combined-export-picture-option.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.combined-export-picture-option-title {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  text-align: center;
+}
+
+.combined-export-picture-option-image,
+.combined-export-picture-option .image-fallback.combined-export-picture-option-image {
+  width: 100%;
+  height: 160px;
+  border-radius: 8px;
+  background: #f5f7fa;
+}
+
+.combined-export-picture-category-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 40px;
+}
+
+.combined-export-picture-category-name {
+  max-width: 100%;
+  font-size: 12px;
+  color: #606266;
+  text-align: center;
+  word-break: break-all;
+}
+
+.combined-export-picture-category-counter {
+  font-size: 12px;
+  color: #909399;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .combined-export-picture-options {
+    grid-template-columns: 1fr;
+  }
 }
 
 .combined-export-tab-hint {
@@ -4006,17 +4584,6 @@ onBeforeUnmount(() => {
 .combined-export-hint {
   color: #909399;
   font-size: 13px;
-}
-
-.combined-export-panel {
-  min-width: 0;
-}
-
-.combined-export-panel-title {
-  margin-bottom: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #303133;
 }
 
 .usage-user-tooltip {
