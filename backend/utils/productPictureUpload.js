@@ -47,6 +47,57 @@ function sanitizeProductPictureFileName(nameRaw) {
   return `${text.slice(0, 120)}.png`;
 }
 
+function buildProductPicturePublicUrl(folderSlug, fileName) {
+  return `/upload/products/${folderSlug}/${fileName}`;
+}
+
+function buildProductPictureItem(folderSlug, fileName, file, reused = false) {
+  const publicUrl = buildProductPicturePublicUrl(folderSlug, fileName);
+  return {
+    sequence_no: null,
+    original_name: file?.originalname,
+    file_name: fileName,
+    relative_path: `backend\\public\\upload\\products\\${folderSlug}\\${fileName}`,
+    picture_url: publicUrl,
+    public_url: publicUrl,
+    image_url: publicUrl,
+    bytes: file?.size,
+    reused
+  };
+}
+
+/** 将库表/前端传入路径规范为 /upload/products/... 形式 */
+function normalizeStoredProductPictureUrl(raw) {
+  const text = String(raw ?? '').trim();
+  if (!text) return '';
+  if (/^https?:\/\//i.test(text)) return text;
+  const normalized = text.replace(/\\/g, '/').replace(/^\/+/, '');
+  if (normalized.startsWith('upload/products/') || normalized.startsWith('upload/')) {
+    return `/${normalized}`;
+  }
+  if (normalized.startsWith('backend/public/upload/products/')) {
+    return `/${normalized.slice('backend/public/'.length)}`;
+  }
+  if (normalized.startsWith('public/upload/products/')) {
+    return `/${normalized.slice('public/'.length)}`;
+  }
+  return `/upload/products/${normalized.replace(/^upload\/products\/?/i, '')}`;
+}
+
+function resolveAbsoluteProductPicturePath(publicUrl) {
+  const normalized = normalizeStoredProductPictureUrl(publicUrl);
+  if (!normalized || /^https?:\/\//i.test(normalized)) return '';
+  const relative = normalized.replace(/^\/upload\/products\/?/i, '');
+  if (!relative) return '';
+  const segments = relative.split('/').filter(Boolean);
+  return path.join(PRODUCT_IMAGE_UPLOAD_DIR, ...segments);
+}
+
+function productPictureFileExists(publicUrl) {
+  const absolutePath = resolveAbsoluteProductPicturePath(publicUrl);
+  return Boolean(absolutePath && fs.existsSync(absolutePath));
+}
+
 function ensureProductImageUploadDir() {
   fs.mkdirSync(PRODUCT_IMAGE_UPLOAD_DIR, { recursive: true });
 }
@@ -88,17 +139,13 @@ function saveProductPictureFiles({ folderKey, files, startSequence = 1, fileName
       ? sanitizeProductPictureFileName(String(nameList[index]).replace(/\.png$/i, ''))
       : `${sequenceNo}.png`;
     const absolutePath = path.join(batchDir, fileName);
-    fs.writeFileSync(absolutePath, file.buffer);
-    const publicUrl = `/upload/products/${folderSlug}/${fileName}`;
+    const reused = fs.existsSync(absolutePath);
+    if (!reused) {
+      fs.writeFileSync(absolutePath, file.buffer);
+    }
     items.push({
-      sequence_no: sequenceNo,
-      original_name: file.originalname,
-      file_name: fileName,
-      relative_path: `backend\\public\\upload\\products\\${folderSlug}\\${fileName}`,
-      picture_url: publicUrl,
-      public_url: publicUrl,
-      image_url: publicUrl,
-      bytes: file.size
+      ...buildProductPictureItem(folderSlug, fileName, file, reused),
+      sequence_no: sequenceNo
     });
   });
 
@@ -116,5 +163,9 @@ module.exports = {
   sanitizeProductPictureFileName,
   ensureProductImageUploadDir,
   buildAbstractProductCategoryFolderKey,
+  buildProductPicturePublicUrl,
+  normalizeStoredProductPictureUrl,
+  resolveAbsoluteProductPicturePath,
+  productPictureFileExists,
   saveProductPictureFiles
 };

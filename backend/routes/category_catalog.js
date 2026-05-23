@@ -12,7 +12,9 @@ const {
   buildAbstractProductCategoryFolderKey,
   normalizeFolderWhitespace,
   sanitizeProductPictureFileName,
-  saveProductPictureFiles
+  saveProductPictureFiles,
+  normalizeStoredProductPictureUrl,
+  productPictureFileExists
 } = require('../utils/productPictureUpload');
 
 const requireCategoryManagers = () => requireRoles(['developer', 'data_admin']);
@@ -214,6 +216,66 @@ async function assertCategoryExists(connection, productType, categoryName) {
   }
 }
 
+async function findAbstractProductByUniqueName(connection, productType, categoryName, abstractName) {
+  const [[row]] = await connection.query(
+    `
+      SELECT id, product_type, category_name, abstract_name, image_url, created_at, updated_at
+      FROM unqualified_product_abstract_catalog
+      WHERE product_type = ? AND category_name = ? AND abstract_name = ?
+      LIMIT 1
+    `,
+    [productType, categoryName, abstractName]
+  );
+  return row || null;
+}
+
+async function resolveReusableAbstractImageUrl(connection, imageUrl) {
+  const normalized = normalizeStoredProductPictureUrl(imageUrl);
+  if (!normalized) {
+    return { url: null, reused: false };
+  }
+  if (/^https?:\/\//i.test(normalized)) {
+    return { url: normalized, reused: false };
+  }
+
+  const [[existingByPath]] = await connection.query(
+    `
+      SELECT image_url
+      FROM unqualified_product_abstract_catalog
+      WHERE TRIM(COALESCE(image_url, '')) <> ''
+        AND (
+          image_url = ?
+          OR image_url = ?
+          OR REPLACE(image_url, '\\\\', '/') = ?
+        )
+      ORDER BY id ASC
+      LIMIT 1
+    `,
+    [normalized, String(imageUrl || '').trim(), normalized]
+  );
+  if (existingByPath?.image_url) {
+    return {
+      url: String(existingByPath.image_url).trim(),
+      reused: true
+    };
+  }
+
+  if (productPictureFileExists(normalized)) {
+    return { url: normalized, reused: true };
+  }
+
+  return { url: normalized, reused: false };
+}
+
+function buildAbstractProductImageUploadMessage(first) {
+  if (!first?.image_url) {
+    return '图片保存失败';
+  }
+  return first.reused
+    ? `已复用已有图片资源 ${first.image_url}`
+    : `已保存图片到 ${first.image_url}`;
+}
+
 router.get('/abstract-products', requireCategoryManagers(), async (req, res) => {
   try {
     await ensureReady();
@@ -268,12 +330,13 @@ router.post(
 
       res.json({
         success: true,
-        message: `已保存图片到 ${first.image_url}`,
+        message: buildAbstractProductImageUploadMessage(first),
         data: {
           folder_key: saved.folder_key,
           folder_slug: saved.folder_slug,
           image_url: first.image_url,
           picture_url: first.picture_url,
+          reused: Boolean(first.reused),
           items: saved.items
         }
       });
@@ -356,11 +419,12 @@ router.post(
 
       res.json({
         success: true,
-        message: `已上传图片并写入 image_url：${imageUrl}`,
+        message: buildAbstractProductImageUploadMessage(first),
         data: {
           ...updated,
           folder_key: saved.folder_key,
           folder_slug: saved.folder_slug,
+          reused: Boolean(first.reused),
           items: saved.items
         }
       });
@@ -380,6 +444,20 @@ router.post('/abstract-products', requireCategoryManagers(), async (req, res) =>
     const { productType, categoryName, abstractName, imageUrl } = normalizeAbstractProductPayload(req.body);
     await assertCategoryExists(pool, productType, categoryName);
 
+    const existingByName = await findAbstractProductByUniqueName(
+      pool,
+      productType,
+      categoryName,
+      abstractName
+    );
+    if (existingByName) {
+      return res.status(409).json({ success: false, message: '该分类下已存在相同抽象产品名称' });
+    }
+
+    const resolvedImage = imageUrl
+      ? await resolveReusableAbstractImageUrl(pool, imageUrl)
+      : { url: null, reused: false };
+
     try {
       await pool.query(
         `
@@ -388,7 +466,7 @@ router.post('/abstract-products', requireCategoryManagers(), async (req, res) =>
           )
           VALUES (?, ?, ?, ?)
         `,
-        [productType, categoryName, abstractName, imageUrl]
+        [productType, categoryName, abstractName, resolvedImage.url]
       );
     } catch (insertErr) {
       if (insertErr?.code === 'ER_DUP_ENTRY') {
@@ -407,7 +485,11 @@ router.post('/abstract-products', requireCategoryManagers(), async (req, res) =>
       [productType, categoryName, abstractName]
     );
 
-    res.json({ success: true, message: '已新增抽象产品', data: created });
+    res.json({
+      success: true,
+      message: resolvedImage.reused ? '已新增抽象产品，并复用已有图片资源' : '已新增抽象产品',
+      data: created
+    });
   } catch (error) {
     console.error('新增抽象产品失败:', error);
     res.status(error.statusCode || 500).json({ success: false, message: error.statusCode ? error.message : '新增抽象产品失败' });
@@ -424,6 +506,9 @@ router.put('/abstract-products/:id', requireCategoryManagers(), async (req, res)
 
     const { productType, categoryName, abstractName, imageUrl } = normalizeAbstractProductPayload(req.body);
     await assertCategoryExists(pool, productType, categoryName);
+    const resolvedImage = imageUrl
+      ? await resolveReusableAbstractImageUrl(pool, imageUrl)
+      : { url: null, reused: false };
 
     try {
       const [result] = await pool.query(
@@ -432,7 +517,7 @@ router.put('/abstract-products/:id', requireCategoryManagers(), async (req, res)
           SET product_type = ?, category_name = ?, abstract_name = ?, image_url = ?
           WHERE id = ?
         `,
-        [productType, categoryName, abstractName, imageUrl, id]
+        [productType, categoryName, abstractName, resolvedImage.url, id]
       );
       if (!Number(result?.affectedRows || 0)) {
         return res.status(404).json({ success: false, message: '抽象产品不存在或已删除' });
