@@ -371,7 +371,11 @@ const handleLogout = async () => {
 .el-menu--horizontal>.el-menu-item.is-active {
   color: #f5f7f8 !important;
 }
-
+:deep(.el-descriptions__label.el-descriptions__cell.is-bordered-label) {
+  /* width: 100%!important; */
+  background: #F2F7FF !important;
+  /* background: #E8F3FF!important; */
+}
 .header {
   /* background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); */
   background:rgb(61, 129, 218);

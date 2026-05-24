@@ -76,6 +76,13 @@
             </el-form-item>
           </el-col>
           <el-col :span="4">
+            <el-form-item label="使用次数">
+              <el-select v-model="filters.usage_count_zero" clearable placeholder="全部" style="width: 100%">
+                <el-option label="未使用(0次)" value="1" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="4">
             <div class="filter-actions">
               <el-button type="primary" @click="handleSearch">搜索</el-button>
               <el-button @click="resetFilters">重置</el-button>
@@ -1964,7 +1971,8 @@ function createDefaultFilters() {
     year_start: DEFAULT_FILTER_YEAR_START,
     year_end: '',
     announcement_id: '',
-    supervision_id: ''
+    supervision_id: '',
+    usage_count_zero: ''
   }
 }
 
@@ -1996,7 +2004,8 @@ function applyRouteFilters() {
     year_start: String(route.query.year_start || fallbackYear || DEFAULT_FILTER_YEAR_START),
     year_end: String(route.query.year_end || fallbackYear || ''),
     announcement_id: String(route.query.announcement_id || ''),
-    supervision_id: String(route.query.supervision_id || '')
+    supervision_id: String(route.query.supervision_id || ''),
+    usage_count_zero: String(route.query.usage_count_zero || '')
   }
 }
 
@@ -2016,6 +2025,7 @@ const hasActiveFilters = computed(() => Boolean(
   || filters.value.year_end
   || filters.value.announcement_id
   || filters.value.supervision_id
+  || filters.value.usage_count_zero
 ))
 
 // const activeYearLabel = computed(() => {

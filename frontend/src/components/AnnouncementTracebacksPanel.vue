@@ -12,12 +12,12 @@
    
 
     <el-form :model="filters" inline class="filter-form">
-      <el-form-item label="状态">
+      <!-- <el-form-item label="状态">
         <el-select v-model="filters.handled_status" clearable placeholder="全部状态" style="width: 150px">
           <el-option label="待处理" value="pending" />
           <el-option label="已处理" value="resolved" />
         </el-select>
-      </el-form-item>
+      </el-form-item> -->
       <el-form-item label="类型">
         <el-select v-model="filters.trace_type" clearable placeholder="全部类型" style="width: 170px">
           <el-option label="重复导入" value="duplicate" />
@@ -59,7 +59,7 @@
           <el-icon><Delete /></el-icon>
           批量删除 ({{ selectedTracebackIds.length }})
         </el-button>
-        <span v-else>删除后会同步清理临时区相关数据，便于再次导入不报重复</span>
+        <!-- <span v-else>删除后会同步清理临时区相关数据，便于再次导入不报重复</span> -->
       </div>
     </div>
 
@@ -120,7 +120,7 @@
         <template #default="{ row }">
           <div class="row-actions">
             <el-button v-if="row.source_detail_url" link type="primary" @click="openSourceUrl(row.source_detail_url)">查看网址</el-button>
-            <el-button v-if="row.existing_batch_id" link type="primary" @click="goToStagingBatch(row.existing_batch_id)">定位批次</el-button>
+            <!-- <el-button v-if="row.existing_batch_id" link type="primary" @click="goToStagingBatch(row.existing_batch_id)">定位批次</el-button> -->
             <el-button v-if="row.existing_announcement_id || row.existing_supervision_id" link type="success" @click="goToPublished(row)">查看正式稿</el-button>
             <!-- <el-button v-if="row.handled_status !== 'resolved'" link type="warning" @click="handleResolveTraceback(row)">标记已处理</el-button> -->
             <el-button link type="danger" @click="handleDeleteTraceback(row)">删除</el-button>

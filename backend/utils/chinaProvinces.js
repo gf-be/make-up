@@ -132,19 +132,32 @@ function expandCanonicalToKnownRawVariants(canonical) {
 }
 
 /**
- * 构造 (col IN (variants) OR TRIM(col) LIKE ?)，并把参数依次追加到 params。
+ * SQL：去掉全角/半角括号及其中内容后的省份主名（「上海（日本进口）」→「上海」）
+ */
+function sqlProvinceBaseNameExpr(columnExpr) {
+  return `TRIM(SUBSTRING_INDEX(REPLACE(REPLACE(IFNULL(${columnExpr},''), '（', '('), '）', ')'), '(', 1))`;
+}
+
+/**
+ * 构造省份列筛选：(完整值 IN / 前缀 LIKE / 主名 IN)，并把参数依次追加到 params。
  * canonical 应为 normalizeProvinceToStandard 的结果。
  */
 function appendProvinceColumnPredicate(columnExpr, canonical, params) {
   const variants = expandCanonicalToKnownRawVariants(canonical);
   const inPh = variants.map(() => '?').join(', ');
-  params.push(...variants, `${canonical}%`);
-  return `(TRIM(${columnExpr}) IN (${inPh}) OR TRIM(${columnExpr}) LIKE ?)`;
+  const baseExpr = sqlProvinceBaseNameExpr(columnExpr);
+  params.push(...variants, `${canonical}%`, ...variants);
+  return `(
+    TRIM(${columnExpr}) IN (${inPh})
+    OR TRIM(${columnExpr}) LIKE ?
+    OR ${baseExpr} IN (${inPh})
+  )`;
 }
 
 module.exports = {
   normalizeProvinceToStandard,
   expandCanonicalToKnownRawVariants,
   appendProvinceColumnPredicate,
+  sqlProvinceBaseNameExpr,
   STANDARD_CN_PROVINCES
 };

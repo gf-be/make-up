@@ -257,10 +257,18 @@
 
               <div v-loading="productDetailsLoading" class="product-detail-table-wrap">
                 <template v-if="productDetailPager.total > 0">
-                  <el-table ref="productDetailTableRef" :data="productDetails" stripe>
+                  <el-table
+                    ref="productDetailTableRef"
+                    :data="productDetails"
+                    stripe
+                    size="small"
+                    class="product-detail-table"
+                    :row-class-name="productDetailRowClassName"
+                  >
                     <el-table-column type="expand" width="50">
                       <template #default="{ row }">
-                        <el-descriptions :column="2" border size="small" class="detail-expanded">
+                        <el-descriptions :column="2" border size="small"
+                          class="detail-expanded detail-product-expanded-descriptions">
                           <el-descriptions-item label="产品名称">
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.product_name" size="small" />
                             <span v-else>{{ row.product_name || '暂无' }}</span>
@@ -280,11 +288,11 @@
                             <span v-else>{{ row.attachment_sampling_category || '暂无' }}</span>
                           </el-descriptions-item>
                           <el-descriptions-item label="注册人/备案人等名称">
-                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.company_names" type="textarea" :rows="2" size="small" />
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.company_names" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.company_names || '暂无' }}</span>
                           </el-descriptions-item>
                           <el-descriptions-item label="注册人/备案人等地址">
-                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.company_addresses" type="textarea" :rows="2" size="small" />
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.company_addresses" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.company_addresses || '暂无' }}</span>
                           </el-descriptions-item>
                           <el-descriptions-item label="被抽样单位名称">
@@ -292,7 +300,7 @@
                             <span v-else>{{ row.sample_unit_name || '暂无' }}</span>
                           </el-descriptions-item>
                           <el-descriptions-item label="被抽样单位地址">
-                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.sample_unit_address" type="textarea" :rows="2" size="small" />
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.sample_unit_address" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.sample_unit_address || '暂无' }}</span>
                           </el-descriptions-item>
                           <el-descriptions-item label="生产日期">
@@ -324,7 +332,7 @@
                             <span v-else>{{ row.unqualified_items || '暂无' }}</span>
                           </el-descriptions-item>
                           <el-descriptions-item label="检验结果">
-                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.inspection_result" type="textarea" :rows="2" size="small" />
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.inspection_result" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.inspection_result || '暂无' }}</span>
                           </el-descriptions-item>
                           <el-descriptions-item v-if="isFoodAnnouncement" label="正文文案" :span="2">
@@ -332,7 +340,7 @@
                               v-if="isEditingProductDetail(row)"
                               v-model="productDetailForm.food_body_text"
                               type="textarea"
-                              :rows="4"
+                              :rows="2"
                               size="small"
                               placeholder="从核验工作台写入或在此编辑；入库同步至问题产品库"
                             />
@@ -341,11 +349,11 @@
                          
                           
                           <el-descriptions-item label="规定要求" :span="2">
-                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.requirement" type="textarea" :rows="2" size="small" />
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.requirement" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.requirement || '暂无' }}</span>
                           </el-descriptions-item>
                           <el-descriptions-item label="备注" >
-                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.remarks" type="textarea" :rows="2" size="small" />
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.remarks" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.remarks || '暂无' }}</span>
                           </el-descriptions-item>
                           
@@ -368,30 +376,32 @@
 
                     <el-table-column prop="product_name" label="产品" min-width="180" show-overflow-tooltip />
                      <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="130" show-overflow-tooltip />
-                    <el-table-column prop="picture_url" label="产品图" width="208" show-overflow-tooltip>
+                    <el-table-column prop="picture_url" label="产品图" width="108" align="center"
+                      class-name="detail-picture-table-cell" show-overflow-tooltip>
                       <template #default="{ row }">
-                        <div class="detail-product-picture-cell">
-                          <template v-if="resolveProductPictureSrc(row.picture_url)">
+                        <div class="detail-product-picture-cell detail-product-picture-cell-col">
+                          <div
+                            class="detail-product-thumb-wrap"
+                            :class="{
+                              'is-disabled': !canUploadDetailRowProductPicture(row),
+                              'is-uploading': isDetailRowPictureUploading(row)
+                            }"
+                            v-loading="isDetailRowPictureUploading(row)"
+                            @mouseenter="onDetailProductThumbPreviewEnter(row, $event)"
+                            @mouseleave="onDetailProductThumbPreviewLeave"
+                            @click.stop="onDetailProductThumbClick(row)"
+                          >
                             <el-image
+                              v-if="resolveProductPictureSrc(row.picture_url) && !isDetailProductPictureLoadFailed(row)"
                               class="detail-product-thumb"
                               fit="cover"
                               :src="resolveProductPictureSrc(row.picture_url)"
-                              :preview-src-list="[resolveProductPictureSrc(row.picture_url)]"
-                              preview-teleported
-                              hide-on-click-modal
+                              @error="markDetailProductPictureLoadFailed(row)"
                             />
-                          </template>
-                          <span v-else class="muted-text">—</span>
-                          <div v-if="canUploadDetailRowProductPicture(row)" class="detail-row-picture-actions">
-                            <el-button
-                              type="primary"
-                              link
-                              size="small"
-                              :loading="isDetailRowPictureUploading(row)"
-                              @click.stop="triggerDetailRowProductPictureUpload(row)"
-                            >
-                              上传图片
-                            </el-button>
+                            <div v-else class="detail-product-thumb-placeholder">
+                              <el-icon v-if="canUploadDetailRowProductPicture(row)" :size="24"><Plus /></el-icon>
+                              <span v-else class="muted-text">—</span>
+                            </div>
                           </div>
                           <div v-if="isEditingProductDetail(row)" class="muted-text detail-picture-edit-tip">
                             请先保存本次编辑后再上传本行图片
@@ -404,20 +414,38 @@
                       prop="food_body_text"
                       label="正文文案"
                       min-width="120"
-                      show-overflow-tooltip
+                      class-name="detail-food-body-table-cell"
                     >
                       <template #default="{ row }">
                         <div class="staging-food-body-cell">
-                          <span class="staging-food-body-snippet muted-text">{{ formatFoodBodySnippet(row.food_body_text) }}</span>
-                          <el-button
-                            v-if="canManageProductDetails && row.food_body_text == null"
-                            type="primary"
-                            link
-                            size="small"
-                            @click.stop="openDetailFoodBodyTextPicker(row)"
+                          <span
+                            class="staging-food-body-snippet"
+                            :class="{ 'is-empty': !hasDetailFoodBodyText(row) }"
+                            :title="String(row.food_body_text || '').trim() || ''"
                           >
-                            查看正文
-                          </el-button>
+                            {{ formatFoodBodySnippet(row.food_body_text) }}
+                          </span>
+                          <div v-if="canManageProductDetails" class="staging-food-body-actions">
+                            <el-button
+                              v-if="hasDetailFoodBodyText(row)"
+                              type="danger"
+                              link
+                              size="small"
+                              :loading="foodBodyImportSaving"
+                              @click.stop="clearFoodBodyText(row)"
+                            >
+                              清空
+                            </el-button>
+                            <el-button
+                              v-else
+                              type="primary"
+                              link
+                              size="small"
+                              @click.stop="openDetailFoodBodyTextPicker(row)"
+                            >
+                              查看正文
+                            </el-button>
+                          </div>
                         </div>
                       </template>
                     </el-table-column>
@@ -441,7 +469,7 @@
                       :page-size="productDetailPager.limit"
                       layout="total, sizes, prev, pager, next, jumper"
                       :total="productDetailPager.total"
-                      :page-sizes="[10, 20, 50, 100, 200]"
+                      :page-sizes="[10, 20, 50]"
                       background
                       @current-change="handleProductDetailPageChange"
                       @size-change="handleProductDetailPageSizeChange"
@@ -588,13 +616,23 @@
       </template>
     </el-dialog>
 
+    <Teleport to="body">
+      <div
+        v-if="detailPicturePreview.visible"
+        class="detail-product-thumb-preview"
+        :style="detailPicturePreview.style"
+      >
+        <img :src="detailPicturePreview.src" alt="" class="detail-product-thumb-preview-image" />
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Download } from '@element-plus/icons-vue'
+import { Download, Plus } from '@element-plus/icons-vue'
 import {
   deleteAnnouncementProductDetail,
   getAnnouncementById,
@@ -663,6 +701,17 @@ const productImageStartSequence = ref(1)
 const uploadingProductImages = ref(false)
 const detailRowPictureTargetRow = ref(null)
 const uploadingDetailRowPictureDetailId = ref(null)
+const detailPicturePreview = ref({
+  visible: false,
+  src: '',
+  style: {}
+})
+/** @type {HTMLElement | null} */
+let detailPicturePreviewScrollEl = null
+const detailProductPictureLoadFailedIds = ref(new Set())
+
+const DETAIL_PICTURE_PREVIEW_SIZE = 104
+const DETAIL_PICTURE_PREVIEW_GAP = 6
 
 const foodBodyTextDialogVisible = ref(false)
 const foodBodyDialogFullText = ref('')
@@ -957,6 +1006,116 @@ function triggerDetailRowProductPictureUpload(row) {
   detailRowProductImageInputRef.value?.click()
 }
 
+function isDetailProductPictureLoadFailed(row) {
+  const id = row?.id
+  return id != null && detailProductPictureLoadFailedIds.value.has(String(id))
+}
+
+function markDetailProductPictureLoadFailed(row) {
+  const id = row?.id
+  if (id == null || detailProductPictureLoadFailedIds.value.has(String(id))) {
+    return
+  }
+  const next = new Set(detailProductPictureLoadFailedIds.value)
+  next.add(String(id))
+  detailProductPictureLoadFailedIds.value = next
+}
+
+function clearDetailProductPictureLoadFailed(row) {
+  const id = row?.id
+  if (id == null || !detailProductPictureLoadFailedIds.value.has(String(id))) {
+    return
+  }
+  const next = new Set(detailProductPictureLoadFailedIds.value)
+  next.delete(String(id))
+  detailProductPictureLoadFailedIds.value = next
+}
+
+function unbindDetailPicturePreviewScrollDismiss() {
+  if (detailPicturePreviewScrollEl) {
+    detailPicturePreviewScrollEl.removeEventListener('scroll', hideDetailPicturePreview)
+    detailPicturePreviewScrollEl = null
+  }
+}
+
+function hideDetailPicturePreview() {
+  detailPicturePreview.value = { visible: false, src: '', style: {} }
+  unbindDetailPicturePreviewScrollDismiss()
+}
+
+function bindDetailPicturePreviewScrollDismiss() {
+  unbindDetailPicturePreviewScrollDismiss()
+  const tableEl = productDetailTableRef.value?.$el
+  const bodyWrapper = tableEl?.querySelector('.el-table__body-wrapper')
+  if (!bodyWrapper) return
+  detailPicturePreviewScrollEl = bodyWrapper
+  bodyWrapper.addEventListener('scroll', hideDetailPicturePreview, { passive: true })
+}
+
+function onDetailProductThumbPreviewEnter(row, event) {
+  const src = resolveProductPictureSrc(row.picture_url)
+  if (!src || isDetailProductPictureLoadFailed(row)) return
+
+  const trigger = event?.currentTarget
+  if (!(trigger instanceof HTMLElement)) return
+
+  const rect = trigger.getBoundingClientRect()
+  const tableEl = productDetailTableRef.value?.$el
+  const headerWrapper = tableEl?.querySelector('.el-table__header-wrapper')
+  const headerBottom = headerWrapper?.getBoundingClientRect().bottom ?? 0
+  const rows = productDetails.value
+  const rowIndex = rows.indexOf(row)
+  const isFirstRow = rowIndex === 0
+  const isLastRow = rowIndex >= 0 && rowIndex === rows.length - 1
+  const previewSize = DETAIL_PICTURE_PREVIEW_SIZE
+  const gap = DETAIL_PICTURE_PREVIEW_GAP
+
+  let top
+  if (isLastRow) {
+    top = rect.top - previewSize - gap
+  } else {
+    top = rect.bottom + gap
+  }
+
+  if (isFirstRow && !isLastRow) {
+    top = Math.max(top, headerBottom + gap)
+  }
+
+  if (isLastRow && top < gap) {
+    top = rect.bottom + gap
+  }
+
+  if (top + previewSize > window.innerHeight - gap) {
+    top = Math.max(gap, rect.top - previewSize - gap)
+  }
+
+  let left = rect.left + rect.width / 2 - previewSize / 2
+  left = Math.max(gap, Math.min(left, window.innerWidth - previewSize - gap))
+
+  detailPicturePreview.value = {
+    visible: true,
+    src,
+    style: {
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${previewSize}px`,
+      height: `${previewSize}px`
+    }
+  }
+  bindDetailPicturePreviewScrollDismiss()
+}
+
+function onDetailProductThumbPreviewLeave() {
+  hideDetailPicturePreview()
+}
+
+function onDetailProductThumbClick(row) {
+  if (isEditingProductDetail(row)) {
+    return
+  }
+  triggerDetailRowProductPictureUpload(row)
+}
+
 async function handleDetailRowProductImageInputChange(event) {
   const input = event.target
   const file = input?.files?.[0]
@@ -1004,6 +1163,7 @@ async function handleDetailRowProductImageInputChange(event) {
     }
 
     ElMessage.success('产品图已上传并写入本条明细')
+    clearDetailProductPictureLoadFailed(row)
     await refreshAnnouncementData()
 
     const stillEditingSame =
@@ -1046,10 +1206,52 @@ function buildProductDetailPutBody(source = {}) {
   }
 }
 
-function formatFoodBodySnippet(raw, maxLen = 56) {
+function formatFoodBodySnippet(raw) {
   const s = String(raw || '').replace(/\s+/g, ' ').trim()
-  if (!s) return '—'
-  return s.length <= maxLen ? s : `${s.slice(0, maxLen)}…`
+  return s || '—'
+}
+
+function hasDetailFoodBodyText(row = {}) {
+  return Boolean(String(row.food_body_text ?? '').trim())
+}
+
+async function clearFoodBodyText(row) {
+  if (!canManageProductDetails.value) {
+    ElMessage.warning('当前账号无编辑权限')
+    return
+  }
+
+  const announcementId = currentAnnouncementId.value
+  if (!row?.id || !announcementId) {
+    return
+  }
+
+  if (!hasDetailFoodBodyText(row)) {
+    ElMessage.info('当前行暂无正文文案')
+    return
+  }
+
+  foodBodyImportSaving.value = true
+  try {
+    await updateAnnouncementProductDetail(
+      announcementId,
+      row.id,
+      buildProductDetailPutBody({ ...row, food_body_text: null })
+    )
+    ElMessage.success('正文文案已清空')
+    await refreshAnnouncementData()
+
+    const stillEditingSame =
+      editingProductDetailId.value != null && String(editingProductDetailId.value) === String(row.id)
+    if (stillEditingSame && productDetailForm.id === row.id) {
+      productDetailForm.food_body_text = ''
+    }
+  } catch (error) {
+    console.error('清空正文文案失败:', error)
+    ElMessage.error(error?.response?.data?.message || error?.message || '清空失败')
+  } finally {
+    foodBodyImportSaving.value = false
+  }
 }
 
 function openDetailFoodBodyTextPicker(row) {
@@ -1241,6 +1443,10 @@ const stopEditingProductDetail = () => {
 
 const isEditingProductDetail = (row) => {
   return row?.id != null && String(row.id) === String(editingProductDetailId.value)
+}
+
+function productDetailRowClassName({ row }) {
+  return isEditingProductDetail(row) ? 'is-editing-product-detail' : ''
 }
 
 const fetchAnnouncementOnly = async (announcementId) => {
@@ -1796,8 +2002,32 @@ watch(resolvedAnnouncementId, (id) => {
   font-size: 13px;
 }
 
+.detail-filter-form {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: #f8fbff;
+  border: 1px solid #edf2f8;
+  border-radius: 12px;
+}
+
 .detail-expanded {
-  padding: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
+}
+
+.detail-product-expanded-descriptions :deep(.el-descriptions__label) {
+  /* background: #f0f6fc !important; */
+  color: #6b849f;
+  font-weight: 600;
+}
+
+.detail-product-expanded-descriptions :deep(.el-descriptions__content) {
+  background: #ffffff !important;
+  color: #5f6f82;
+}
+
+.detail-product-expanded-descriptions :deep(.el-descriptions__cell) {
+  border-color: #e8eef6 !important;
 }
 
 .detail-expanded :deep(.el-descriptions__table) {
@@ -1823,6 +2053,67 @@ watch(resolvedAnnouncementId, (id) => {
 
 .product-detail-table-wrap {
   min-height: 160px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #edf2f8;
+  background: linear-gradient(180deg, #fcfdff 0%, #f8fbff 100%);
+}
+
+.product-detail-table {
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #edf2f8;
+  background: #ffffff;
+}
+
+.product-detail-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.product-detail-table :deep(.el-table__header-wrapper th.el-table__cell) {
+  background: #83b1ff !important;
+  color: #f6f7f8;
+  font-weight: 600;
+  border-bottom: 1px solid #edf2f8 !important;
+}
+
+.product-detail-table :deep(.el-table__body tr > td.el-table__cell) {
+  border-bottom: 1px solid #f3f6fb;
+  color: #5f6f82;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.product-detail-table :deep(.el-table__body tr.el-table__row--striped > td.el-table__cell) {
+  background: #e2edfd;
+}
+
+.product-detail-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: #f6f9fd !important;
+}
+
+.product-detail-table :deep(.el-table__body tr.is-editing-product-detail > td.el-table__cell) {
+  background: #f1f6fc !important;
+  color: #5b7ea8;
+  /* box-shadow: inset 3px 0 0 #b3c7e0; */
+}
+
+.product-detail-table :deep(.el-table__body tr.is-editing-product-detail:hover > td.el-table__cell) {
+  background: #ebf2fa !important;
+}
+
+.product-detail-table :deep(.el-table__expanded-cell) {
+  padding: 0;
+  background: #f8fbff;
+  border-bottom: 1px solid #edf2f8;
+}
+
+.product-detail-table :deep(.el-table__expand-icon) {
+  color: #7da7d9;
+}
+
+.product-detail-table :deep(.el-table__expand-icon:hover) {
+  color: #5b9bd5;
 }
 
 .product-detail-pagination {
@@ -1831,6 +2122,7 @@ watch(resolvedAnnouncementId, (id) => {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 16px;
+  padding-top: 4px;
 }
 
 .remark-text {
@@ -1864,17 +2156,103 @@ watch(resolvedAnnouncementId, (id) => {
 
 .detail-product-picture-cell {
   display: flex;
-  flex-direction: space-between;
-  align-items: flex-start;
-  gap: 4px;
-  min-height: 72px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.detail-product-picture-cell.detail-product-picture-cell-col {
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  width: 52px;
+  margin: 0 auto;
+}
+
+.detail-product-thumb-wrap {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  border: 1px solid #e0ebf5;
+  overflow: hidden;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: #fafcff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.detail-product-thumb-wrap:hover:not(.is-disabled):not(.is-uploading) {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 1px rgba(147, 197, 253, 0.18);
+}
+
+.detail-product-thumb-wrap.is-disabled {
+  cursor: default;
+}
+
+.detail-product-thumb-wrap.is-disabled:not(.is-uploading) {
+  opacity: 0.88;
+}
+
+.detail-product-thumb-wrap.is-uploading {
+  cursor: wait;
 }
 
 .detail-product-thumb {
-  width: 60px;
-  height: 60px;
-  border-radius: 4px;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.detail-product-thumb :deep(.el-image__inner) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.3);
+  transform-origin: center center;
+}
+
+.detail-product-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9eb3cc;
+  background: #f3f7fc;
+}
+
+.detail-product-thumb-wrap:hover:not(.is-disabled):not(.is-uploading) .detail-product-thumb-placeholder {
+  color: #7da7d9;
+  background: #eef4fb;
+}
+
+.detail-product-thumb-preview {
+  position: fixed;
+  z-index: 4000;
+  border-radius: 8px;
   overflow: hidden;
+  box-shadow: 0 8px 24px rgba(100, 130, 170, 0.14);
+  border: 1px solid #a8c4e8;
+  background: #fff;
+  pointer-events: none;
+}
+
+.detail-product-thumb-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.product-detail-table-wrap :deep(td.detail-picture-table-cell) {
+  overflow: visible;
+}
+
+.product-detail-table-wrap :deep(td.detail-picture-table-cell .cell) {
+  overflow: visible;
+  line-height: 1;
 }
 
 .detail-row-picture-actions {
@@ -1884,8 +2262,16 @@ watch(resolvedAnnouncementId, (id) => {
 }
 
 .detail-picture-edit-tip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(100% + 4px);
+  z-index: 4;
+  width: max-content;
+  max-width: 220px;
   font-size: 12px;
   line-height: 1.4;
+  text-align: center;
 }
 
 .food-body-text-dialog :deep(.el-dialog__body) {
@@ -1953,16 +2339,40 @@ watch(resolvedAnnouncementId, (id) => {
 
 .staging-food-body-cell {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .staging-food-body-snippet {
   flex: 1;
   min-width: 0;
   font-size: 12px;
-  line-height: 1.35;
-  color: #606266;
+  line-height: 1.4;
+  color: #5f6f82;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staging-food-body-snippet.is-empty {
+  color: #9eb3cc;
+}
+
+.staging-food-body-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.staging-food-body-actions :deep(.el-button) {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.product-detail-table-wrap :deep(td.detail-food-body-table-cell .cell) {
+  overflow: hidden;
 }
 
 .food-body-pre {

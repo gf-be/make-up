@@ -151,27 +151,14 @@ async function ensureInspectionDetailsSchema(connection) {
   }
 }
 
-async function syncInspectionsFromAnnouncementDetails(connection, announcementId) {
-
+/** 移除由抽检通告派生的 inspections / inspection_details（不再写入派生明细） */
+async function removeInspectionsDerivedFromAnnouncement(connection, announcementId) {
   const normalizedAnnouncementId = Number(announcementId);
   if (!normalizedAnnouncementId) {
     return {
-      inspection_id: null,
-      detail_count: 0,
       deleted_inspection_count: 0
     };
   }
-
-  const [announcementRows] = await connection.query(
-    `
-      SELECT id, title, announcement_no, publish_date, inspection_unit, inspection_count
-      FROM announcements
-      WHERE id = ?
-      LIMIT 1
-    `,
-    [normalizedAnnouncementId]
-  );
-  const announcement = announcementRows[0] || null;
 
   const [existingInspectionRows] = await connection.query(
     'SELECT id FROM inspections WHERE announcement_id = ?',
@@ -188,139 +175,13 @@ async function syncInspectionsFromAnnouncementDetails(connection, announcementId
   }
   await connection.query('DELETE FROM inspections WHERE announcement_id = ?', [normalizedAnnouncementId]);
 
-  if (!announcement) {
-    return {
-      inspection_id: null,
-      detail_count: 0,
-      deleted_inspection_count: existingInspectionIds.length
-    };
-  }
-
-  const [detailRows] = await connection.query(
-    `
-      SELECT
-        apd.*,
-        csr.company_id
-      FROM announcement_product_details apd
-      LEFT JOIN company_sampling_records csr
-        ON csr.announcement_detail_id = apd.id
-       AND csr.announcement_id = apd.announcement_id
-      WHERE apd.announcement_id = ?
-      ORDER BY apd.sequence_no ASC, apd.id ASC
-    `,
-    [normalizedAnnouncementId]
-  );
-
-  if (detailRows.length === 0) {
-    return {
-      inspection_id: null,
-      detail_count: 0,
-      deleted_inspection_count: existingInspectionIds.length
-    };
-  }
-
-  const totalSamples = detailRows.length;
-  const unqualifiedCount = detailRows.length;
-  const qualifiedCount = 0;
-  const qualifiedRate = 0;
-  const region = deriveInspectionRegion(detailRows);
-  const level = deriveInspectionLevel(announcement, region);
-  const summary = buildInspectionSummary(announcement, detailRows);
-
-  const [inspectionResult] = await connection.query(
-    `
-      INSERT INTO inspections (
-        announcement_id,
-        title,
-        batch_number,
-        inspection_date,
-        inspection_unit,
-        region,
-        level,
-        total_samples,
-        qualified_count,
-        unqualified_count,
-        qualified_rate,
-        summary,
-        status,
-        source
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', '抽检通告派生')
-    `,
-    [
-      normalizedAnnouncementId,
-      announcement.title,
-      announcement.announcement_no || null,
-      announcement.publish_date || null,
-      announcement.inspection_unit || null,
-      region,
-      level,
-      totalSamples,
-      qualifiedCount,
-      unqualifiedCount,
-      qualifiedRate,
-      summary
-    ]
-  );
-
-  const inspectionId = Number(inspectionResult.insertId);
-
-  const chunkSize = 200;
-  for (let index = 0; index < detailRows.length; index += chunkSize) {
-    const chunk = detailRows.slice(index, index + chunkSize);
-    const values = chunk.flatMap((row) => {
-      const companyNames = splitCompanyNames(row.company_names);
-      return [
-        inspectionId,
-        row.product_name || null,
-        null,
-        row.company_id ? Number(row.company_id) : null,
-        companyNames[0] || normalizeText(row.company_names) || null,
-        normalizeDateForSql(row.production_date),
-        row.sample_unit_name || row.sample_unit_address || row.product_region || null,
-        'unqualified',
-        row.unqualified_items || null,
-        row.requirement || null
-      ];
-    });
-
-    await connection.query(
-      `
-        INSERT INTO inspection_details (
-          inspection_id,
-          product_name,
-          brand,
-          company_id,
-          manufacturer,
-          production_date,
-          sample_source,
-          inspection_result,
-          unqualified_items,
-          inspection_standard
-        ) VALUES ${chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}
-      `,
-      values
-    );
-  }
-
-  await connection.query(
-    'UPDATE announcements SET inspection_count = ? WHERE id = ?',
-    [Math.max(totalSamples, Number(announcement.inspection_count || 0)), normalizedAnnouncementId]
-  );
-
   return {
-    inspection_id: inspectionId,
-    detail_count: detailRows.length,
-    deleted_inspection_count: existingInspectionIds.length,
-    total_samples: totalSamples,
-    qualified_count: qualifiedCount,
-    unqualified_count: unqualifiedCount,
-    region,
-    level
+    deleted_inspection_count: existingInspectionIds.length
   };
 }
 
 module.exports = {
   ensureInspectionDetailsSchema,
-  syncInspectionsFromAnnouncementDetails
+  removeInspectionsDerivedFromAnnouncement
 };
 

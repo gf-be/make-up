@@ -55,18 +55,18 @@ const routes = [
   {
     path: '/announcement-tracebacks',
     redirect: (to) => {
-      const query = { ...to.query };
-      delete query.path;
-      const legacyId = query.id;
-      delete query.id;
-      query.view = 'traceback';
-      if (legacyId && !query.tracebackId) {
-        query.tracebackId = String(Array.isArray(legacyId) ? legacyId[0] : legacyId);
-      }
+      const query = { ...to.query }
+      delete query.path
+      delete query.id
+      delete query.tracebackId
       return {
         path: '/announcement-staging',
-        query
-      };
+        query: {
+          ...query,
+          view: 'staging',
+          stagingTab: 'batchReview'
+        }
+      }
     }
   },
   {

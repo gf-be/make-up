@@ -53,71 +53,98 @@
     </el-card>
 
     <div class="manage-layout">
-      <el-card shadow="never" class="list-card">
-        <template #header>
-          <div class="panel-header">
-            <span>通告列表</span>
-            <!-- <el-tag type="info" effect="plain">共 {{ pagination.total }} 条</el-tag> -->
-          </div>
-        </template>
-
-        <el-table
-          v-loading="loading"
-          :data="announcementRows"
-          row-key="id"
-          stripe
-          highlight-current-row
-          empty-text="暂无通告"
-          class="announcement-table"
-          :row-class-name="getRowClassName"
-          @row-click="selectAnnouncement"
+      <div class="list-drawer-workspace">
+        <div
+          class="list-drawer-hover-edge"
+          title="鼠标移入查看通告列表"
+          @mouseenter="openListDrawer"
+          @mouseleave="scheduleCloseListDrawer"
         >
-          <el-table-column label="通告信息" min-width="260" show-overflow-tooltip>
-            <template #default="{ row }">
-              <div class="announcement-title">{{ row.title || '（无标题）' }}</div>
-              <div class="announcement-meta">
-                <span>{{ row.announcement_no || '无编号' }}</span>
-                <span>{{ formatDate(row.publish_date) }}</span>
-              </div>
-            </template>
-          </el-table-column>
-          <!-- <el-table-column label="产品" width="86" align="center">
-            <template #default="{ row }">
-              <el-tag size="small">{{ getProductTypeLabel(row.product_type) }}</el-tag>
-            </template>
-          </el-table-column> -->
-          <!-- <el-table-column prop="inspection_count" label="批次" width="72" align="center" /> -->
-        </el-table>
-
-        <el-pagination
-          v-model:current-page="pagination.page"
-          v-model:page-size="pagination.limit"
-          :total="pagination.total"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next"
-          small
-          background
-          class="pagination"
-          @size-change="handlePageSizeChange"
-          @current-change="loadAnnouncements"
-        />
-      </el-card>
-
-      <div class="detail-pane">
-        <div v-if="selectedAnnouncement" class="detail-toolbar">
-          <div class="selected-title">{{ selectedAnnouncement.title || '通告详情' }}</div>
+          <span class="list-drawer-edge-label">通告列表</span>
         </div>
-        <AnnouncementDetail :announcement-id="selectedAnnouncementId" embedded />
+
+        <el-drawer
+          v-model="listDrawerVisible"
+          v-bind="listDrawerProps"
+          class="announcement-list-drawer"
+        >
+          <div
+            class="list-drawer-body"
+            @mouseenter="openListDrawer"
+            @mouseleave="scheduleCloseListDrawer"
+          >
+            <el-table
+              v-loading="loading"
+              :data="announcementRows"
+              row-key="id"
+              stripe
+              highlight-current-row
+              empty-text="暂无通告"
+              class="announcement-table"
+              :max-height="announcementListTableMaxHeight"
+              :row-class-name="getRowClassName"
+              @row-click="selectAnnouncement"
+            >
+              <el-table-column label="通告信息" min-width="260" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <div class="announcement-title">{{ row.title || '（无标题）' }}</div>
+                  <div class="announcement-meta">
+                    <span>{{ row.announcement_no || '无编号' }}</span>
+                    <span>{{ formatDate(row.publish_date) }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <el-pagination
+              v-if="announcementPaginationVisible"
+              v-model:current-page="pagination.page"
+              v-model:page-size="pagination.limit"
+              :total="pagination.total"
+              :page-sizes="[10, 20]"
+              layout="total, sizes, prev, pager, next"
+              small
+              background
+              class="pagination"
+              @size-change="handlePageSizeChange"
+              @current-change="loadAnnouncements"
+            />
+          </div>
+        </el-drawer>
+
+        <div class="detail-pane">
+          <div v-if="selectedAnnouncement" class="detail-toolbar">
+            <div class="selected-title">{{ selectedAnnouncement.title || '通告详情' }}</div>
+          </div>
+          <AnnouncementDetail :announcement-id="selectedAnnouncementId" embedded />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import AnnouncementDetail from './AnnouncementDetail.vue'
 import { getAnnouncements } from '@/api/index'
+
+/** @typedef {import('element-plus').DrawerProps} DrawerProps */
+
+/** @type {DrawerProps} */
+const listDrawerProps = {
+  direction: 'ltr',
+  size: '380px',
+  modal: false,
+  showClose: false,
+  appendToBody: false,
+  teleported: false,
+  title: '通告列表'
+}
+
+const listDrawerVisible = ref(false)
+const announcementListTableMaxHeight = ref(520)
+let listDrawerCloseTimer = null
 
 const PRODUCT_TYPE_LABELS = {
   cosmetics: '化妆品',
@@ -152,6 +179,8 @@ const pagination = reactive({
 const selectedAnnouncement = computed(() =>
   announcementRows.value.find((row) => String(row.id) === String(selectedAnnouncementId.value)) || null
 )
+
+const announcementPaginationVisible = computed(() => Number(pagination.total || 0) >= 10)
 
 function normalizeAnnouncementListResponse(res) {
   const payload = res?.data
@@ -231,7 +260,47 @@ function getRowClassName({ row }) {
   return String(row.id) === String(selectedAnnouncementId.value) ? 'selected-row' : ''
 }
 
+function syncAnnouncementListTableMaxHeight() {
+  if (typeof window === 'undefined') {
+    return
+  }
+  announcementListTableMaxHeight.value = Math.max(320, Math.min(760, Math.round(window.innerHeight - 280)))
+}
+
+function openListDrawer() {
+  if (listDrawerCloseTimer) {
+    clearTimeout(listDrawerCloseTimer)
+    listDrawerCloseTimer = null
+  }
+  listDrawerVisible.value = true
+}
+
+function scheduleCloseListDrawer() {
+  if (listDrawerCloseTimer) {
+    clearTimeout(listDrawerCloseTimer)
+  }
+  listDrawerCloseTimer = window.setTimeout(() => {
+    listDrawerVisible.value = false
+    listDrawerCloseTimer = null
+  }, 280)
+}
+
+syncAnnouncementListTableMaxHeight()
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', syncAnnouncementListTableMaxHeight)
+}
+
 loadAnnouncements()
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', syncAnnouncementListTableMaxHeight)
+  }
+  if (listDrawerCloseTimer) {
+    clearTimeout(listDrawerCloseTimer)
+    listDrawerCloseTimer = null
+  }
+})
 </script>
 
 <style scoped>
@@ -271,51 +340,149 @@ loadAnnouncements()
 }
 
 .manage-layout {
-  display: grid;
-  grid-template-columns: minmax(380px, 34%) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
+  min-height: calc(100vh - 230px);
 }
 
-.list-card,
+.list-drawer-workspace {
+  position: relative;
+  min-height: calc(100vh - 230px);
+  padding-left: 18px;
+}
+
+.list-drawer-hover-edge {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 0 10px 10px 0;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.1), rgba(147, 197, 253, 0.04));
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  border-left: none;
+  transition: background 0.2s ease, width 0.2s ease, box-shadow 0.2s ease;
+}
+
+.list-drawer-hover-edge:hover {
+  width: 18px;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.16), rgba(147, 197, 253, 0.08));
+  box-shadow: 2px 0 10px rgba(96, 165, 250, 0.08);
+}
+
+.list-drawer-edge-label {
+  writing-mode: vertical-rl;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #7da7d9;
+  user-select: none;
+}
+
+.list-drawer-body {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.announcement-list-drawer.el-drawer) {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  height: auto;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fcfdff;
+  border-right: 1px solid #edf2f8;
+  box-shadow: 6px 0 20px rgba(100, 130, 170, 0.06);
+}
+
+:deep(.announcement-list-drawer .el-drawer__header) {
+  margin-bottom: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8eef6;
+  background: linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
+  flex-shrink: 0;
+}
+
+:deep(.announcement-list-drawer .el-drawer__title) {
+  color: #5b7ea8;
+  font-weight: 600;
+}
+
+:deep(.announcement-list-drawer .el-drawer__body) {
+  padding: 0 12px 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .detail-pane {
   min-height: calc(100vh - 230px);
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .announcement-table {
   width: 100%;
 }
 
+.announcement-table :deep(.el-table__header-wrapper th.el-table__cell) {
+  background: #f7faff !important;
+  color: #7a94b8;
+  border-bottom-color: #edf2f8 !important;
+}
+
+.announcement-table :deep(.el-table__body tr > td.el-table__cell) {
+  border-bottom-color: #f3f6fb;
+  color: #5f6f82;
+}
+
+.announcement-table :deep(.el-table__body tr.el-table__row--striped > td.el-table__cell) {
+  background: #fcfdff;
+}
+
+.announcement-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: #f6f9fd !important;
+}
+
 .announcement-title {
   font-weight: 600;
-  color: #303133;
+  color: #5b7ea8;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  border-bottom: 1px solid #eef4fb;
 }
 
 .announcement-meta {
   display: flex;
   gap: 10px;
   margin-top: 4px;
-  color: #909399;
+  color: #9eb3cc;
   font-size: 12px;
 }
 
-.list-card :deep(.selected-row > td) {
-  background-color: #ecf5ff !important;
+.announcement-table :deep(.selected-row > td) {
+  background-color: #f1f6fc !important;
+  color: #5b7ea8 !important;
+  box-shadow: inset 3px 0 0 #a8c4e8;
 }
 
 .pagination {
   margin-top: 14px;
   justify-content: flex-end;
-}
-
-.detail-pane {
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .detail-toolbar {
@@ -332,11 +499,5 @@ loadAnnouncements()
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@media (max-width: 1100px) {
-  .manage-layout {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

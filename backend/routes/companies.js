@@ -4,6 +4,11 @@ const pool = require('../config/database');
 const { requireRoles } = require('../utils/auth');
 const { ensureCompaniesSamplingSchema } = require('../utils/companySamplingSync');
 const { getProductTypeOptions, normalizeProductType } = require('../utils/unqualifiedProducts');
+const {
+  normalizeProvinceToStandard,
+  appendProvinceColumnPredicate,
+  sqlProvinceBaseNameExpr
+} = require('../utils/chinaProvinces');
 
 const USCC_CHARSET_RE = /^[0-9A-HJ-NPQRTUWXY]{18}$/i;
 const JP_CORP_NUM_RE = /^\d{13}$/;
@@ -17,12 +22,10 @@ function normalizeUsEinDigits(raw) {
   return US_EIN_DIGITS_RE.test(compact) ? compact : null;
 }
 
-/**
- * SQL：去掉全角/半角括号及其中内容后的省份主名，用于列表筛选与筛选项 DISTINCT（「河南」「河南（豫）」归为同一项）
- * @param {string} columnRef 如 c.province、province
- */
-function sqlProvinceBaseName(columnRef) {
-  return `TRIM(SUBSTRING_INDEX(REPLACE(REPLACE(IFNULL(${columnRef},''), '（', '('), '）', ')'), '(', 1))`;
+function appendCompanyProvinceFilter(clauses, params, provinceRaw, columnRef = 'c.province') {
+  const canon = normalizeProvinceToStandard(provinceRaw);
+  if (!canon) return;
+  clauses.push(appendProvinceColumnPredicate(columnRef, canon, params));
 }
 
 /** 中国 USCC / 日本法人番号 / 美国 EIN，返回存库用字符串；不合法则 null */
@@ -157,22 +160,6 @@ function buildUnqualifiedCompanySourceSql() {
     UNION ALL
 
     SELECT
-      d.company_id,
-      d.product_name,
-      COALESCE(i.inspection_date, DATE(d.created_at), DATE(i.created_at)) AS record_date,
-      a.product_type AS product_type,
-      COALESCE(a.announcement_type, 'sampling') AS announcement_type,
-      'inspection' AS source_type,
-      i.id AS source_id,
-      i.title AS source_title
-    FROM inspection_details d
-    LEFT JOIN inspections i ON d.inspection_id = i.id
-    LEFT JOIN announcements a ON i.announcement_id = a.id
-    WHERE d.inspection_result = 'unqualified' AND d.company_id IS NOT NULL
-
-    UNION ALL
-
-    SELECT
       csr.company_id,
       NULL AS product_name,
       COALESCE(s.publish_date, s.supervision_date) AS record_date,
@@ -202,9 +189,7 @@ function applyUnqualifiedCompanyFilters(queryParts, params, filters = {}) {
   }
 
   if (province) {
-    const pnorm = sqlProvinceBaseName('c.province');
-    queryParts.push(`(${pnorm} = ? OR c.province = ?)`);
-    params.push(province, province);
+    appendCompanyProvinceFilter(queryParts, params, province);
   }
 
   if (productType) {
@@ -238,10 +223,6 @@ function buildCompanyHasUnqualifiedExists(alias = 'c') {
   return `(
     EXISTS (SELECT 1 FROM company_sampling_records csr WHERE csr.company_id = ${alias}.id)
     OR EXISTS (
-      SELECT 1 FROM inspection_details d
-      WHERE d.company_id = ${alias}.id AND d.inspection_result = 'unqualified'
-    )
-    OR EXISTS (
       SELECT 1 FROM company_supervision_records csr2
       INNER JOIN supervisions s ON s.id = csr2.supervision_id
       WHERE csr2.company_id = ${alias}.id
@@ -256,9 +237,6 @@ function buildCompanyHasUnqualifiedExists(alias = 'c') {
 function buildUnqualifiedDistinctCompanyUnionSql() {
   return `
     SELECT company_id FROM company_sampling_records
-    UNION
-    SELECT company_id FROM inspection_details
-    WHERE company_id IS NOT NULL AND inspection_result = 'unqualified'
     UNION
     SELECT csr.company_id FROM company_supervision_records csr
     INNER JOIN supervisions s ON s.id = csr.supervision_id
@@ -316,12 +294,11 @@ router.get('/', async (req, res) => {
       countParams.push(`%${brand}%`);
     }
     if (province) {
-      const provinceKw = String(province).trim();
-      const pnorm = sqlProvinceBaseName('c.province');
-      query += ` AND (${pnorm} = ? OR c.province = ?)`;
-      countQuery += ` AND (${pnorm} = ? OR c.province = ?)`;
-      params.push(provinceKw, provinceKw);
-      countParams.push(provinceKw, provinceKw);
+      const canon = normalizeProvinceToStandard(province);
+      if (canon) {
+        query += ` AND ${appendProvinceColumnPredicate('c.province', canon, params)}`;
+        countQuery += ` AND ${appendProvinceColumnPredicate('c.province', canon, countParams)}`;
+      }
     }
     if (product_category) {
       query += ' AND c.product_category = ?';
@@ -390,8 +367,6 @@ router.get('/stats/overview', async (req, res) => {
         SELECT COUNT(*) AS count FROM (
           SELECT company_id FROM company_sampling_records WHERE company_id IS NOT NULL
           UNION
-          SELECT company_id FROM inspection_details WHERE company_id IS NOT NULL
-          UNION
           SELECT company_id FROM company_supervision_records WHERE company_id IS NOT NULL
         ) sampled_companies
       `),
@@ -455,7 +430,7 @@ router.get('/unqualified/filter-options', async (req, res) => {
     await ensureCompaniesSamplingSchema(pool);
 
     const sourceSql = buildUnqualifiedCompanySourceSql();
-    const upnorm = sqlProvinceBaseName('c.province');
+    const upnorm = sqlProvinceBaseNameExpr('c.province');
     const [[provinceRows], [productTypeRows], [yearRows]] = await Promise.all([
       pool.query(
         `
@@ -590,7 +565,7 @@ router.get('/filter-options', async (req, res) => {
   try {
     await ensureCompaniesSamplingSchema(pool);
 
-    const pnorm = sqlProvinceBaseName('province');
+    const pnorm = sqlProvinceBaseNameExpr('province');
     const [[provinceRows], [productCategoryRows]] = await Promise.all([
       pool.query(
         `
@@ -990,23 +965,6 @@ router.get('/:id', async (req, res) => {
         UNION ALL
 
         SELECT
-          'inspection' AS source_type,
-          i.id AS source_id,
-          i.title,
-          i.inspection_date,
-          i.level,
-          d.product_name,
-          d.brand,
-          d.inspection_result,
-          d.unqualified_items,
-          d.inspection_standard
-        FROM inspection_details d
-        LEFT JOIN inspections i ON d.inspection_id = i.id
-        WHERE d.company_id = ?
-
-        UNION ALL
-
-        SELECT
           'supervision' AS source_type,
           s.id AS source_id,
           s.title,
@@ -1031,11 +989,11 @@ router.get('/:id', async (req, res) => {
         `
       SELECT
         COUNT(*) AS record_count,
-        COUNT(DISTINCT inspection_id) AS inspection_count,
+        COUNT(DISTINCT announcement_id) AS inspection_count,
         COUNT(DISTINCT product_name) AS product_count,
-        SUM(CASE WHEN inspection_result = 'qualified' THEN 1 ELSE 0 END) AS qualified_count,
-        SUM(CASE WHEN inspection_result = 'unqualified' THEN 1 ELSE 0 END) AS unqualified_count
-      FROM inspection_details
+        0 AS qualified_count,
+        COUNT(*) AS unqualified_count
+      FROM company_sampling_records
       WHERE company_id = ?
     `,
         [id]
@@ -1053,7 +1011,7 @@ router.get('/:id', async (req, res) => {
     ];
 
     if (includeHistory) {
-      aggPromises.push(pool.query(historySql, [id, id, id, historyLimit]));
+      aggPromises.push(pool.query(historySql, [id, id, historyLimit]));
     }
 
     const results = await Promise.all(aggPromises);

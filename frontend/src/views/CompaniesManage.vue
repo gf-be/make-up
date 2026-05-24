@@ -24,13 +24,18 @@
             <el-form-item label="省份">
               <el-select
                 v-model="filters.province"
-                placeholder="全部省份"
+                placeholder="全部"
                 clearable
                 filterable
                 style="width: 180px"
                 @change="onProvinceFilterChange"
               >
-                <el-option v-for="item in filterOptions.provinces" :key="item.value" :label="item.label" :value="item.value" />
+                <el-option
+                  v-for="item in filterOptions.provinces"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
               </el-select>
             </el-form-item>
             <el-form-item label="信用代码">
@@ -52,6 +57,7 @@
             </el-form-item>
           </el-form>
           <el-table
+            class="table-height company-list-table"
             :data="listRows"
             stripe
             row-key="id"
@@ -154,13 +160,20 @@
                   社会信用代码可与中/日/美常见规则一致，填写后不得重复。
                 </div> -->
 
+                <div class="edit-form-head">
+                  <el-button type="primary" :loading="saving" @click="handleBasicFormEditOrSave">
+                    {{ basicFormEditing ? '保存' : '编辑' }}
+                  </el-button>
+                  <el-button v-if="basicFormEditing" @click="cancelBasicFormEdit">取消</el-button>
+                </div>
+
                 <el-form ref="formRef" :model="editForm" label-width="128px" class="edit-form">
                   <el-form-item
                     label="企业名称"
                     prop="name"
                     :rules="[{ required: true, message: '请输入企业名称', trigger: 'blur' }]"
                   >
-                    <el-input v-model="editForm.name" maxlength="200" show-word-limit />
+                    <el-input v-model="editForm.name" maxlength="200" show-word-limit :disabled="!basicFormEditing" />
                   </el-form-item>
                   <el-form-item
                     label="社会信用代码"
@@ -174,33 +187,30 @@
                       placeholder="中国 18 位统一码 / 日本 13 位法人番号 / 美国 EIN；留空可清除"
                       clearable
                       style="width: 360px"
+                      :disabled="!basicFormEditing"
                     />
                   </el-form-item>
                   <el-form-item label="企业类型" prop="type">
-                    <el-select v-model="editForm.type" style="width: 220px">
+                    <el-select v-model="editForm.type" style="width: 220px" :disabled="!basicFormEditing">
                       <el-option label="生产企业" value="manufacturer" />
                       <el-option label="经销商" value="distributor" />
                       <el-option label="销售商" value="seller" />
                     </el-select>
                   </el-form-item>
                   <el-form-item label="品牌" >
-                    <el-input v-model="editForm.brand" maxlength="120" clearable placeholder="可不填品牌名称"/>
+                    <el-input v-model="editForm.brand" maxlength="120" clearable placeholder="可不填品牌名称" :disabled="!basicFormEditing" />
                   </el-form-item>
                   <el-form-item label="产品分类">
-                    <el-input v-model="editForm.product_category" maxlength="100" placeholder="如：化妆品" clearable />
+                    <el-input v-model="editForm.product_category" maxlength="100" placeholder="如：化妆品" clearable :disabled="!basicFormEditing" />
                   </el-form-item>
                   <el-form-item label="省份">
-                    <el-input v-model="editForm.province" maxlength="50" clearable />
+                    <el-input v-model="editForm.province" maxlength="50" clearable :disabled="!basicFormEditing" />
                   </el-form-item>
                   <el-form-item label="城市">
-                    <el-input v-model="editForm.city" maxlength="50" clearable />
+                    <el-input v-model="editForm.city" maxlength="50" clearable :disabled="!basicFormEditing" />
                   </el-form-item>
                   <el-form-item label="地址">
-                    <el-input v-model="editForm.address" type="textarea" :rows="3" maxlength="500" show-word-limit />
-                  </el-form-item>
-                  <el-form-item>
-                    <el-button type="primary" :loading="saving" @click="saveBasic">保存主档</el-button>
-                    <el-button @click="reloadDetail">取消</el-button>
+                    <el-input v-model="editForm.address" type="textarea" :rows="3" maxlength="500" show-word-limit :disabled="!basicFormEditing" />
                   </el-form-item>
                 </el-form>
               </el-tab-pane>
@@ -356,6 +366,7 @@ import {
   confirmImportCompanyNameChange
 } from '@/api/index'
 import { currentUser, MODULE_PERMISSIONS } from '@/utils/auth'
+import { mergeProvinceSelectOptions, normalizeProvinceToStandard } from '@/utils/chinaProvinces.js'
 
 const router = useRouter()
 
@@ -373,6 +384,7 @@ function userCanNavigateTo(moduleKey) {
 const listLoading = ref(false)
 const detailLoading = ref(false)
 const saving = ref(false)
+const basicFormEditing = ref(false)
 const deletingCompany = ref(false)
 const listRows = ref([])
 const selectedId = ref(null)
@@ -801,27 +813,9 @@ function normalizeListRes(res) {
   return { rows, total }
 }
 
-/** 去掉全角/半角括号及其中内容，与后端 `sqlProvinceBaseName` 语义一致 */
-function provinceDisplayBaseName(raw) {
-  let s = String(raw ?? '').trim()
-  if (!s) return ''
-  let prev = ''
-  while (s !== prev) {
-    prev = s
-    s = s.replace(/\s*[\(（][^)）]*[\)）]\s*/g, '').trim()
-  }
-  return s
-}
-
-/** 省份下拉：主名去重（如「河南」「河南（豫）」合并为一项） */
-function normalizeProvinceSelectOptions(list) {
-  const map = new Map()
-  for (const item of list || []) {
-    const base = provinceDisplayBaseName(item?.value ?? item?.label ?? '')
-    if (!base) continue
-    if (!map.has(base)) map.set(base, { value: base, label: base })
-  }
-  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'))
+function resolveProvinceFilterParam(value) {
+  const normalized = normalizeProvinceToStandard(value)
+  return normalized || undefined
 }
 
 async function loadFilterOptions() {
@@ -829,7 +823,7 @@ async function loadFilterOptions() {
     const res = await getCompanyFilterOptions()
     const data = res?.data || { provinces: [], product_categories: [] }
     filterOptions.value = {
-      provinces: normalizeProvinceSelectOptions(data.provinces),
+      provinces: mergeProvinceSelectOptions(data.provinces),
       product_categories: Array.isArray(data.product_categories) ? data.product_categories : []
     }
   } catch {
@@ -847,7 +841,7 @@ async function loadList() {
   try {
     const res = await getCompanies({
       name: filters.name || undefined,
-      province: filters.province?.trim() || undefined,
+      province: resolveProvinceFilterParam(filters.province),
       credit_code: filters.credit_code?.trim() || undefined,
       credit_code_empty: filters.credit_code_empty ? 'true' : undefined,
       page: pagination.page,
@@ -901,7 +895,7 @@ async function exportList() {
     if (needFetch) {
       const res = await getCompanies({
         name: filters.name || undefined,
-        province: filters.province?.trim() || undefined,
+        province: resolveProvinceFilterParam(filters.province),
         credit_code: filters.credit_code?.trim() || undefined,
         credit_code_empty: filters.credit_code_empty ? 'true' : undefined,
         page: 1,
@@ -946,6 +940,7 @@ async function exportList() {
 async function loadDetail(id) {
   if (!id) return
   detailLoading.value = true
+  basicFormEditing.value = false
   try {
     const res = await getCompanyDetail(id, { include_history: 0 })
     detail.value = res?.data ?? null
@@ -960,6 +955,22 @@ async function loadDetail(id) {
   }
 }
 
+function cancelBasicFormEdit() {
+  if (detail.value?.company) {
+    applyCompanyToForm(detail.value.company)
+  }
+  formRef.value?.clearValidate?.()
+  basicFormEditing.value = false
+}
+
+async function handleBasicFormEditOrSave() {
+  if (!basicFormEditing.value) {
+    basicFormEditing.value = true
+    return
+  }
+  await saveBasic()
+}
+
 function reloadDetail() {
   return loadDetail(selectedId.value)
 }
@@ -972,6 +983,7 @@ function handleRowClick(row) {
 watch(selectedId, (id) => {
   if (!id) {
     detail.value = null
+    basicFormEditing.value = false
     return
   }
   activeTab.value = 'basic'
@@ -1040,6 +1052,7 @@ async function saveBasic() {
       product_category: editForm.product_category?.trim() || null
     })
     ElMessage.success('企业主档已保存')
+    basicFormEditing.value = false
     await loadList()
     await reloadDetail()
   } catch (e) {
@@ -1122,6 +1135,56 @@ loadList()
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* 左侧企业列表：清爽蓝色系表格 */
+.company-list-table {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #c8daf5 !important;
+  box-shadow: 0 1px 4px rgba(64, 128, 220, 0.08);
+}
+
+.company-list-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.company-list-table :deep(.el-table__header th.el-table__cell) {
+  background: linear-gradient(180deg, #5b9cf6 0%, #4a8fe8 100%) !important;
+  color: #ffffff !important;
+  border-color: #7eb0f4 !important;
+  font-weight: 600 !important;
+  font-size: 13px;
+  padding: 10px 0;
+}
+
+.company-list-table :deep(.el-table__body td.el-table__cell) {
+  border-color: #dce8fa !important;
+  color: #303133;
+  font-size: 13px;
+  padding: 9px 0;
+  transition: background-color 0.15s ease;
+}
+
+.company-list-table :deep(.el-table__body tr.el-table__row--striped td.el-table__cell) {
+  background-color: #f7faff !important;
+}
+
+.company-list-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: #ebf3ff !important;
+  cursor: pointer;
+}
+
+.company-list-table :deep(.el-table__body tr.current-row > td.el-table__cell) {
+  background-color: #dbeafe !important;
+}
+
+.company-list-table :deep(.el-table__empty-block) {
+  background-color: #fafcff;
+}
+
+.company-list-table :deep(.el-table__empty-text) {
+  color: #8da8cc;
 }
 
 .import-tips {
@@ -1226,6 +1289,13 @@ loadList()
 
 .edit-form {
   max-width: 720px;
+}
+
+.edit-form-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 12px;
 }
 
 .muted-text {

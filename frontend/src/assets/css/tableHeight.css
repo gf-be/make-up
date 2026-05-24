@@ -7,7 +7,7 @@
 
 /* 表头：蓝色背景 + 白色文字 */
 .table-height .el-table__header th {
-  background-color: #6aace2 !important;
+  background-color: #8ec7f7 !important;
   color: #ffffff !important;
   border: 1px solid #c7d5f3 !important;
   font-weight: 600 !important;
@@ -21,7 +21,7 @@
 
 /* 悬浮行（stripe 行背景用 .el-table__cell，需直接命中 td） */
 .table-height .el-table__body tr:hover > td {
-  background-color: #e6f0ff !important;
+  background-color: #E8F3FF !important;
 }
 .table-height .ascending{
   border-bottom-color: #ffffff!important;
@@ -37,3 +37,7 @@
 .el-card__body{
   padding: 8px 10px 8px!important;
 }
+/* .table-height :deep(.el-table__body tr.is-active-batch > td.el-table__cell),
+.table-height :deep(.el-table__body tr.is-hover-row > td.el-table__cell) {
+  overflow: visible !important;
+} */

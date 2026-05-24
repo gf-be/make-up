@@ -48,7 +48,7 @@
         :total="pagination.total"
         :page-size="pagination.limit"
         :current-page="pagination.page"
-        :page-sizes="[10, 20, 50, 100]"
+        :page-sizes="[10, 20]"
         @current-change="onPageChange"
         @size-change="onSizeChange"
       />

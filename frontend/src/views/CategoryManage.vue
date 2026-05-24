@@ -24,9 +24,9 @@
 
                 <div class="tree-node">
                   <span class="tree-node-label">{{ data.label }}</span>
-                  <el-tag v-if="data.type === 'category'" size="small" type="info">
+                  <!-- <el-tag v-if="data.type === 'category'" size="small" type="info">
                     {{ data.usage_count ?? 0 }}
-                  </el-tag>
+                  </el-tag> -->
                 </div>
               </template>
             </el-tree>
@@ -112,7 +112,7 @@
       destroy-on-close>
       <el-form label-width="92px" class="category-dialog-form">
         <el-form-item label="类型键" required>
-          <el-input v-model="newTypeKey" placeholder="数据库内存储的名称" maxlength="50" show-word-limit clearable
+          <el-input v-model="newTypeKey" placeholder="" maxlength="50" show-word-limit clearable
             @keyup.enter="handleCreateProductType" />
         </el-form-item>
         <el-form-item label="显示名称">

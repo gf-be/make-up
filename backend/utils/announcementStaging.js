@@ -16,7 +16,7 @@ const {
   getSupervisionRelatedCompanyIds,
   removeAnnouncementCompanySampling
 } = require('./companySamplingSync');
-const { syncInspectionsFromAnnouncementDetails } = require('./announcementInspectionSync');
+const { removeInspectionsDerivedFromAnnouncement } = require('./announcementInspectionSync');
 const { linkFoodInspectionToPublishedAnnouncement } = require('./foodInspectionStore');
 
 const {
@@ -2607,13 +2607,13 @@ async function syncPublishedAnnouncementDerivedData(connection, announcementId, 
   const publishDate = announcementRows[0]?.publish_date || null;
 
   const companySyncResult = await syncCompaniesFromAnnouncementDetails(connection, announcementId, publishDate);
-  const inspectionSyncResult = await syncInspectionsFromAnnouncementDetails(connection, announcementId);
+  const derivedInspectionCleanup = await removeInspectionsDerivedFromAnnouncement(connection, announcementId);
   const unqualifiedSyncResult = await replaceUnqualifiedProductsFromAnnouncementDetails(connection, announcementId);
   const inspectionCount = await refreshPublishedAnnouncementInspectionCount(connection, announcementId, fallbackInspectionCount);
 
   return {
     companySyncResult,
-    inspectionSyncResult,
+    derivedInspectionCleanup,
     unqualifiedSyncResult,
     inspectionCount
   };

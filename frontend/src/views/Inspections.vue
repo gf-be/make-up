@@ -105,7 +105,7 @@
         v-model:page-size="pagination.limit"
         v-model:current-page="pagination.page"
         :total="pagination.total"
-        :page-sizes="[10, 20, 50, 100]"
+        :page-sizes="[10, 20]"
         layout="total, sizes, prev, pager, next, jumper"
         @size-change="loadData"
         @current-change="loadData"

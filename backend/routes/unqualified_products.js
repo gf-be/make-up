@@ -1083,6 +1083,7 @@ function pickTreeFilterSnapshot(filters = {}) {
     'year_end',
     'announcement_id',
     'supervision_id',
+    'usage_count_zero',
     'dimension_preset_id'
   ];
   const out = {};
@@ -1305,6 +1306,17 @@ function appendUnqualifiedProductFilters(conditions, params, filters = {}) {
       )
     `);
   }
+
+  if (isTruthyQueryFlag(filters.usage_count_zero)) {
+    conditions.push(`
+      NOT EXISTS (
+        SELECT 1
+        FROM unqualified_product_usage_records upur_zero
+        WHERE upur_zero.unqualified_product_id = up.id
+          AND upur_zero.use_count > 0
+      )
+    `);
+  }
 }
 
 const TREE_DIMENSION_DEFS = {
@@ -1432,6 +1444,11 @@ function normalizeTreePath(path = {}) {
   }
 
   return normalized;
+}
+
+function isTruthyQueryFlag(value) {
+  return value === true || value === 1 || value === '1'
+    || String(value || '').trim().toLowerCase() === 'true';
 }
 
 function parseTreePaths(input = {}) {
@@ -2235,8 +2252,9 @@ async function handleUnqualifiedNodeDetails(req, res) {
     const offset = (currentPage - 1) * pageSize;
 
     const dimensionOrder = getConfiguredTreeDimensions(input.dimension_order);
+    const filterOnly = isTruthyQueryFlag(input.filter_only);
     const selectedPaths = compactTreePaths(parseTreePaths(input));
-    if (!selectedPaths.length) {
+    if (!selectedPaths.length && !filterOnly) {
       return res.json({
         success: true,
         data: [],
@@ -2253,19 +2271,25 @@ async function handleUnqualifiedNodeDetails(req, res) {
 
     const { whereClause, params } = buildBaseFilterState(input);
     const countParams = [...params];
-    const pathSql = buildPathExistsSql(selectedPaths, countParams, 'up');
+    const pathSql = selectedPaths.length
+      ? buildPathExistsSql(selectedPaths, countParams, 'up')
+      : '';
+    const pathClause = pathSql ? `AND ${pathSql}` : '';
     const [countRows] = await pool.query(
       `
         SELECT COUNT(*) AS total
         FROM unqualified_products up
         WHERE ${whereClause}
-          AND ${pathSql}
+          ${pathClause}
       `,
       countParams
     );
     const total = Number(countRows[0]?.total || 0);
     const dataParams = [...params];
-    const dataPathSql = buildPathExistsSql(selectedPaths, dataParams, 'up');
+    const dataPathSql = selectedPaths.length
+      ? buildPathExistsSql(selectedPaths, dataParams, 'up')
+      : '';
+    const dataPathClause = dataPathSql ? `AND ${dataPathSql}` : '';
     const [pageRows] = await pool.query(
       `
         SELECT
@@ -2273,7 +2297,7 @@ async function handleUnqualifiedNodeDetails(req, res) {
         FROM unqualified_products up
         ${getProductUsageStatsJoinSql('up')}
         WHERE ${whereClause}
-          AND ${dataPathSql}
+          ${dataPathClause}
         ORDER BY ${getProductOrderClause('up', input)}
         LIMIT ? OFFSET ?
       `,
@@ -2408,8 +2432,9 @@ async function handleNodeDetailChart(req, res) {
       return res.status(400).json({ success: false, message: '无效的统计字段' });
     }
 
+    const filterOnly = isTruthyQueryFlag(input.filter_only);
     const selectedPaths = compactTreePaths(parseTreePaths(input));
-    if (!selectedPaths.length) {
+    if (!selectedPaths.length && !filterOnly) {
       return res.json({ success: true, data: [], chart_dimension: dimensionKey });
     }
 
@@ -2417,7 +2442,10 @@ async function handleNodeDetailChart(req, res) {
 
     const { whereClause, params } = buildBaseFilterState(input);
     const queryParams = [...params];
-    const pathSql = buildPathExistsSql(selectedPaths, queryParams, 'up');
+    const pathSql = selectedPaths.length
+      ? buildPathExistsSql(selectedPaths, queryParams, 'up')
+      : '';
+    const pathClause = pathSql ? `AND ${pathSql}` : '';
     const idClause =
       productIds.length > 0 ? `AND up.id IN (${productIds.map(() => '?').join(', ')})` : '';
     if (productIds.length) {
@@ -2429,7 +2457,7 @@ async function handleNodeDetailChart(req, res) {
         SELECT (${bucketExpr}) AS bucket, COUNT(*) AS cnt
         FROM unqualified_products up
         WHERE ${whereClause}
-          AND ${pathSql}
+          ${pathClause}
           ${idClause}
         GROUP BY (${bucketExpr})
         ORDER BY cnt DESC

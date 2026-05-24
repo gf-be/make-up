@@ -50,7 +50,7 @@
         :page-size="pagination.limit"
         :current-page="pagination.page"
         :total="pagination.total"
-        :page-sizes="[10, 20, 50, 100]"
+        :page-sizes="[10, 20]"
         layout="total, sizes, prev, pager, next, jumper"
         @update:page-size="handlePageSizeChange"
         @update:current-page="handlePageChange"

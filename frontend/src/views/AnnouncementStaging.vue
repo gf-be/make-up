@@ -36,7 +36,9 @@
         </div>
       </template>
 
-      <el-tabs v-model="mainTab" class="staging-main-tabs" @tab-change="onMainTabChange">
+
+
+      <el-tabs type="border-card" v-model="mainTab" class="staging-main-tabs" @tab-change="onMainTabChange">
         <!-- <el-tab-pane label="批量 JSON 工作台" name="batches"> -->
         <!-- <el-alert
             type="info"
@@ -121,64 +123,64 @@
         <!-- </el-tab-pane> -->
 
         <el-tab-pane label="待核验批次" name="batchReview">
+
+          <!-- <el-form :model="filters" inline class="filter-form-batch">
+            <el-form-item label="年份">
+              <el-select v-model="filters.year" clearable placeholder="全部" style="width: 120px" @change="applyFilters">
+                <el-option v-for="opt in yearOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="产品">
+              <el-select v-model="filters.product_type" clearable placeholder="全部" style="width: 120px"
+                @change="applyFilters">
+                <el-option v-for="opt in productTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="状态">
+              <el-select v-model="filters.status" clearable placeholder="全部状态" style="width: 138px"
+                @change="applyFilters">
+                <el-option v-for="opt in statusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              </el-select>
+            </el-form-item>
+            <el-form-item style="margin-bottom: 0px;">
+              <el-button type="primary" @click="applyFilters">检索</el-button>
+              <el-button @click="resetFilters">重置</el-button>
+              <el-button type="success" plain :disabled="!overview.pending_batch_count" :loading="bulkConfirming"
+                style="margin: 12px 10px !important;" @click="handleConfirmAll">
+                一键入库（{{ overview.pending_batch_count || 0 }}）
+              </el-button>
+            </el-form-item>
+          </el-form> -->
           <div class="workspace-layout workspace-layout-simple">
-            <div class="batch-list-pane">
-              <el-card shadow="never" class="batch-list-card" v-loading="loading">
-
-
-                <el-form :model="filters" inline class="filter-form-batch">
-                  <el-form-item label="年份">
-                    <el-select v-model="filters.year" clearable placeholder="全部" style="width: 120px"
-                      @change="applyFilters">
-                      <el-option v-for="opt in yearOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-                    </el-select>
-                  </el-form-item>
-                  <el-form-item label="产品">
-                    <el-select v-model="filters.product_type" clearable placeholder="全部" style="width: 120px"
-                      @change="applyFilters">
-                      <el-option v-for="opt in productTypeOptions" :key="opt.value" :label="opt.label"
-                        :value="opt.value" />
-                    </el-select>
-                  </el-form-item>
-                  <el-form-item label="状态">
-                    <el-select v-model="filters.status" clearable placeholder="全部状态" style="width: 138px"
-                      @change="applyFilters">
-                      <el-option v-for="opt in statusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-                    </el-select>
-                  </el-form-item>
-                  <el-form-item style="margin-bottom: 0px;">
-                    <el-button type="primary" @click="applyFilters">检索</el-button>
-                    <el-button @click="resetFilters">重置</el-button>
-                    <el-button type="success" plain :disabled="!overview.pending_batch_count" :loading="bulkConfirming"
-                      style="margin: 12px 10px !important;" @click="handleConfirmAll">
-                      一键入库（{{ overview.pending_batch_count || 0 }}）
-                    </el-button>
-                  </el-form-item>
-                </el-form>
-
-                <el-table class="batch-table " :data="batchListRows" row-key="id"
-                  :max-height="batchReviewTableMaxHeight" size="small" stripe :row-class-name="batchRowClassName"
-                  @row-click="handleBatchRowClick">
-                  <el-table-column label="通告标题" min-width="190" show-overflow-tooltip>
-                    <template #default="{ row }">{{ row.title || '（无标题）' }}</template>
-                  </el-table-column>
-                  <!-- <el-table-column prop="announcement_no" label="年号" width="90" align="center" show-overflow-tooltip/> -->
-                  <!-- <el-table-column label="状态" width="82" align="center">
-                    <template #default="{ row }">
-                      <el-tag size="small" :type="getStatusTagType(row.status)">{{ getStatusLabel(row.status)
-                        }}</el-tag>
-                    </template>
-                  </el-table-column> -->
-                  <!-- <el-table-column label="上传人" width="88" show-overflow-tooltip>
-                    <template #default="{ row }">{{ getSourceUserLabel(row) }}</template>
-                  </el-table-column> -->
-                  <!-- <el-table-column label="来源文件" min-width="140" show-overflow-tooltip>
-                    <template #default="{ row }">{{ getStagingSourceFileLabel(row) }}</template>
-                  </el-table-column> -->
-                  <!-- <el-table-column prop="publish_date" label="发布日期" width="112" align="center" /> -->
-                </el-table>
-              </el-card>
+            <div class="batch-drawer-hover-edge" title="鼠标移入查看待核验批次列表" @mouseenter="openBatchDrawer"
+              @mouseleave="scheduleCloseBatchDrawer">
+              <span class="batch-drawer-edge-label">批次列表</span>
             </div>
+
+            <el-drawer v-model="batchDrawerVisible" direction="ltr" :size="batchDrawerWidth"
+              :modal="false" :show-close="false" :append-to-body="false" :teleported="false" class="batch-list-drawer">
+              <template #header>
+                <div class="batch-drawer-header">
+                  <div class="batch-drawer-header-main">
+                    <span class="batch-drawer-header-title">待核验批次</span>
+                    <!-- <span class="batch-drawer-header-badge">{{ batchListRows.length }}</span> -->
+                  </div>
+                  <!-- <span class="batch-drawer-header-sub">点击行查看详情</span> -->
+                </div>
+              </template>
+              <div class="batch-drawer-body" v-loading="loading" @mouseenter="openBatchDrawer"
+                @mouseleave="scheduleCloseBatchDrawer">
+                <el-table class="batch-table" :data="batchListRows" row-key="id"
+                  :max-height="batchReviewTableMaxHeight" size="small" stripe empty-text="暂无待核验批次"
+                  :row-class-name="batchRowClassName" @row-click="handleBatchRowClick">
+                  <el-table-column label="通告标题" min-width="190" show-overflow-tooltip>
+                    <template #default="{ row }">
+                      <span class="batch-table-title">{{ row.title || '（无标题）' }}</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </el-drawer>
 
             <div class="detail-layout">
 
@@ -200,10 +202,10 @@
                         暂存
                       </el-button>
 
-                      <!-- <el-button v-if="nextBatch" type="primary" plain :loading="switchingBatchId === nextBatch.id"
+                      <el-button v-if="nextBatch" type="primary" plain :loading="switchingBatchId === nextBatch.id"
                         @click="handleGoNextBatch()">
                         下一个通告
-                      </el-button> -->
+                      </el-button>
 
 
                       <el-button type="success" :loading="confirmingId === currentBatch.id"
@@ -218,10 +220,10 @@
                     <el-tab-pane label="通告正文" name="body">
                       <div class="section-toolbar section-toolbar-wrap">
                         <div class="attachment-table-edit-actions">
-                          <el-button v-if="!bodyTabEditing" link @click="enterBodyTabEdit">
+                          <el-button v-if="!bodyTabEditing" type="primary" round @click="enterBodyTabEdit">
                             编辑
                           </el-button>
-                          <el-button v-else @click="saveBodyTabEdit" link>
+                          <el-button v-else @click="saveBodyTabEdit" type="success" round>
                             保存
                           </el-button>
                         </div>
@@ -256,11 +258,11 @@
                               <el-form-item class="nested-form-item">
                                 <el-select v-model="infoEditForm.announcement_type" placeholder="请选择" size="small">
                                   <el-option v-for="opt in announcementTypeOptions" :key="opt.value" :label="opt.label"
-                                    :value="opt.value" />
+                                    :value="opt.value" width="100%" />
                                 </el-select>
                               </el-form-item>
                             </el-descriptions-item>
-                            <el-descriptions-item label="检验/检查单位">
+                            <el-descriptions-item label="检验/检查单位" :span="2">
                               <el-input v-model="infoEditForm.inspection_unit" size="small" />
                             </el-descriptions-item>
 
@@ -307,19 +309,18 @@
                     </el-tab-pane>
 
                     <el-tab-pane label="附件解析产品列表" name="attachments">
-                      <div class="section-toolbar section-toolbar-wrap" >
+                      <div class="section-toolbar section-toolbar-wrap">
                         <div v-if="hasAttachmentSamplingEditableTable" class="attachment-table-edit-actions">
-                          <el-button v-if="!attachmentsTableEditingRowKey" link
-                            title="请先在表格左侧展开恰好一行后再编辑该产品"
+                          <el-button v-if="!attachmentsTableEditingRowKey" type="primary" round title="请先在表格左侧展开恰好一行后再编辑该产品"
                             @click="enterAttachmentsTableEdit">
                             编辑
                           </el-button>
 
-                          <el-button v-else :loading="savingStagingAttachmentsInline" link type="primary"
+                          <el-button v-else :loading="savingStagingAttachmentsInline" round type="primary"
                             @click="saveAttachmentsTableEdit">
                             保存
                           </el-button>
-                          <el-button type="success" plain :loading="uploadingProductImages" link
+                          <el-button type="success" plain :loading="uploadingProductImages" round
                             @click="selectProductImages">
                             导入图片
                           </el-button>
@@ -336,216 +337,247 @@
 
                             <template v-if="currentMergedJsonAttachmentGroup.filtered_rows.length">
                               <div class="staging-attachment-table-shell">
-                              <el-table v-if="isFlightBatch" :data="currentMergedJsonAttachmentGroup.filtered_rows"
-                                size="small" stripe :max-height="attachmentTableMaxHeight"
-                                class="table-height staging-attachment-table" style="width: 100%">
-                                <el-table-column prop="sequence_no" label="序号" width="64" align="center" />
-                                <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
-                                <el-table-column prop="company_name" label="企业名称" min-width="160"
-                                  show-overflow-tooltip />
-                                <el-table-column prop="inspection_unit" label="检查单位" min-width="140"
-                                  show-overflow-tooltip />
-                                <el-table-column prop="defects_and_problems" label="检查问题" min-width="200"
-                                  show-overflow-tooltip />
-                                <el-table-column prop="handling_measures" label="处理措施" min-width="160"
-                                  show-overflow-tooltip />
-                              </el-table>
+                                <el-table v-if="isFlightBatch" :data="mergedAttachmentPageRows" size="small" stripe
+                                  :max-height="attachmentTableMaxHeight" class="table-height staging-attachment-table"
+                                  style="width: 100%">
+                                  <el-table-column prop="sequence_no" label="序号" width="64" align="center" />
+                                  <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
+                                  <el-table-column prop="company_name" label="企业名称" min-width="160"
+                                    show-overflow-tooltip />
+                                  <el-table-column prop="inspection_unit" label="检查单位" min-width="140"
+                                    show-overflow-tooltip />
+                                  <el-table-column prop="defects_and_problems" label="检查问题" min-width="200"
+                                    show-overflow-tooltip />
+                                  <el-table-column prop="handling_measures" label="处理措施" min-width="160"
+                                    show-overflow-tooltip />
+                                </el-table>
 
-                              <el-table v-else :data="currentMergedJsonAttachmentGroup.filtered_rows" size="small"
-                                stripe :max-height="attachmentTableMaxHeight"
-                                class="table-height staging-attachment-table" style="width: 100%"
-                                :row-key="(row) => stagingSamplingTableRowKey(currentMergedJsonAttachmentGroup, row)"
-                                :expand-row-keys="stagingMergedAccordionExpandKeys"
-                                @expand-change="onStagingSamplingMergedTableExpandChange">
-                                <el-table-column type="expand" width="44">
-                                  <template #default="{ row }">
-                                    <template v-if="isStagingMergedSamplingRowEditing(row)">
-                                      <el-descriptions :column="2" border size="small" class="detail-expanded">
+                                <el-table v-else ref="stagingAttachmentTableRef" :data="mergedAttachmentPageRows" size="small" stripe
+                                  :max-height="attachmentTableMaxHeight" class="table-height staging-attachment-table"
+                                  style="width: 100%"
+                                  :row-key="(row) => stagingSamplingTableRowKey(currentMergedJsonAttachmentGroup, row)"
+                                  :expand-row-keys="stagingMergedAccordionExpandKeys"
+                                  @expand-change="onStagingSamplingMergedTableExpandChange">
+                                  <el-table-column type="expand" width="44">
+                                    <template #default="{ row }">
+                                      <template v-if="isStagingMergedSamplingRowEditing(row)">
+                                        <el-descriptions :column="2" border size="small" class="detail-expanded">
+                                          <el-descriptions-item label="生产企业">
+                                            <el-input v-model="row.company_names" :autosize="{ minRows: 1, maxRows: 6 }"
+                                              size="small" placeholder="注册人/备案人等名称" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="生产企业地址">
+                                            <el-input v-model="row.company_addresses" type="textarea"
+                                              :autosize="{ minRows: 1, maxRows: 6 }" size="small" placeholder="地址" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="被抽样单位名称">
+                                            <el-input v-model="row.sample_unit_name" size="small"
+                                              placeholder="被抽样单位名称" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="被抽样单位地址">
+                                            <el-input v-model="row.sample_unit_address" type="textarea"
+                                              :autosize="{ minRows: 1, maxRows: 4 }" size="small" placeholder="地址" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="正文文案" :span="2">
+                                            <el-input v-model="row.food_body_text" type="textarea"
+                                              :autosize="{ minRows: 1, maxRows: 6 }" size="small" placeholder="正文文案" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="生产日期">
+                                            <el-input v-model="row.production_date" size="small" placeholder="生产日期" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="限期使用日期/保质期">
+                                            <el-input v-model="row.expiry_date" size="small" placeholder="限期使用日期/保质期" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item v-if="!isFoodStagingBatch" label="所在地/进口地区">
+                                            <el-input v-model="row.product_region" size="small"
+                                              placeholder="所在地/进口地区" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item v-if="!isFoodStagingBatch" label="注册/备案编号">
+                                            <el-input v-model="row.registration_no" size="small"
+                                              placeholder="注册/备案编号" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item v-if="!isFoodStagingBatch" label="生产许可证号">
+                                            <el-input v-model="row.production_license_no" size="small"
+                                              placeholder="生产许可证号" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="检验结果">
+                                            <el-input v-model="row.inspection_result" type="textarea"
+                                              :autosize="{ minRows: 1, maxRows: 6 }" size="small" placeholder="检验结果" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="规定要求">
+                                            <el-input v-model="row.requirement" type="textarea"
+                                              :autosize="{ minRows: 1, maxRows: 6 }" size="small" placeholder="规定要求" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="备注">
+                                            <el-input v-model="row.remarks" type="textarea"
+                                              :autosize="{ minRows:1, maxRows: 6 }" size="small" placeholder="备注" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="涉嫌假冒">
+                                            <el-switch :model-value="Boolean(Number(row.is_counterfeit))"
+                                              @update:model-value="(v) => { row.is_counterfeit = v ? 1 : 0 }" />
+                                          </el-descriptions-item>
+                                        </el-descriptions>
+                                      </template>
+                                      <el-descriptions v-else :column="2" border size="small" class="detail-expanded">
                                         <el-descriptions-item label="生产企业">
-                                          <el-input v-model="row.company_names" :autosize="{ minRows: 2, maxRows: 6 }"
-                                            size="small" placeholder="注册人/备案人等名称" />
+                                          <span class="attachment-readonly-block">{{ row.company_names || '—' }}</span>
                                         </el-descriptions-item>
                                         <el-descriptions-item label="生产企业地址">
-                                          <el-input v-model="row.company_addresses" type="textarea"
-                                            :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="地址" />
+                                          <span class="attachment-readonly-block">{{ row.company_addresses || '—'
+                                          }}</span>
                                         </el-descriptions-item>
                                         <el-descriptions-item label="被抽样单位名称">
-                                          <el-input v-model="row.sample_unit_name" size="small" placeholder="被抽样单位名称" />
+                                          {{ row.sample_unit_name || '—' }}
                                         </el-descriptions-item>
                                         <el-descriptions-item label="被抽样单位地址">
-                                          <el-input v-model="row.sample_unit_address" type="textarea"
-                                            :autosize="{ minRows: 2, maxRows: 4 }" size="small" placeholder="地址" />
-                                        </el-descriptions-item>
-                                        <el-descriptions-item label="正文文案" :span="2">
-                                          <el-input v-model="row.food_body_text" type="textarea"
-                                            :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="正文文案" />
+                                          <span class="attachment-readonly-block">{{ row.sample_unit_address || '—'
+                                          }}</span>
                                         </el-descriptions-item>
                                         <el-descriptions-item label="生产日期">
-                                          <el-input v-model="row.production_date" size="small" placeholder="生产日期" />
+                                          {{ row.production_date || '—' }}
                                         </el-descriptions-item>
                                         <el-descriptions-item label="限期使用日期/保质期">
-                                          <el-input v-model="row.expiry_date" size="small" placeholder="限期使用日期/保质期" />
+                                          {{ row.expiry_date || '—' }}
                                         </el-descriptions-item>
                                         <el-descriptions-item v-if="!isFoodStagingBatch" label="所在地/进口地区">
-                                          <el-input v-model="row.product_region" size="small" placeholder="所在地/进口地区" />
+                                          {{ row.product_region || '—' }}
                                         </el-descriptions-item>
                                         <el-descriptions-item v-if="!isFoodStagingBatch" label="注册/备案编号">
-                                          <el-input v-model="row.registration_no" size="small" placeholder="注册/备案编号" />
+                                          {{ row.registration_no || '—' }}
                                         </el-descriptions-item>
                                         <el-descriptions-item v-if="!isFoodStagingBatch" label="生产许可证号">
-                                          <el-input v-model="row.production_license_no" size="small"
-                                            placeholder="生产许可证号" />
+                                          {{ row.production_license_no || '—' }}
                                         </el-descriptions-item>
                                         <el-descriptions-item label="检验结果">
-                                          <el-input v-model="row.inspection_result" type="textarea"
-                                            :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="检验结果" />
+                                          <span class="attachment-readonly-block">{{ row.inspection_result || '—'
+                                          }}</span>
                                         </el-descriptions-item>
                                         <el-descriptions-item label="规定要求">
-                                          <el-input v-model="row.requirement" type="textarea"
-                                            :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="规定要求" />
+                                          <span class="attachment-readonly-block">{{ row.requirement || '—' }}</span>
                                         </el-descriptions-item>
-                                        <el-descriptions-item label="备注" >
-                                          <el-input v-model="row.remarks" type="textarea"
-                                            :autosize="{ minRows: 2, maxRows: 6 }" size="small" placeholder="备注" />
+                                        <el-descriptions-item label="备注">
+                                          <span class="attachment-readonly-block">{{ row.remarks || '—' }}</span>
                                         </el-descriptions-item>
                                         <el-descriptions-item label="涉嫌假冒">
-                                          <el-switch :model-value="Boolean(Number(row.is_counterfeit))"
-                                            @update:model-value="(v) => { row.is_counterfeit = v ? 1 : 0 }" />
+                                          {{ Number(row.is_counterfeit) ? '是' : '否' }}
                                         </el-descriptions-item>
                                       </el-descriptions>
                                     </template>
-                                    <el-descriptions v-else :column="2" border size="small" class="detail-expanded">
-                                      <el-descriptions-item label="生产企业">
-                                        <span class="attachment-readonly-block">{{ row.company_names || '—' }}</span>
-                                      </el-descriptions-item>
-                                      <el-descriptions-item label="生产企业地址">
-                                        <span class="attachment-readonly-block">{{ row.company_addresses || '—'
-                                        }}</span>
-                                      </el-descriptions-item>
-                                      <el-descriptions-item label="被抽样单位名称">
-                                        {{ row.sample_unit_name || '—' }}
-                                      </el-descriptions-item>
-                                      <el-descriptions-item label="被抽样单位地址">
-                                        <span class="attachment-readonly-block">{{ row.sample_unit_address || '—'
-                                          }}</span>
-                                      </el-descriptions-item>
-                                      <el-descriptions-item label="生产日期">
-                                        {{ row.production_date || '—' }}
-                                      </el-descriptions-item>
-                                      <el-descriptions-item label="限期使用日期/保质期">
-                                        {{ row.expiry_date || '—' }}
-                                      </el-descriptions-item>
-                                      <el-descriptions-item v-if="!isFoodStagingBatch" label="所在地/进口地区">
-                                        {{ row.product_region || '—' }}
-                                      </el-descriptions-item>
-                                      <el-descriptions-item v-if="!isFoodStagingBatch" label="注册/备案编号">
-                                        {{ row.registration_no || '—' }}
-                                      </el-descriptions-item>
-                                      <el-descriptions-item v-if="!isFoodStagingBatch" label="生产许可证号">
-                                        {{ row.production_license_no || '—' }}
-                                      </el-descriptions-item>
-                                      <el-descriptions-item label="检验结果">
-                                        <span class="attachment-readonly-block">{{ row.inspection_result || '—'
-                                        }}</span>
-                                      </el-descriptions-item>
-                                      <el-descriptions-item label="规定要求">
-                                        <span class="attachment-readonly-block">{{ row.requirement || '—' }}</span>
-                                      </el-descriptions-item>
-                                      <el-descriptions-item label="备注" >
-                                        <span class="attachment-readonly-block">{{ row.remarks || '—' }}</span>
-                                      </el-descriptions-item>
-                                      <el-descriptions-item label="涉嫌假冒">
-                                        {{ Number(row.is_counterfeit) ? '是' : '否' }}
-                                      </el-descriptions-item>
-                                    </el-descriptions>
-                                  </template>
-                                </el-table-column>
-                                <el-table-column label="序号" width="60" align="center">
-                                  <template #default="{ row }">
-                                    <span>{{ row.sequence_no || '—' }}</span>
-                                  </template>
-                                </el-table-column>
-         
-                                <el-table-column label="产品名称" min-width="140" show-overflow-tooltip>
-                                  <template #default="{ row }">
-                                    <el-input v-if="isStagingMergedSamplingRowEditing(row)" v-model="row.product_name"
-                                      size="small" />
-                                    <span v-else>{{ row.product_name || '—' }}</span>
-                                  </template>
-                                </el-table-column>
-                                <el-table-column prop="attachment_sampling_category" label="产品分类" min-width="72" show-overflow-tooltip>
-                                  <template #default="{ row }">
-                                    <el-input v-if="isStagingMergedSamplingRowEditing(row)"
-                                      v-model="row.attachment_sampling_category" size="small" />
-                                    <span v-else>{{ row.attachment_sampling_category || '—' }}</span>
-                                  </template>
-                                </el-table-column>
-                                <!-- <el-table-column prop="sample_unit_name" label="被抽样单位" show-overflow-tooltip>
+                                  </el-table-column>
+                                  <el-table-column label="序号" width="60" align="center">
+                                    <template #default="{ row }">
+                                      <span>{{ row.sequence_no || '—' }}</span>
+                                    </template>
+                                  </el-table-column>
+
+                                  <el-table-column label="产品名称" min-width="140" show-overflow-tooltip>
+                                    <template #default="{ row }">
+                                      <el-input v-if="isStagingMergedSamplingRowEditing(row)" v-model="row.product_name"
+                                        size="small" />
+                                      <span v-else>{{ row.product_name || '—' }}</span>
+                                    </template>
+                                  </el-table-column>
+                                  <el-table-column prop="attachment_sampling_category" label="产品分类" min-width="72"
+                                    show-overflow-tooltip>
+                                    <template #default="{ row }">
+                                      <el-input v-if="isStagingMergedSamplingRowEditing(row)"
+                                        v-model="row.attachment_sampling_category" size="small" />
+                                      <span v-else>{{ row.attachment_sampling_category || '—' }}</span>
+                                    </template>
+                                  </el-table-column>
+                                  <!-- <el-table-column prop="sample_unit_name" label="被抽样单位" show-overflow-tooltip>
                                     <template #default="{ row }">
                                       <el-input v-if="attachmentsListEditing" v-model="row.sample_unit_name" size="small" />
                                       <span v-else>{{ row.sample_unit_name || '—' }}</span>
                                     </template>
                                   </el-table-column> -->
 
-                                
-                                <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="130" show-overflow-tooltip>
-                                  <template #default="{ row }">
-                                    <el-input v-if="isStagingMergedSamplingRowEditing(row)"
-                                      v-model="row.unqualified_items" size="small" />
-                                    <span v-else>{{ row.unqualified_items || '—' }}</span>
-                                  </template>
-                                </el-table-column>
-                                <el-table-column
-                                  v-if="isFoodStagingBatch"
-                                  prop="food_body_text"
-                                  label="正文文案"
-                                  min-width="120"
-                                  show-overflow-tooltip
-                                >
-                                  <template #default="{ row }">
-                                    <div class="staging-food-body-cell" >
-                                      <span class="staging-food-body-snippet muted-text" >{{ formatFoodBodySnippet(row.food_body_text) }}</span>
-                                      <el-button
-                                        type="primary"
-                                        link
-                                        size="small"
-                                        @click.stop="openFoodBodyTextPicker(row)"
-                                        v-if="row.food_body_text == null"
-                                      >
-                                        查看正文
-                                      </el-button>
 
-                                    </div>
-                                  </template>
-                                </el-table-column>
-                                <el-table-column prop="picture_url" label="产品图" min-width="108" align="center" show-overflow-tooltip>
-                                  <template #default="{ row }">
-                                    <div class="staging-product-picture-cell staging-product-picture-cell-col">
-                                      <template v-if="resolveProductPictureSrc(row.picture_url)">
-                                        <el-image class="staging-product-thumb" fit="cover"
-                                          :src="resolveProductPictureSrc(row.picture_url)"
-                                          :preview-src-list="[resolveProductPictureSrc(row.picture_url)]"
-                                          preview-teleported hide-on-click-modal />
-                                        <!-- <span class="staging-picture-meta muted-text">{{ row.picture_url }}</span> -->
-                                      </template>
-                                      <span v-else class="muted-text">—</span>
-                                      <div v-if="canUploadStagingRowProductPicture" class="staging-row-picture-actions">
-                                        <el-button type="primary" link size="small"
-                                          :loading="isStagingRowPictureUploading(currentMergedJsonAttachmentGroup, row)"
-                                          @click.stop="triggerStagingRowPictureUpload(row)">
-                                          <!-- {{ row.picture_url ? '替换图片' : '本地上传' }} -->
-                                          上传图片
-                                        </el-button>
+                                  <el-table-column prop="unqualified_items" label="不符合规定项目" min-width="130"
+                                    show-overflow-tooltip>
+                                    <template #default="{ row }">
+                                      <el-input v-if="isStagingMergedSamplingRowEditing(row)"
+                                        v-model="row.unqualified_items" size="small" />
+                                      <span v-else>{{ row.unqualified_items || '—' }}</span>
+                                    </template>
+                                  </el-table-column>
+                                  <el-table-column v-if="isFoodStagingBatch" prop="food_body_text" label="正文文案"
+                                    min-width="120" show-overflow-tooltip>
+                                    <template #default="{ row }">
+                                      <div class="staging-food-body-cell">
+                                        <span
+                                          class="staging-food-body-snippet"
+                                          :class="{ 'is-empty': !hasStagingFoodBodyText(row) }"
+                                          :title="String(row.food_body_text || '').trim() || ''"
+                                        >
+                                          {{ formatFoodBodySnippet(row.food_body_text) }}
+                                        </span>
+                                        <div class="staging-food-body-actions">
+                                          <el-button
+                                            v-if="hasStagingFoodBodyText(row)"
+                                            type="danger"
+                                            link
+                                            size="small"
+                                            @click.stop="clearFoodBodyText(row)"
+                                          >
+                                            清空
+                                          </el-button>
+                                          <el-button
+                                            v-else
+                                            type="primary"
+                                            link
+                                            size="small"
+                                            @click.stop="openFoodBodyTextPicker(row)"
+                                          >
+                                            查看正文
+                                          </el-button>
+                                        </div>
                                       </div>
-                                      <div v-if="isStagingMergedSamplingRowEditing(row)"
-                                        class="muted-text staging-picture-edit-tip">
-                                        请先点「保存」完成本条编辑后，再为本行上传图片
+                                    </template>
+                                  </el-table-column>
+                                  <el-table-column prop="picture_url" label="产品图" min-width="108" align="center"
+                                    class-name="staging-picture-table-cell" show-overflow-tooltip>
+                                    <template #default="{ row }">
+                                      <div class="staging-product-picture-cell staging-product-picture-cell-col">
+                                        <div
+                                          class="staging-product-thumb-wrap"
+                                          :class="{
+                                            'is-disabled': !canUploadStagingRowProductPicture || isStagingMergedSamplingRowEditing(row),
+                                            'is-uploading': isStagingRowPictureUploading(currentMergedJsonAttachmentGroup, row)
+                                          }"
+                                          v-loading="isStagingRowPictureUploading(currentMergedJsonAttachmentGroup, row)"
+                                          @mouseenter="onStagingProductThumbPreviewEnter(row, $event)"
+                                          @mouseleave="onStagingProductThumbPreviewLeave"
+                                          @click.stop="onStagingProductThumbClick(row)"
+                                        >
+                                          <el-image
+                                            v-if="resolveProductPictureSrc(row.picture_url) && !isStagingProductPictureLoadFailed(row)"
+                                            class="staging-product-thumb"
+                                            fit="cover"
+                                            :src="resolveProductPictureSrc(row.picture_url)"
+                                            @error="markStagingProductPictureLoadFailed(row)"
+                                          />
+                                          <div v-else class="staging-product-thumb-placeholder">
+                                            <el-icon :size="24"><Plus /></el-icon>
+                                          </div>
+                                        </div>
+                                        <div v-if="isStagingMergedSamplingRowEditing(row)"
+                                          class="muted-text staging-picture-edit-tip">
+                                          请先点「保存」完成本条编辑后，再为本行上传图片
+                                        </div>
                                       </div>
-                                    </div>
-                                  </template>
-                                </el-table-column>
+                                    </template>
+                                  </el-table-column>
 
-                              </el-table>
+                                </el-table>
+
+                                <el-pagination v-if="mergedAttachmentPaginationTotal > 0"
+                                  class="staging-attachment-pagination" size="small"
+                                  layout="total, sizes, prev, pager, next, jumper"
+                                  :total="mergedAttachmentPaginationTotal" :page-size="mergedAttachmentPagination.limit"
+                                  :current-page="mergedAttachmentPagination.page" :page-sizes="[10, 20]"
+                                  @update:current-page="onMergedAttachmentPageChange"
+                                  @update:page-size="onMergedAttachmentPageSizeChange" />
                               </div>
                             </template>
                             <el-empty v-else :description="detailFilters.keyword ? '当前筛选条件下没有匹配结果' : '暂无附件解析明细'" />
@@ -853,14 +885,9 @@
       </template>
     </el-dialog>
 
-    
-<el-dialog
-      v-model="productImageUploadDialogVisible"
-      width="760px"
-      title="导入图片"
-      draggable
-      :close-on-click-modal="false"
-    >
+
+    <el-dialog v-model="productImageUploadDialogVisible" width="760px" title="导入图片" draggable
+      :close-on-click-modal="false">
       <el-alert type="success" :closable="false" show-icon class="mb-16">
         <template #title>
           当前已选中{{ productImageFileRows.length }}个图片
@@ -892,23 +919,12 @@
         </el-button>
       </template>
     </el-dialog>
-    <el-dialog
-      v-model="foodBodyTextDialogVisible"
-      width="960px"
-      draggable
-      :close-on-click-modal="false"
-      destroy-on-close
-      class="food-body-text-dialog"
-      @closed="resetFoodBodyTextPicker"
-    >
+    <el-dialog v-model="foodBodyTextDialogVisible" width="960px" draggable :close-on-click-modal="false"
+      destroy-on-close class="food-body-text-dialog" @closed="resetFoodBodyTextPicker">
       <template #header="{ titleId, titleClass }">
         <div class="food-body-dialog-header">
           <span :id="titleId" :class="titleClass">选取文案</span>
-          <el-button
-            type="primary"
-            :loading="foodBodyImportSaving"
-            @click="confirmFoodBodyTextImport"
-          >
+          <el-button type="primary" :loading="foodBodyImportSaving" @click="confirmFoodBodyTextImport">
             导入
           </el-button>
         </div>
@@ -920,43 +936,21 @@
         <div class="food-body-dialog-col">
           <div class="food-body-dialog-col-heading food-body-heading-row">
             <span>正文内容</span>
-            <FoodBodyTextSearchToolbar
-              v-model="foodBodySearchQuery"
-              :match-total="foodBodyMatchTotal"
-              :active-index="foodBodySearchActiveIndex"
-              :has-source-text="Boolean(foodBodyDialogFullText)"
-              @prev="foodBodySearchGoPrev"
-              @next="foodBodySearchGoNext"
-              @enter-next="foodBodySearchGoNext"
-            />
+            <FoodBodyTextSearchToolbar v-model="foodBodySearchQuery" :match-total="foodBodyMatchTotal"
+              :active-index="foodBodySearchActiveIndex" :has-source-text="Boolean(foodBodyDialogFullText)"
+              @prev="foodBodySearchGoPrev" @next="foodBodySearchGoNext" @enter-next="foodBodySearchGoNext" />
           </div>
-          <div
-            class="food-body-select-surface"
-            @mouseup="captureFoodBodySelection"
-          >
-            <pre
-              v-if="!foodBodyDialogFullText"
-              class="food-body-pre muted-text"
-            >（当前批次正文为空，请先在「通告正文」页签编辑并暂存正文）</pre>
-            <pre
-              v-else
-              ref="foodBodyPreRef"
-              class="food-body-pre"
-              v-html="foodBodyHighlightedDisplayHtml"
-            />
+          <div class="food-body-select-surface" @mouseup="captureFoodBodySelection">
+            <pre v-if="!foodBodyDialogFullText" class="food-body-pre muted-text">（当前批次正文为空，请先在「通告正文」页签编辑并暂存正文）</pre>
+            <pre v-else ref="foodBodyPreRef" class="food-body-pre" v-html="foodBodyHighlightedDisplayHtml" />
           </div>
         </div>
         <div class="food-body-dialog-col">
           <div class="food-body-dialog-col-heading">选中预览</div>
           <div class="food-body-preview-panel">
-            <el-input
-              v-model="foodBodySelectionPreview"
-              type="textarea"
-              :autosize="{ minRows: 12, maxRows: 28 }"
-              resize="vertical"
-              class="food-body-preview-editor"
-              placeholder="在左侧正文中拖选文字后，将自动填入此处；可直接增删修改后再通过标题栏「导入」保存。"
-            />
+            <el-input v-model="foodBodySelectionPreview" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }"
+              resize="vertical" class="food-body-preview-editor"
+              placeholder="在左侧正文中拖选文字后，将自动填入此处；可直接增删修改后再通过标题栏「导入」保存。" />
           </div>
         </div>
       </div>
@@ -999,6 +993,16 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <Teleport to="body">
+      <div
+        v-if="stagingPicturePreview.visible"
+        class="staging-product-thumb-preview"
+        :style="stagingPicturePreview.style"
+      >
+        <img :src="stagingPicturePreview.src" alt="" class="staging-product-thumb-preview-image" />
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -1009,7 +1013,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRaw, watch } from 'vue'
 
 import { useRoute, useRouter } from 'vue-router'
-import { Refresh, Upload } from '@element-plus/icons-vue'
+import { Plus, Refresh, Upload } from '@element-plus/icons-vue'
 import {
   getAnnouncementStagingOverview,
   getAnnouncementStagingTree,
@@ -1132,13 +1136,34 @@ const stagingBatchDeleting = ref(false)
 
 const batchReviewTableMaxHeight = ref(480)
 const attachmentTableMaxHeight = ref(520)
+const batchDrawerVisible = ref(false)
+const batchDrawerWidth = '320px'
+let batchDrawerCloseTimer = null
+
+function openBatchDrawer() {
+  if (batchDrawerCloseTimer) {
+    clearTimeout(batchDrawerCloseTimer)
+    batchDrawerCloseTimer = null
+  }
+  batchDrawerVisible.value = true
+}
+
+function scheduleCloseBatchDrawer() {
+  if (batchDrawerCloseTimer) {
+    clearTimeout(batchDrawerCloseTimer)
+  }
+  batchDrawerCloseTimer = window.setTimeout(() => {
+    batchDrawerVisible.value = false
+    batchDrawerCloseTimer = null
+  }, 280)
+}
 
 function syncBatchReviewViewportHeights() {
   if (typeof window === 'undefined') {
     return
   }
   const h = window.innerHeight
-  batchReviewTableMaxHeight.value = Math.max(220, Math.min(680, Math.round(h * 0.42)))
+  batchReviewTableMaxHeight.value = Math.max(320, Math.min(900, Math.round(h * 0.72)))
   attachmentTableMaxHeight.value = Math.max(280, Math.min(680, Math.round(h * 0.52)))
 }
 
@@ -1234,10 +1259,10 @@ const preloadingBatchIds = new Set()
 
 
 /** 左侧批次列表状态：`announcement_staging_batches.status` ENUM（与后端一致） */
-const STAGING_BATCH_STATUS_OPTIONS = [
-  { value: 'pending', label: '待确认' },
-  { value: 'confirmed', label: '已入库' }
-]
+// const STAGING_BATCH_STATUS_OPTIONS = [
+//   { value: 'pending', label: '待确认' },
+//   { value: 'confirmed', label: '已入库' }
+// ]
 
 const filters = reactive({
   status: '',
@@ -1257,11 +1282,16 @@ const yearOptions = computed(() => [
   }))
 ])
 
-const statusOptions = STAGING_BATCH_STATUS_OPTIONS
+// const statusOptions = STAGING_BATCH_STATUS_OPTIONS
 
 const detailFilters = reactive({
   keyword: '',
   companyKeyword: ''
+})
+
+const mergedAttachmentPagination = reactive({
+  page: 1,
+  limit: 10
 })
 
 const overview = reactive(createEmptyOverview())
@@ -2173,7 +2203,7 @@ const isFoodStagingBatch = computed(() => currentTypeInfo.value.product_type ===
 /** 附件产品表：非正文编辑、非列表编辑时允许按行本地上传（与批量导入共用目录规则） */
 const canUploadStagingRowProductPicture = computed(
   () =>
-  Boolean(currentBatchId.value)
+    Boolean(currentBatchId.value)
     && !isFlightBatch.value
     && !attachmentsTableEditingRowKey.value
     && !bodyTabEditing.value
@@ -2245,6 +2275,44 @@ const currentMergedJsonAttachmentGroup = computed(() => ({
   filtered_rows: currentAttachmentGroups.value.flatMap((attachment) => attachment.filtered_rows || [])
 }))
 
+const mergedAttachmentFilteredRows = computed(() => (
+  currentMergedJsonAttachmentGroup.value.filtered_rows || []
+))
+
+const mergedAttachmentPaginationTotal = computed(() => mergedAttachmentFilteredRows.value.length)
+
+const mergedAttachmentPageRows = computed(() => {
+  const rows = mergedAttachmentFilteredRows.value
+  const limit = Math.max(1, Number(mergedAttachmentPagination.limit) || 10)
+  const maxPage = Math.max(1, Math.ceil(rows.length / limit) || 1)
+  const page = Math.min(Math.max(1, Number(mergedAttachmentPagination.page) || 1), maxPage)
+  const start = (page - 1) * limit
+  return rows.slice(start, start + limit)
+})
+
+function clearMergedAttachmentTableInteractionState() {
+  hideStagingPicturePreview()
+  stagingMergedAccordionExpandKeys.value = []
+  stagingSamplingAttachmentExpandedRows.value = []
+  attachmentsTableEditingRowKey.value = null
+}
+
+function resetMergedAttachmentPaginationState() {
+  mergedAttachmentPagination.page = 1
+  clearMergedAttachmentTableInteractionState()
+}
+
+function onMergedAttachmentPageChange(page) {
+  mergedAttachmentPagination.page = page
+  clearMergedAttachmentTableInteractionState()
+}
+
+function onMergedAttachmentPageSizeChange(limit) {
+  mergedAttachmentPagination.limit = limit
+  mergedAttachmentPagination.page = 1
+  clearMergedAttachmentTableInteractionState()
+}
+
 /** 当前是否存在可切换编辑模式的抽检附件表格（非飞行检查且有过滤后行） */
 const hasAttachmentSamplingEditableTable = computed(() => {
   if (isFlightBatch.value) return false
@@ -2254,6 +2322,132 @@ const hasAttachmentSamplingEditableTable = computed(() => {
 function isStagingRowPictureUploading(attachmentGroup, row) {
   if (!row) return false
   return stagingRowPictureUploadingKey.value === stagingSamplingTableRowKey(attachmentGroup, row)
+}
+
+const stagingProductPictureLoadFailedKeys = ref(new Set())
+const stagingAttachmentTableRef = ref(null)
+const stagingPicturePreview = ref({
+  visible: false,
+  src: '',
+  style: {}
+})
+let stagingPicturePreviewScrollEl = null
+
+const STAGING_PICTURE_PREVIEW_SIZE = 104
+const STAGING_PICTURE_PREVIEW_GAP = 6
+
+function unbindStagingPicturePreviewScrollDismiss() {
+  if (stagingPicturePreviewScrollEl) {
+    stagingPicturePreviewScrollEl.removeEventListener('scroll', hideStagingPicturePreview)
+    stagingPicturePreviewScrollEl = null
+  }
+}
+
+function hideStagingPicturePreview() {
+  stagingPicturePreview.value = { visible: false, src: '', style: {} }
+  unbindStagingPicturePreviewScrollDismiss()
+}
+
+function bindStagingPicturePreviewScrollDismiss() {
+  unbindStagingPicturePreviewScrollDismiss()
+  const tableEl = stagingAttachmentTableRef.value?.$el
+  const bodyWrapper = tableEl?.querySelector('.el-table__body-wrapper')
+  if (!bodyWrapper) return
+  stagingPicturePreviewScrollEl = bodyWrapper
+  bodyWrapper.addEventListener('scroll', hideStagingPicturePreview, { passive: true })
+}
+
+function onStagingProductThumbPreviewEnter(row, event) {
+  const src = resolveProductPictureSrc(row.picture_url)
+  if (!src || isStagingProductPictureLoadFailed(row)) return
+
+  const trigger = event?.currentTarget
+  if (!(trigger instanceof HTMLElement)) return
+
+  const rect = trigger.getBoundingClientRect()
+  const tableEl = stagingAttachmentTableRef.value?.$el
+  const headerWrapper = tableEl?.querySelector('.el-table__header-wrapper')
+  const headerBottom = headerWrapper?.getBoundingClientRect().bottom ?? 0
+  const rows = mergedAttachmentPageRows.value
+  const rowIndex = rows.indexOf(row)
+  const isFirstRow = rowIndex === 0
+  const isLastRow = rowIndex >= 0 && rowIndex === rows.length - 1
+  const previewSize = STAGING_PICTURE_PREVIEW_SIZE
+  const gap = STAGING_PICTURE_PREVIEW_GAP
+
+  let top
+  if (isLastRow) {
+    top = rect.top - previewSize - gap
+  } else {
+    top = rect.bottom + gap
+  }
+
+  if (isFirstRow && !isLastRow) {
+    top = Math.max(top, headerBottom + gap)
+  }
+
+  if (isLastRow && top < gap) {
+    top = rect.bottom + gap
+  }
+
+  if (top + previewSize > window.innerHeight - gap) {
+    top = Math.max(gap, rect.top - previewSize - gap)
+  }
+
+  let left = rect.left + rect.width / 2 - previewSize / 2
+  left = Math.max(gap, Math.min(left, window.innerWidth - previewSize - gap))
+
+  stagingPicturePreview.value = {
+    visible: true,
+    src,
+    style: {
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${previewSize}px`,
+      height: `${previewSize}px`
+    }
+  }
+  bindStagingPicturePreviewScrollDismiss()
+}
+
+function onStagingProductThumbPreviewLeave() {
+  hideStagingPicturePreview()
+}
+
+function getStagingProductPictureRowKey(row) {
+  return stagingSamplingTableRowKey(currentMergedJsonAttachmentGroup.value, row)
+}
+
+function isStagingProductPictureLoadFailed(row) {
+  const key = getStagingProductPictureRowKey(row)
+  return key ? stagingProductPictureLoadFailedKeys.value.has(key) : false
+}
+
+function markStagingProductPictureLoadFailed(row) {
+  const key = getStagingProductPictureRowKey(row)
+  if (!key || stagingProductPictureLoadFailedKeys.value.has(key)) {
+    return
+  }
+  const next = new Set(stagingProductPictureLoadFailedKeys.value)
+  next.add(key)
+  stagingProductPictureLoadFailedKeys.value = next
+}
+
+function clearStagingProductPictureLoadFailed(row) {
+  const key = getStagingProductPictureRowKey(row)
+  if (!key || !stagingProductPictureLoadFailedKeys.value.has(key)) {
+    return
+  }
+  const next = new Set(stagingProductPictureLoadFailedKeys.value)
+  next.delete(key)
+  stagingProductPictureLoadFailedKeys.value = next
+}
+
+function onStagingProductThumbClick(row) {
+  if (isStagingMergedSamplingRowEditing(row)) {
+    return
+  }
+  triggerStagingRowPictureUpload(row)
 }
 
 function triggerStagingRowPictureUpload(row) {
@@ -2319,6 +2513,7 @@ async function handleStagingRowPictureInputChange(event) {
 
     updateCurrentBatchDetail(patchRes.data)
     fillInlineStagingEditors()
+    clearStagingProductPictureLoadFailed(row)
 
     ElMessage.success('产品图已上传并写入本条明细')
   } catch (error) {
@@ -2333,6 +2528,32 @@ function formatFoodBodySnippet(raw, maxLen = 56) {
   const s = String(raw || '').replace(/\s+/g, ' ').trim()
   if (!s) return '—'
   return s.length <= maxLen ? s : `${s.slice(0, maxLen)}…`
+}
+
+function hasStagingFoodBodyText(row = {}) {
+  return Boolean(String(row.food_body_text ?? '').trim())
+}
+
+async function clearFoodBodyText(row) {
+  const batchId = currentBatch.value?.id
+  if (!row || !batchId) {
+    return
+  }
+  foodBodyImportSaving.value = true
+  try {
+    const patchRes = await updateAnnouncementStagingItem(batchId, {
+      locator: buildStagingSamplingRowLocator(row),
+      item: { food_body_text: null }
+    })
+    updateCurrentBatchDetail(patchRes.data)
+    fillInlineStagingEditors()
+    ElMessage.success('正文文案已清空')
+  } catch (error) {
+    console.error('清空正文文案失败:', error)
+    ElMessage.error(error?.response?.data?.message || error?.message || '清空失败')
+  } finally {
+    foodBodyImportSaving.value = false
+  }
 }
 
 function buildStagingSamplingRowLocator(row = {}) {
@@ -3023,21 +3244,21 @@ async function handleDeleteCurrentBatch() {
 }
 
 
-// async function handleGoNextBatch() {
-//   if (!nextBatch.value?.id || switchingBatchId.value) {
-//     return
-//   }
+async function handleGoNextBatch() {
+  if (!nextBatch.value?.id || switchingBatchId.value) {
+    return
+  }
 
-//   try {
-//     switchingBatchId.value = nextBatch.value.id
-//     await selectBatch(nextBatch.value, {
-//       force: false,
-//       tab: activeDetailTab.value === 'attachments' ? 'attachments' : 'body'
-//     })
-//   } finally {
-//     switchingBatchId.value = null
-//   }
-// }
+  try {
+    switchingBatchId.value = nextBatch.value.id
+    await selectBatch(nextBatch.value, {
+      force: false,
+      tab: activeDetailTab.value === 'attachments' ? 'attachments' : 'body'
+    })
+  } finally {
+    switchingBatchId.value = null
+  }
+}
 
 
 async function handleConfirmAll() {
@@ -3200,9 +3421,7 @@ const resetFilters = async () => {
 watch(
   [activeDetailTab, currentBatchId],
   () => {
-    attachmentsTableEditingRowKey.value = null
-    stagingSamplingAttachmentExpandedRows.value = []
-    stagingMergedAccordionExpandKeys.value = []
+    clearMergedAttachmentTableInteractionState()
     bodyTabEditing.value = false
     if (!currentBatchId.value) {
       return
@@ -3212,6 +3431,26 @@ watch(
   },
   { immediate: true }
 )
+
+watch(currentBatchId, () => {
+  resetMergedAttachmentPaginationState()
+  stagingProductPictureLoadFailedKeys.value = new Set()
+})
+
+watch(
+  () => detailFilters.keyword,
+  () => {
+    resetMergedAttachmentPaginationState()
+  }
+)
+
+watch(mergedAttachmentPaginationTotal, (total) => {
+  const limit = Math.max(1, Number(mergedAttachmentPagination.limit) || 10)
+  const maxPage = Math.max(1, Math.ceil(total / limit) || 1)
+  if (mergedAttachmentPagination.page > maxPage) {
+    mergedAttachmentPagination.page = maxPage
+  }
+})
 
 watch(
   [filters, detailFilters, selectedTreeKey, selectedBatchId, activeDetailTab, selectedAttachmentIndex, lastImportResult, mainTab],
@@ -3290,12 +3529,17 @@ onMounted(async () => {
 
 
 onBeforeUnmount(() => {
+  hideStagingPicturePreview()
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', syncBatchReviewViewportHeights)
   }
   if (workspaceSaveTimer) {
     clearTimeout(workspaceSaveTimer)
     workspaceSaveTimer = null
+  }
+  if (batchDrawerCloseTimer) {
+    clearTimeout(batchDrawerCloseTimer)
+    batchDrawerCloseTimer = null
   }
 })
 
@@ -3306,6 +3550,13 @@ onBeforeUnmount(() => {
   padding: 0 10px !important;
   --el-table-text-color:black!important;
 } */
+
+:deep(.el-descriptions__label.el-descriptions__cell.is-bordered-label) {
+  /* width: 100%!important; */
+  background: #F2F7FF !important;
+  /* background: #E8F3FF!important; */
+}
+
 .food-body-text-dialog :deep(.el-dialog__body) {
   padding-top: 8px;
 }
@@ -3361,6 +3612,7 @@ onBeforeUnmount(() => {
   background: rgba(251, 191, 36, 0.95);
   outline: 2px solid rgba(245, 158, 11, 0.75);
 }
+
 .announcement-staging {
   max-width: 1760px;
   margin: 0 auto;
@@ -3572,6 +3824,120 @@ onBeforeUnmount(() => {
 
 .workspace-layout-simple {
   min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  position: relative;
+  padding-left: 18px;
+}
+
+.batch-drawer-hover-edge {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 0 10px 10px 0;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.12), rgba(59, 130, 246, 0.05));
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-left: none;
+  transition: background 0.2s ease, width 0.2s ease, box-shadow 0.2s ease;
+}
+
+.batch-drawer-hover-edge:hover {
+  width: 18px;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.2), rgba(59, 130, 246, 0.1));
+  box-shadow: 2px 0 12px rgba(37, 99, 235, 0.1);
+}
+
+.batch-drawer-edge-label {
+  writing-mode: vertical-rl;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #2563eb;
+  user-select: none;
+}
+
+.batch-drawer-body {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px 12px;
+}
+
+.batch-drawer-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.batch-drawer-header-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-drawer-header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+.batch-drawer-header-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.batch-drawer-header-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+:deep(.batch-list-drawer.el-drawer) {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  height: auto;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f6ff 100%);
+  border-right: 1px solid #dbeafe;
+  box-shadow: 8px 0 28px rgba(37, 99, 235, 0.1);
+}
+
+:deep(.batch-list-drawer .el-drawer__header) {
+  margin: 0;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 52%, #3b82f6 100%);
+  flex-shrink: 0;
+}
+
+:deep(.batch-list-drawer .el-drawer__body) {
+  padding: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .staging-main-tabs :deep(.el-tabs__header) {
@@ -3621,7 +3987,7 @@ onBeforeUnmount(() => {
 }
 
 .filter-form-batch {
-  /* margin-bottom: 12px; */
+  margin-bottom: 12px;
   padding: 10px 12px;
   background: #f7f9fc;
   border-radius: 12px;
@@ -3667,12 +4033,58 @@ onBeforeUnmount(() => {
   color: #909399;
 }
 
+.batch-table {
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #dbeafe;
+  background: #ffffff;
+}
+
+.batch-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.batch-table :deep(.el-table__header-wrapper th.el-table__cell) {
+  background: #eff6ff !important;
+  color: #1e40af;
+  font-weight: 600;
+  border-bottom: 1px solid #dbeafe !important;
+}
+
+.batch-table :deep(.el-table__body tr > td.el-table__cell) {
+  border-bottom: 1px solid #eef4ff;
+  color: #334155;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.batch-table :deep(.el-table__body tr.el-table__row--striped > td.el-table__cell) {
+  background: #fafcff;
+}
+
+.batch-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: #f0f7ff !important;
+}
+
 .batch-table :deep(.el-table__body tr.is-active-batch > td.el-table__cell) {
-  background-color: #ecf5ff !important;
+  background: #e8f1ff !important;
+  color: #1e3a8a;
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.batch-table :deep(.el-table__body tr.is-active-batch:hover > td.el-table__cell) {
+  background: #dbeafe !important;
 }
 
 .batch-table :deep(.el-table__body tr) {
   cursor: pointer;
+}
+
+.batch-table-title {
+  display: block;
+  font-size: 13px;
+  line-height: 1.45;
+  color: inherit;
 }
 
 .workspace-layout-review {
@@ -4140,6 +4552,48 @@ onBeforeUnmount(() => {
 .inline-staging-info-form :deep(.nested-form-item .el-form-item__content) {
   margin-left: 0 !important;
 }
+/* :deep(.el-table__cell) {
+  overflow: visible !important;
+} */
+.detail-expanded {
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
+}
+
+.detail-expanded :deep(.el-descriptions__label) {
+  color: #6b849f;
+  font-weight: 600;
+}
+
+.detail-expanded :deep(.el-descriptions__content) {
+  background: #ffffff !important;
+  color: #303133;
+}
+
+.detail-expanded :deep(.el-descriptions__cell) {
+  border-color: #dce8fa !important;
+}
+
+.detail-expanded :deep(.el-descriptions__table) {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.detail-expanded :deep(.el-descriptions__cell.el-descriptions__label),
+.detail-expanded :deep(.el-descriptions__label) {
+  width: 168px;
+  min-width: 168px;
+  max-width: 168px;
+  box-sizing: border-box;
+  vertical-align: top;
+}
+
+.detail-expanded :deep(.el-descriptions__cell.el-descriptions__content),
+.detail-expanded :deep(.el-descriptions__content) {
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
 
 .detail-expanded :deep(.el-input),
 .detail-expanded :deep(.el-textarea) {
@@ -4159,9 +4613,82 @@ onBeforeUnmount(() => {
 }
 
 .staging-product-picture-cell.staging-product-picture-cell-col {
-  /* flex-direction: column; */
-  align-items: stretch;
+  align-items: center;
   gap: 6px;
+}
+
+.staging-product-thumb-wrap {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  overflow: hidden;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: #fafafa;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.staging-product-thumb-wrap:hover:not(.is-disabled):not(.is-uploading) {
+  border-color: #409eff;
+  box-shadow: 0 0 0 1px rgba(64, 158, 255, 0.15);
+}
+
+.staging-product-thumb-wrap.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.staging-product-thumb-wrap.is-uploading {
+  cursor: wait;
+}
+
+.staging-product-thumb {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.staging-product-thumb :deep(.el-image__inner) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.3);
+  transform-origin: center center;
+}
+
+.staging-product-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  background: #f5f7fa;
+}
+
+.staging-product-thumb-wrap:hover:not(.is-disabled):not(.is-uploading) .staging-product-thumb-placeholder {
+  color: #409eff;
+  background: #ecf5ff;
+}
+
+.staging-product-thumb-preview {
+  position: fixed;
+  z-index: 4000;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(100, 130, 170, 0.14);
+  border: 1px solid #a8c4e8;
+  background: #fff;
+  pointer-events: none;
+}
+
+.staging-product-thumb-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .staging-row-picture-actions {
@@ -4174,12 +4701,13 @@ onBeforeUnmount(() => {
   line-height: 1.35;
 }
 
-.staging-product-thumb {
-  width: 52px;
-  height: 52px;
-  border-radius: 6px;
-  border: 1px solid #e4e7ed;
-  flex-shrink: 0;
+.staging-attachment-table :deep(td.staging-picture-table-cell) {
+  overflow: visible;
+}
+
+.staging-attachment-table :deep(td.staging-picture-table-cell .cell) {
+  overflow: visible;
+  line-height: 1;
 }
 
 .staging-picture-meta {
@@ -4191,20 +4719,35 @@ onBeforeUnmount(() => {
 
 .staging-food-body-cell {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .staging-food-body-snippet {
   flex: 1;
   min-width: 0;
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.4;
   color: #606266;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.staging-food-body-snippet-empty {
+.staging-food-body-snippet.is-empty {
   color: #909399;
+}
+
+.staging-food-body-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.staging-food-body-actions :deep(.el-button) {
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 .food-body-pre {
@@ -4258,6 +4801,71 @@ onBeforeUnmount(() => {
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* 附件解析明细：清爽蓝色系表格 */
+.staging-attachment-table {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #c8daf5 !important;
+  box-shadow: 0 1px 4px rgba(64, 128, 220, 0.08);
+}
+
+.staging-attachment-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.staging-attachment-table :deep(.el-table__header th.el-table__cell) {
+  background: linear-gradient(180deg, #5b9cf6 0%, #4a8fe8 100%) !important;
+  color: #ffffff !important;
+  border-color: #7eb0f4 !important;
+  font-weight: 600 !important;
+  font-size: 13px;
+  padding: 10px 0;
+}
+
+.staging-attachment-table :deep(.el-table__body td.el-table__cell) {
+  border-color: #dce8fa !important;
+  color: #303133;
+  font-size: 13px;
+  padding: 9px 0;
+  transition: background-color 0.15s ease;
+}
+
+.staging-attachment-table :deep(.el-table__body tr.el-table__row--striped > td.el-table__cell) {
+  background-color: #f7faff !important;
+}
+
+.staging-attachment-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: #ebf3ff !important;
+}
+
+.staging-attachment-table :deep(.el-table__expand-icon) {
+  color: #4a8fe8;
+}
+
+.staging-attachment-table :deep(.el-table__expand-icon .el-icon) {
+  font-size: 14px;
+}
+
+.staging-attachment-table :deep(.el-table__expanded-cell) {
+  background-color: #f5f9ff !important;
+  border-color: #dce8fa !important;
+  padding: 12px 16px;
+}
+
+.staging-attachment-table :deep(.el-table__empty-block) {
+  background-color: #fafcff;
+}
+
+.staging-attachment-table :deep(.el-table__empty-text) {
+  color: #8da8cc;
+}
+
+.staging-attachment-pagination {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .attachment-group-card,
