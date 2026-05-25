@@ -120,7 +120,7 @@
                   />
                   <span v-else>{{ formatSamplingBatchScalar(announcement.sampling_unqualified_batch_count) }}</span>
                 </el-descriptions-item>
-                <el-descriptions-item label="抽检合格批次">
+                <!-- <el-descriptions-item label="抽检合格批次">
                   <el-input-number
                     v-if="overviewKeyEditMode"
                     v-model="overviewKeyForm.sampling_qualified"
@@ -131,7 +131,7 @@
                     class="overview-sampling-input"
                   />
                   <span v-else>{{ formatSamplingBatchQualifiedSpan(announcement) }}</span>
-                </el-descriptions-item>
+                </el-descriptions-item> -->
                 <el-descriptions-item label="抽检总批次">
                   <el-input-number
                     v-if="overviewKeyEditMode"
