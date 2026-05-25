@@ -233,7 +233,7 @@ function splitCompanyEntries(namesValue, addressesValue = '') {
       return;
     }
     seen.add(key);
-    deduped.push(entry);
+    deduped.push(enrichCompanyEntryType(entry));
   });
 
   return deduped;
@@ -297,6 +297,11 @@ const OPERATOR_LABELS_FOOD = [
 ];
 
 const SAMPLE_UNIT_LABELS = ['被抽样单位'];
+const COMPANY_TYPE_LABELS = {
+  manufacturer: '生产企业',
+  distributor: '经销商',
+  seller: '销售商'
+};
 
 function normalizeEntityLabel(label) {
   return normalizeText(label)
@@ -311,6 +316,39 @@ function labelMatchesGroup(label, group = []) {
   }
 
   return group.some((item) => normalizeEntityLabel(item) === normalized);
+}
+
+function resolveCompanyEntryType(label, fallbackType = 'manufacturer') {
+  const normalized = normalizeEntityLabel(label);
+  if (!normalized) {
+    return fallbackType;
+  }
+  if (labelMatchesGroup(normalized, SAMPLE_UNIT_LABELS) || /被抽样|抽样单位|经营者|销售单位|销售门店|网店/.test(normalized)) {
+    return 'seller';
+  }
+  if (labelMatchesGroup(normalized, MANUFACTURER_LABELS_FOOD)
+    || labelMatchesGroup(normalized, MANUFACTURER_LABELS_COSMETICS)
+    || /生产|制造|制作|供应/.test(normalized)) {
+    return 'manufacturer';
+  }
+  if (/销售商|销售者/.test(normalized)) {
+    return 'seller';
+  }
+  if (labelMatchesGroup(normalized, OPERATOR_LABELS_FOOD)
+    || labelMatchesGroup(normalized, OPERATOR_LABELS_COSMETICS)
+    || /经销|代理|进口|委托|受托|总经销/.test(normalized)) {
+    return 'distributor';
+  }
+  return fallbackType;
+}
+
+function enrichCompanyEntryType(entry, fallbackType = 'manufacturer') {
+  const type = resolveCompanyEntryType(entry?.label, fallbackType);
+  return {
+    ...entry,
+    type,
+    type_label: COMPANY_TYPE_LABELS[type] || COMPANY_TYPE_LABELS.manufacturer
+  };
 }
 
 function pickLabeledEntry(entries = [], labelGroup = []) {
@@ -496,7 +534,9 @@ function appendSampleUnitCompanyEntry(entries, sampleUnitName, sampleUnitAddress
   list.push({
     label: '被抽样单位',
     name,
-    address
+    address,
+    type: 'seller',
+    type_label: COMPANY_TYPE_LABELS.seller
   });
   return list;
 }
@@ -510,6 +550,8 @@ module.exports = {
   isInvalidCompanyValue,
   buildStructuredCompanyFields,
   appendSampleUnitCompanyEntry,
+  resolveCompanyEntryType,
+  enrichCompanyEntryType,
   REGISTRANT_LABELS,
   MANUFACTURER_LABELS_COSMETICS,
   MANUFACTURER_LABELS_FOOD,

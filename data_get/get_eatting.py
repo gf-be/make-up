@@ -457,14 +457,49 @@ def extract_next_page_url(soup: BeautifulSoup, current_url: str) -> Optional[str
     return None
 
 
+COMPANY_ENTRY_TYPE_LABELS = {
+    "manufacturer": "生产企业",
+    "distributor": "经销商",
+    "seller": "销售商",
+}
+
+
+def infer_company_entry_type(label: object) -> str:
+    text = normalize_whitespace(label or "")
+    compact = re.sub(r"[（(].*?[）)]", "", text).replace(" ", "")
+    if not compact:
+        return "manufacturer"
+    if re.search(r"被抽样|抽样单位|经营者|销售单位|销售门店|网店|销售商|销售者", compact):
+        return "seller"
+    if re.search(r"经销|代理|进口|委托|受托|总经销", compact):
+        return "distributor"
+    if re.search(r"生产|制造|制作|供应", compact):
+        return "manufacturer"
+    return "manufacturer"
+
+
+def enrich_company_entry_type(entry: Dict[str, object]) -> Dict[str, object]:
+    company_type = normalize_whitespace(entry.get("type") or "") or infer_company_entry_type(entry.get("label"))
+    if company_type not in COMPANY_ENTRY_TYPE_LABELS:
+        company_type = infer_company_entry_type(entry.get("label"))
+    entry["type"] = company_type
+    entry["type_label"] = COMPANY_ENTRY_TYPE_LABELS.get(company_type, COMPANY_ENTRY_TYPE_LABELS["manufacturer"])
+    return entry
+
+
 def enrich_food_row_company_entries(row: Dict[str, object]) -> Dict[str, object]:
-    """将被抽样单位名称/地址并入 company_entries，供企业表同步使用。"""
+    """为 company_entries 增加企业类型，并将被抽样单位并入企业同步列表。"""
     if not isinstance(row, dict):
         return row
     sample_name = normalize_whitespace(row.get("sample_unit_name") or "")
+    entries = [
+        enrich_company_entry_type(item)
+        for item in (row.get("company_entries") or [])
+        if isinstance(item, dict)
+    ]
     if not sample_name:
+        row["company_entries"] = entries
         return row
-    entries = [item for item in (row.get("company_entries") or []) if isinstance(item, dict)]
     sample_address = normalize_whitespace(row.get("sample_unit_address") or "") or None
     dedupe_key = f"{sample_name}__{sample_address or ''}"
     existing_keys = {
@@ -476,8 +511,10 @@ def enrich_food_row_company_entries(row: Dict[str, object]) -> Dict[str, object]
             "label": "被抽样单位",
             "name": sample_name,
             "address": sample_address,
+            "type": "seller",
+            "type_label": COMPANY_ENTRY_TYPE_LABELS["seller"],
         })
-        row["company_entries"] = entries
+    row["company_entries"] = entries
     return row
 
 

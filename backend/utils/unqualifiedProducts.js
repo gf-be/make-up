@@ -13,8 +13,7 @@ const {
 const {
   extractIssueItems,
   COSMETICS_PRODUCT_CATEGORIES,
-  buildDerivedAnalyticsFields,
-  deriveProductCategory
+  buildDerivedAnalyticsFields
 } = require('./dataAnalysisHelpers');
 const {
   ensureCompaniesSamplingSchema,
@@ -1508,14 +1507,15 @@ async function buildAnnouncementDetailPayloadRows(connection, detailRows, announ
         requirement: row.requirement,
         attachment_sampling_category: row.attachment_sampling_category
       });
-      const productCategory = deriveProductCategory(row.product_name);
+      const sourceProductName = normalizeText(row.product_name) || null;
       const companyId = await upsertCompany(
         connection,
         entry.name,
         entry.address,
         derivedRegion.manufacturer_province === '未标注' ? null : derivedRegion.manufacturer_province,
         derivedRegion.manufacturer_city === '未标注' ? null : derivedRegion.manufacturer_city,
-        productCategory
+        sourceProductName,
+        entry.type
       );
 
       if (!companyId) {
@@ -1541,14 +1541,15 @@ async function buildAnnouncementDetailPayloadRows(connection, detailRows, announ
         requirement: row.requirement,
         attachment_sampling_category: row.attachment_sampling_category
       });
-      const productCategory = deriveProductCategory(row.product_name);
+      const sourceProductName = normalizeText(row.product_name) || null;
       primaryCompanyId = await upsertCompany(
         connection,
         structured.manufacturer_name,
         structured.manufacturer_address,
         derivedRegion.manufacturer_province === '未标注' ? null : derivedRegion.manufacturer_province,
         derivedRegion.manufacturer_city === '未标注' ? null : derivedRegion.manufacturer_city,
-        productCategory
+        sourceProductName,
+        'manufacturer'
       );
     }
 

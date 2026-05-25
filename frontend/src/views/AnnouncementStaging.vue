@@ -3680,9 +3680,6 @@ async function handleConfirm(row) {
 
     confirmingId.value = row.id
     const currentIndex = batchListRows.value.findIndex((item) => Number(item.id) === Number(row.id))
-    // console.log(currentIndex)
-    // console.log(batchListRows.value[currentIndex + 1])
-    console.log(batchListRows.value[currentIndex - 1])
     const fallbackBatch = currentIndex >= 0
       ? (batchListRows.value[currentIndex + 1] || batchListRows.value[currentIndex - 1] || null)
       : null
@@ -3697,6 +3694,7 @@ async function handleConfirm(row) {
       return
     }
     console.error('导入正式库失败:', error)
+    ElMessage.error(error?.response?.data?.message || error?.message || '导入正式库失败')
   } finally {
     if (confirmingId.value === row?.id) {
       confirmingId.value = null

@@ -38,7 +38,7 @@
     {
       "attachment_name": "附件2 淀粉及淀粉制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/65786d8abdb042aebc2238157f0d8930.xlsx?fileName=附件2 淀粉及淀粉制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件2 淀粉及淀粉制品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件2 淀粉及淀粉制品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -79,7 +79,9 @@
               {
                 "label": null,
                 "name": "内蒙古蒙森农业科技股份有限公司",
-                "address": "内蒙古自治区赤峰市松山区大夫营子乡政府所在地"
+                "address": "内蒙古自治区赤峰市松山区大夫营子乡政府所在地",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\1.png"
@@ -113,7 +115,9 @@
               {
                 "label": "被抽样单位",
                 "name": "南京市江宁区汪瑜调味品店",
-                "address": "江苏省南京市江宁区东山街道大里聚福城怡景街农贸市场4、5、6号摊位"
+                "address": "江苏省南京市江宁区东山街道大里聚福城怡景街农贸市场4、5、6号摊位",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\2.png"
@@ -126,7 +130,7 @@
     {
       "attachment_name": "附件3 调味品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/638d71e490ff41f0a9931f79ec81058f.xlsx?fileName=附件3 调味品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件3 调味品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件3 调味品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -167,12 +171,16 @@
               {
                 "label": null,
                 "name": "广东省东莞市中堂镇镇寻味园食品有限公司",
-                "address": "/"
+                "address": "/",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "阳江市阳东区美味坊电商行",
-                "address": "广东省阳江市阳东区北惯镇北惯路八号之八（1）"
+                "address": "广东省阳江市阳东区北惯镇北惯路八号之八（1）",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\3.png"
@@ -206,12 +214,16 @@
               {
                 "label": "供应商",
                 "name": "七里河区俊元调料批发部",
-                "address": "/"
+                "address": "/",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "陇西晓茹便利店",
-                "address": "甘肃省定西市陇西县巩昌镇北城路南安农贸市场10号楼一楼121室"
+                "address": "甘肃省定西市陇西县巩昌镇北城路南安农贸市场10号楼一楼121室",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\4.png"
@@ -245,7 +257,9 @@
               {
                 "label": "被抽样单位",
                 "name": "陇西县海阳调料店",
-                "address": "甘肃省定西市陇西县巩昌镇北城路农贸市场3号楼01室"
+                "address": "甘肃省定西市陇西县巩昌镇北城路农贸市场3号楼01室",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\5.png"
@@ -279,12 +293,16 @@
               {
                 "label": "进口商",
                 "name": "大昌洋行（上海）有限公司",
-                "address": "上海市浦东新区东方路710号汤臣金融大厦21楼"
+                "address": "上海市浦东新区东方路710号汤臣金融大厦21楼",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "被抽样单位",
                 "name": "大昌洋行（上海）有限公司",
-                "address": "中国（上海）自由贸易试验区巴圣路275号40号楼第一层西部位"
+                "address": "中国（上海）自由贸易试验区巴圣路275号40号楼第一层西部位",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\6.png"
@@ -318,17 +336,23 @@
               {
                 "label": "经销商",
                 "name": "北京好食好吃进出口有限公司",
-                "address": "北京市通州区恒业八街6号院"
+                "address": "北京市通州区恒业八街6号院",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "生产单位",
                 "name": "HUY FONG FOODS,INC.",
-                "address": "4800Azusa Canyon Rd.,Irwindale,CA 91706"
+                "address": "4800Azusa Canyon Rd.,Irwindale,CA 91706",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "长沙市雨花区鲨菩食品店",
-                "address": "湖南省长沙市雨花区跳马镇金屏社区石燕湖59-7号-G3078"
+                "address": "湖南省长沙市雨花区跳马镇金屏社区石燕湖59-7号-G3078",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\7.png"
@@ -362,12 +386,16 @@
               {
                 "label": null,
                 "name": "福鼎市李氏调味品厂",
-                "address": "福建省宁德市福鼎市叠石乡竹阳村竹阳新村192—1号"
+                "address": "福建省宁德市福鼎市叠石乡竹阳村竹阳新村192—1号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "福鼎市浙楠食品商行",
-                "address": "福建省宁德市福鼎市梅溪村梅溪亭29号"
+                "address": "福建省宁德市福鼎市梅溪村梅溪亭29号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\8.png"
@@ -380,7 +408,7 @@
     {
       "attachment_name": "附件4 速冻食品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/e7c3710178d94f6298dd8a4e69506b32.xlsx?fileName=附件4 速冻食品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件4 速冻食品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件4 速冻食品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -421,12 +449,16 @@
               {
                 "label": null,
                 "name": "阜阳金厨房食品科技有限公司",
-                "address": "安徽省阜阳市开发区颍五路与州十五交叉口15号"
+                "address": "安徽省阜阳市开发区颍五路与州十五交叉口15号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "郫都区鑫忠诚冷冻食品销售中心",
-                "address": "四川省成都市郫都区团结镇成都市沙西农副产品批发市场水发区2栋1、2号"
+                "address": "四川省成都市郫都区团结镇成都市沙西农副产品批发市场水发区2栋1、2号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\9.png"
@@ -460,12 +492,16 @@
               {
                 "label": null,
                 "name": "河南多多优品食品科技有限公司",
-                "address": "河南省漯河市经济技术开发区民营工业园创新路65号院内"
+                "address": "河南省漯河市经济技术开发区民营工业园创新路65号院内",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "河南优多多食品有限公司",
-                "address": "河南省漯河市市辖区经济技术开发区民营工业园创新路51号"
+                "address": "河南省漯河市市辖区经济技术开发区民营工业园创新路51号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\10.png"
@@ -478,7 +514,7 @@
     {
       "attachment_name": "附件5 餐饮食品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/4595055b58fc4a389bc42ef73fd88f4a.xlsx?fileName=附件5 餐饮食品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件5 餐饮食品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件5 餐饮食品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -519,7 +555,9 @@
               {
                 "label": "被抽样单位",
                 "name": "厦门市湖里区熙之沐饮品店",
-                "address": "福建省厦门市湖里区后浦社78-3号"
+                "address": "福建省厦门市湖里区后浦社78-3号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\11.png"
@@ -553,7 +591,9 @@
               {
                 "label": "被抽样单位",
                 "name": "北京金丰源餐饮服务有限公司",
-                "address": "北京市顺义区高丽营镇四村高泗路11号院30幢"
+                "address": "北京市顺义区高丽营镇四村高泗路11号院30幢",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\12.png"
@@ -587,7 +627,9 @@
               {
                 "label": "被抽样单位",
                 "name": "沈阳神碳餐饮有限公司",
-                "address": "辽宁省沈阳市沈北新区兴盛街2-61号（1门）"
+                "address": "辽宁省沈阳市沈北新区兴盛街2-61号（1门）",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\13.png"
@@ -600,7 +642,7 @@
     {
       "attachment_name": "附件6 糖果制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/c5c9736fc0104d73bd387ad493a20ac9.xlsx?fileName=附件6 糖果制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件6 糖果制品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件6 糖果制品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -641,12 +683,16 @@
               {
                 "label": null,
                 "name": "安徽亦航制药有限公司",
-                "address": "安徽省亳州市谯城区青梅路9号"
+                "address": "安徽省亳州市谯城区青梅路9号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "泗洪贯莫商贸有限公司",
-                "address": "江苏省宿迁市泗洪县工商名府A栋311号"
+                "address": "江苏省宿迁市泗洪县工商名府A栋311号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\14.png"
@@ -680,12 +726,16 @@
               {
                 "label": null,
                 "name": "安徽同恩药业有限公司",
-                "address": "安徽省阜阳市太和县经济开发区友谊路与创业路交叉口大健康产业园A2栋"
+                "address": "安徽省阜阳市太和县经济开发区友谊路与创业路交叉口大健康产业园A2栋",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "成都吉祥大药房有限公司",
-                "address": "四川省成都市郫都区红光镇银润南一路5、7号"
+                "address": "四川省成都市郫都区红光镇银润南一路5、7号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\15.png"
@@ -698,7 +748,7 @@
     {
       "attachment_name": "附件7 方便食品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/f14811a720cd4de8b7a5ec814b958beb.xlsx?fileName=附件7 方便食品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件7 方便食品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件7 方便食品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -739,12 +789,16 @@
               {
                 "label": null,
                 "name": "安徽润枫健康科技有限公司",
-                "address": "安徽省亳州市高新区甘菊路双创产业园二期8栋801、802、803，10栋1001"
+                "address": "安徽省亳州市高新区甘菊路双创产业园二期8栋801、802、803，10栋1001",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "五华区赛林商贸行",
-                "address": "云南省昆明市五华区西翥街道办事处迤六社区石羊厩小村257号"
+                "address": "云南省昆明市五华区西翥街道办事处迤六社区石羊厩小村257号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\16.png"
@@ -778,17 +832,23 @@
               {
                 "label": "经销商",
                 "name": "南昌久海电子商务有限公司",
-                "address": "江西省南昌市新建区经济开发区淘鑫大厦1307号"
+                "address": "江西省南昌市新建区经济开发区淘鑫大厦1307号",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "生产者",
                 "name": "江西美必佳生态科技实业有限公司",
-                "address": "江西省南昌市新建区长堎工业区（二区）工业大道北侧"
+                "address": "江西省南昌市新建区长堎工业区（二区）工业大道北侧",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "南昌久海电子商务有限公司",
-                "address": "江西省南昌市新建区经开区璜源山路188号第13层07阁"
+                "address": "江西省南昌市新建区经开区璜源山路188号第13层07阁",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\17.png"
@@ -801,7 +861,7 @@
     {
       "attachment_name": "附件8 饮料监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/a62e53ab8a0b46f4a9acbafa186c6685.xlsx?fileName=附件8 饮料监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件8 饮料监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件8 饮料监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -842,12 +902,16 @@
               {
                 "label": null,
                 "name": "安徽医味健康科技有限公司",
-                "address": "安徽省亳州市高新区合欢路289号2栋2楼"
+                "address": "安徽省亳州市高新区合欢路289号2栋2楼",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "义乌市帘致电子商务商行",
-                "address": "浙江省金华市义乌市江东街道下湾四区16幢6号202室"
+                "address": "浙江省金华市义乌市江东街道下湾四区16幢6号202室",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\18.png"
@@ -881,12 +945,16 @@
               {
                 "label": null,
                 "name": "惟溢食品（广东）有限公司",
-                "address": "广东省肇庆市高新区大旺大道41号肇庆万洋众创城C41#、C53-2#厂房"
+                "address": "广东省肇庆市高新区大旺大道41号肇庆万洋众创城C41#、C53-2#厂房",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "龙岩佳昕餐饮管理有限公司",
-                "address": "福建省龙岩市新罗区西陂街道张白土村民园路6号8"
+                "address": "福建省龙岩市新罗区西陂街道张白土村民园路6号8",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\19.png"
@@ -920,12 +988,16 @@
               {
                 "label": null,
                 "name": "南阳力诺药业有限公司",
-                "address": "河南省南阳市内乡县龙源路23号"
+                "address": "河南省南阳市内乡县龙源路23号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "深圳市龙华区杰瑞百货商店",
-                "address": "广东省深圳市龙华区大浪街道赖屋山社区赖屋山新村十四巷1号2单元709"
+                "address": "广东省深圳市龙华区大浪街道赖屋山社区赖屋山新村十四巷1号2单元709",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\20.png"
@@ -959,17 +1031,23 @@
               {
                 "label": "委托方",
                 "name": "湖北本草天工健康科技有限公司",
-                "address": "湖北省武汉市洪山区徐东路23号"
+                "address": "湖北省武汉市洪山区徐东路23号",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "受委托方",
                 "name": "安徽乐生元药业有限公司",
-                "address": "安徽省阜阳市太和县经济开发区医疗器械产业园B1栋3楼"
+                "address": "安徽省阜阳市太和县经济开发区医疗器械产业园B1栋3楼",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "广州市花都区花东童婴汇妇婴用品店",
-                "address": "广东省广州市花都区花东镇花东市场第东一幢第11号"
+                "address": "广东省广州市花都区花东镇花东市场第东一幢第11号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\21.png"
@@ -1003,17 +1081,23 @@
               {
                 "label": "委托方",
                 "name": "香港中花集圑有限公司",
-                "address": "香港特别行政区九龍新蒲崗景福街99號啟德工廠大厦二期8樓D07室"
+                "address": "香港特别行政区九龍新蒲崗景福街99號啟德工廠大厦二期8樓D07室",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "受委托方",
                 "name": "辽宁沈大饮品有限公司",
-                "address": "辽宁省营口市大石桥市哈大北路99号"
+                "address": "辽宁省营口市大石桥市哈大北路99号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "上海醉锦廷餐饮管理有限公司第一分公司",
-                "address": "上海市徐汇区肇嘉浜路1111号A段第五层5-12A单元"
+                "address": "上海市徐汇区肇嘉浜路1111号A段第五层5-12A单元",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\22.png"
@@ -1047,12 +1131,16 @@
               {
                 "label": null,
                 "name": "漯河市体宝饮品有限公司",
-                "address": "河南省漯河市郾城区龙江路西段淞江产业集聚区"
+                "address": "河南省漯河市郾城区龙江路西段淞江产业集聚区",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "北京承程餐饮管理有限公司",
-                "address": "北京市海淀区永泰庄路25号建金综合服务楼一层24号"
+                "address": "北京市海淀区永泰庄路25号建金综合服务楼一层24号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\23.png"
@@ -1065,7 +1153,7 @@
     {
       "attachment_name": "附件9 炒货食品及坚果制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/c6979033f81f42e5a745ecd54f614e7c.xlsx?fileName=附件9 炒货食品及坚果制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件9 炒货食品及坚果制品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件9 炒货食品及坚果制品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1106,12 +1194,16 @@
               {
                 "label": null,
                 "name": "青海齐莱滋农牧科技有限公司",
-                "address": "青海省海东市互助县绿色产业园双创基地A栋"
+                "address": "青海省海东市互助县绿色产业园双创基地A栋",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "西宁大十字百货商店有限公司",
-                "address": "青海省西宁市城中区东大街53号"
+                "address": "青海省西宁市城中区东大街53号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\24.png"
@@ -1145,17 +1237,23 @@
               {
                 "label": "委托方",
                 "name": "云南好美味食品有限公司",
-                "address": "云南省昆明市大板桥街道办事处西冲社区居委会西冲口村"
+                "address": "云南省昆明市大板桥街道办事处西冲社区居委会西冲口村",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "生产商",
                 "name": "云南豆可豆食品有限公司",
-                "address": "云南省昆明市呈贡区奥斯迪电商产业园D7栋2楼"
+                "address": "云南省昆明市呈贡区奥斯迪电商产业园D7栋2楼",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "官渡区魔术师百货零售商行",
-                "address": "中国（云南）自由贸易试验区昆明片区官渡区昆明经济技术开发区航天社区居委会大学路高桥村293-3"
+                "address": "中国（云南）自由贸易试验区昆明片区官渡区昆明经济技术开发区航天社区居委会大学路高桥村293-3",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\25.png"
@@ -1189,17 +1287,23 @@
               {
                 "label": "经营者",
                 "name": "南宁市康益惠贸易有限公司",
-                "address": "/"
+                "address": "/",
+                "type": "seller",
+                "type_label": "销售商"
               },
               {
                 "label": "生产商",
                 "name": "南宁市鸿葵食品有限公司",
-                "address": "广西壮族自治区南宁市江南区五一西路"
+                "address": "广西壮族自治区南宁市江南区五一西路",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "南宁御景星港百货有限公司",
-                "address": "广西壮族自治区南宁市青秀区教育路22号金凤凰·南湖御景1层03号商场、2层商场"
+                "address": "广西壮族自治区南宁市青秀区教育路22号金凤凰·南湖御景1层03号商场、2层商场",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\26.png"
@@ -1233,17 +1337,23 @@
               {
                 "label": "经销商",
                 "name": "昆明惠乔春商贸有限公司",
-                "address": "中国（云南）自由贸易试验区昆明片区经开区浦发路2号鼎商国际产业园区B2栋502号"
+                "address": "中国（云南）自由贸易试验区昆明片区经开区浦发路2号鼎商国际产业园区B2栋502号",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "生产商",
                 "name": "昆明经济技术开发区冠欣食品厂",
-                "address": "云南省昆明市经开区阿拉街道东部仓储物流域D-11号"
+                "address": "云南省昆明市经开区阿拉街道东部仓储物流域D-11号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "昇菘（中国）超市有限公司",
-                "address": "云南省昆明市西山区南二环与前卫西路交汇口盛高大城4-B（滇池康桥）"
+                "address": "云南省昆明市西山区南二环与前卫西路交汇口盛高大城4-B（滇池康桥）",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\27.png"
@@ -1256,7 +1366,7 @@
     {
       "attachment_name": "附件10 其他食品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/5a9a3ecf7af4402c874fb06403bb8c38.xlsx?fileName=附件10 其他食品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件10 其他食品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件10 其他食品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1297,12 +1407,16 @@
               {
                 "label": null,
                 "name": "商丘百味佳食品有限公司",
-                "address": "河南省商丘市虞城县城郊乡范庄村44号"
+                "address": "河南省商丘市虞城县城郊乡范庄村44号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "商丘市伊品香食品有限公司",
-                "address": "河南省商丘市虞城县城郊乡范庄村131号"
+                "address": "河南省商丘市虞城县城郊乡范庄村131号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\28.png"
@@ -1315,7 +1429,7 @@
     {
       "attachment_name": "附件11 糕点监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/a265e6dee611413192ab1ace11c1d34b.xlsx?fileName=附件11 糕点监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件11 糕点监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件11 糕点监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1356,12 +1470,16 @@
               {
                 "label": null,
                 "name": "常州市乐麦红食品有限公司",
-                "address": "江苏省常州市武进区牛塘镇沈家弄村湖滨北路508号"
+                "address": "江苏省常州市武进区牛塘镇沈家弄村湖滨北路508号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "常州市莲子花商贸有限公司",
-                "address": "江苏省常州市钟楼区怀德中路166号（3栋201号）"
+                "address": "江苏省常州市钟楼区怀德中路166号（3栋201号）",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\29.png"
@@ -1395,17 +1513,23 @@
               {
                 "label": "委托商",
                 "name": "广西百百阳商贸有限公司",
-                "address": "广西壮族自治区南宁市金凯路112号现代标准厂房5号楼第4层"
+                "address": "广西壮族自治区南宁市金凯路112号现代标准厂房5号楼第4层",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "生产商",
                 "name": "广西三只熊食品科技有限公司",
-                "address": "广西壮族自治区南宁市金凯路112号现代标准厂房5号楼第三层"
+                "address": "广西壮族自治区南宁市金凯路112号现代标准厂房5号楼第三层",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "广西螺知道食品科技有限公司",
-                "address": "广西壮族自治区南宁市洪历路2-6号现代光电科技工业园1号厂房5层501号车间301室"
+                "address": "广西壮族自治区南宁市洪历路2-6号现代光电科技工业园1号厂房5层501号车间301室",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\30.png"
@@ -1439,12 +1563,16 @@
               {
                 "label": null,
                 "name": "重庆全成食品有限公司",
-                "address": "重庆市九龙坡区陶家镇白彭路362号2-1-B、2-2-B、2-3-B号"
+                "address": "重庆市九龙坡区陶家镇白彭路362号2-1-B、2-2-B、2-3-B号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "重庆中汇嘉商贸有限公司",
-                "address": "重庆市渝中区七星岗街道中山一路109号附8号负1-13"
+                "address": "重庆市渝中区七星岗街道中山一路109号附8号负1-13",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\31.png"
@@ -1457,7 +1585,7 @@
     {
       "attachment_name": "附件12 茶叶及相关制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/7c6df3f08f8043a2a67b2e37962e4f9e.xlsx?fileName=附件12 茶叶及相关制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件12 茶叶及相关制品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件12 茶叶及相关制品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1498,12 +1626,16 @@
               {
                 "label": null,
                 "name": "安徽裕禾堂健康产业发展有限公司",
-                "address": "安徽省亳州市高新区酒城大道与曹洪路交叉口南300米"
+                "address": "安徽省亳州市高新区酒城大道与曹洪路交叉口南300米",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "亳州市裕茶堂健康产业发展有限公司",
-                "address": "安徽省亳州市高新区曹洪路369号"
+                "address": "安徽省亳州市高新区曹洪路369号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\32.png"
@@ -1537,17 +1669,23 @@
               {
                 "label": "委托方",
                 "name": "安溪县城关绵新茶行",
-                "address": "福建省泉州市安溪县城厢永隆国际二期79店"
+                "address": "福建省泉州市安溪县城厢永隆国际二期79店",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "受委托方",
                 "name": "泉州市百年修本茶业有限公司",
-                "address": "福建省泉州市安溪县城厢镇河滨南路2006号广福包装1号厂房二楼1号"
+                "address": "福建省泉州市安溪县城厢镇河滨南路2006号广福包装1号厂房二楼1号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "安溪县城关绵新茶行",
-                "address": "福建省泉州市安溪县城厢镇长安街35-79号"
+                "address": "福建省泉州市安溪县城厢镇长安街35-79号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\33.png"
@@ -1560,7 +1698,7 @@
     {
       "attachment_name": "附件13 蜂产品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/d3116a13446346cc8791b49b0e1f080b.xlsx?fileName=附件13 蜂产品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件13 蜂产品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件13 蜂产品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1601,12 +1739,16 @@
               {
                 "label": null,
                 "name": "巴州山龙王红蜂业有限公司",
-                "address": "新疆维吾尔自治区巴音郭楞蒙古自治州库尔勒市托布里其乡上牙村二组144号院"
+                "address": "新疆维吾尔自治区巴音郭楞蒙古自治州库尔勒市托布里其乡上牙村二组144号院",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "沙依巴克区雅山中路王丽食品店",
-                "address": "新疆维吾尔自治区乌鲁木齐市沙依巴克区雅山中路1099号边疆物产园B3—9号"
+                "address": "新疆维吾尔自治区乌鲁木齐市沙依巴克区雅山中路1099号边疆物产园B3—9号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\34.png"
@@ -1619,7 +1761,7 @@
     {
       "attachment_name": "附件14 食用油、油脂及其制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/2c33e5d751334725a22b341b906a41d4.xlsx?fileName=附件14 食用油、油脂及其制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件14 食用油、油脂及其制品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件14 食用油、油脂及其制品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1660,17 +1802,23 @@
               {
                 "label": "委托商",
                 "name": "贵州太朴生态农业有限公司",
-                "address": "贵州省贵阳市开阳县禾丰乡太朴自然农业园"
+                "address": "贵州省贵阳市开阳县禾丰乡太朴自然农业园",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "生产商",
                 "name": "贵州油研纯香生态粮油科技有限公司",
-                "address": "贵州省铜仁市思南县塘头镇机场路"
+                "address": "贵州省铜仁市思南县塘头镇机场路",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "贵州太朴生态食品有限公司",
-                "address": "贵州省贵阳市开阳县禾丰布依族苗族乡王车村太朴有机会五谷工坊"
+                "address": "贵州省贵阳市开阳县禾丰布依族苗族乡王车村太朴有机会五谷工坊",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\35.png"
@@ -1683,7 +1831,7 @@
     {
       "attachment_name": "附件15 保健食品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/bb498cc0e5694490ba0e32d9fdc0d39b.xlsx?fileName=附件15 保健食品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件15 保健食品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件15 保健食品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1724,12 +1872,16 @@
               {
                 "label": null,
                 "name": "安徽哈博药业有限公司",
-                "address": "安徽省阜阳市太和县工业园B区"
+                "address": "安徽省阜阳市太和县工业园B区",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "石峰区俞甄商贸行",
-                "address": "中国湖南株洲石峰区响石岭街道石峰东路1号1栋1层-H672"
+                "address": "中国湖南株洲石峰区响石岭街道石峰东路1号1栋1层-H672",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\36.png"
@@ -1742,7 +1894,7 @@
     {
       "attachment_name": "附件16 特殊膳食食品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/09624f95bfd242caa1ecf9debe8599f0.xlsx?fileName=附件16 特殊膳食食品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件16 特殊膳食食品监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件16 特殊膳食食品监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1783,17 +1935,23 @@
               {
                 "label": "委托商",
                 "name": "山东易倍国际供应链管理有限公司",
-                "address": "山东省烟台市莱山区初家街道润华大厦1号楼2011"
+                "address": "山东省烟台市莱山区初家街道润华大厦1号楼2011",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "受委托商",
                 "name": "山东高唐永旺食品有限公司",
-                "address": "‌山东省聊城市高唐县经济开发区超越路东侧人和路南侧"
+                "address": "‌山东省聊城市高唐县经济开发区超越路东侧人和路南侧",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "被抽样单位",
                 "name": "山东易倍国际供应链管理有限公司",
-                "address": "山东省烟台市莱山区迎春大街177号润华大厦A座20楼2009室"
+                "address": "山东省烟台市莱山区迎春大街177号润华大厦A座20楼2009室",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\37.png"
@@ -1827,17 +1985,23 @@
               {
                 "label": "总经销",
                 "name": "广州广济堂健康科技有限公司",
-                "address": "广东省广州市南沙区榄核镇榄北路120号104"
+                "address": "广东省广州市南沙区榄核镇榄北路120号104",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "生产企业",
                 "name": "江西沃宝健康产业有限公司",
-                "address": "江西省宜春市樟树市永泰镇洋塘村委彭家村898号"
+                "address": "江西省宜春市樟树市永泰镇洋塘村委彭家村898号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "海东市平安区爱清母婴用品店",
-                "address": "青海省海东市平安区平安街道湟源路有色阳光二期一号楼一层商铺"
+                "address": "青海省海东市平安区平安街道湟源路有色阳光二期一号楼一层商铺",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\38.png"
@@ -1871,17 +2035,23 @@
               {
                 "label": "委托企业",
                 "name": "华北制药河北华维健康产业有限公司",
-                "address": "河北省石家庄市经济技术开发区开发大街368号"
+                "address": "河北省石家庄市经济技术开发区开发大街368号",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "受委托企业",
                 "name": "天津中威和治药业有限公司",
-                "address": "天津市宝坻经济开发区宝中道29号"
+                "address": "天津市宝坻经济开发区宝中道29号",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "被抽样单位",
                 "name": "北京京东叁佰陆拾度电子商务有限公司",
-                "address": "北京市北京经济技术开发区科创十一街18号C座2层222室"
+                "address": "北京市北京经济技术开发区科创十一街18号C座2层222室",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\39.png"
@@ -1915,12 +2085,16 @@
               {
                 "label": null,
                 "name": "郑州林诺药业有限公司",
-                "address": "河南省郑州市310国道与竹林大道交叉口"
+                "address": "河南省郑州市310国道与竹林大道交叉口",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "徐州国信医药连锁有限公司",
-                "address": "江苏省徐州市泉山区湖北路滨湖花园三期C9-2-309、310、311、312、313、314；C9-3-317"
+                "address": "江苏省徐州市泉山区湖北路滨湖花园三期C9-2-309、310、311、312、313、314；C9-3-317",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\40.png"
@@ -1954,17 +2128,23 @@
               {
                 "label": "委托商",
                 "name": "薛生白健康管理（方城县）有限公司",
-                "address": "河南省南阳市方城县小史店镇东新区014号"
+                "address": "河南省南阳市方城县小史店镇东新区014号",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "生产企业",
                 "name": "南阳御盛堂大健康产业有限公司",
-                "address": "河南省南阳市方城县小史店镇镇东新区006号"
+                "address": "河南省南阳市方城县小史店镇镇东新区006号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "德兴市悦品商贸行",
-                "address": "江西省上饶市德兴市德兴大道德兴建材商贸城8幢第二层213号-1167"
+                "address": "江西省上饶市德兴市德兴大道德兴建材商贸城8幢第二层213号-1167",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\41.png"
@@ -1977,7 +2157,7 @@
     {
       "attachment_name": "附件17 酒类监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20265/0720bb9d56af4525a52f8be6dff055d6.xlsx?fileName=附件17 酒类监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件17 酒类监督抽检不合格产品信息_3.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260509__市监食检发〔2026〕49号__art_aa1e96b1b2c04dc2877ca8417b3e7dab__市场监管总局办公厅关于42批次食品抽检不合格情况的通报\\附件17 酒类监督抽检不合格产品信息_4.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -2018,17 +2198,23 @@
               {
                 "label": "委托商",
                 "name": "贵州白金王子酒业（集团）有限公司",
-                "address": "贵州省贵阳市南明区花果园街道花果园后街彭家湾花果园彭家湾"
+                "address": "贵州省贵阳市南明区花果园街道花果园后街彭家湾花果园彭家湾",
+                "type": "distributor",
+                "type_label": "经销商"
               },
               {
                 "label": "制造商",
                 "name": "宿迁市洋河镇旭洋酒厂",
-                "address": "江苏省宿迁市洋河新区洋河镇徐淮路17号"
+                "address": "江苏省宿迁市洋河新区洋河镇徐淮路17号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
               },
               {
                 "label": "被抽样单位",
                 "name": "宿迁至品香酒业有限公司",
-                "address": "江苏省宿迁市洋河新区洋河镇颐高互联网JU-2214号"
+                "address": "江苏省宿迁市洋河新区洋河镇颐高互联网JU-2214号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕49号\\42.png"

@@ -37,6 +37,13 @@ function deriveProvinceCity(region, address) {
   return fromAddress;
 }
 
+const COMPANY_TYPES = new Set(['manufacturer', 'distributor', 'seller']);
+
+function normalizeCompanyType(value) {
+  const normalized = normalizeText(value);
+  return COMPANY_TYPES.has(normalized) ? normalized : 'manufacturer';
+}
+
 async function ensureColumnExists(connection, tableName, columnName, definition) {
   const [rows] = await connection.query(`SHOW COLUMNS FROM ${tableName} LIKE ?`, [columnName]);
   if (rows.length === 0) {
@@ -439,27 +446,37 @@ async function deleteOrphanCompanies(connection, companyIds = []) {
   };
 }
 
-async function upsertCompany(connection, companyName, companyAddress, province, city = null, sourceProductName = null) {
+async function upsertCompany(
+  connection,
+  companyName,
+  companyAddress,
+  province,
+  city = null,
+  sourceProductName = null,
+  companyType = 'manufacturer'
+) {
   const normalizedName = normalizeText(companyName);
   if (!normalizedName || isInvalidCompanyValue(normalizedName)) {
     return null;
   }
+  const normalizedType = normalizeCompanyType(companyType);
 
   const [existingRows] = await connection.query(
-    'SELECT id, address, province, city, source_product_name FROM companies WHERE name = ? LIMIT 1',
+    'SELECT id, type, address, province, city, source_product_name FROM companies WHERE name = ? LIMIT 1',
     [normalizedName]
   );
 
   if (existingRows.length > 0) {
     const existing = existingRows[0];
+    const shouldUpdateType = existing.type !== normalizedType;
     const shouldUpdateAddress = (!existing.address && companyAddress);
     const shouldUpdateProvince = (!existing.province && province);
     const shouldUpdateCity = (!existing.city && city);
     const shouldUpdateSourceProductName = (!existing.source_product_name && sourceProductName);
-    if (shouldUpdateAddress || shouldUpdateProvince || shouldUpdateCity || shouldUpdateSourceProductName) {
+    if (shouldUpdateType || shouldUpdateAddress || shouldUpdateProvince || shouldUpdateCity || shouldUpdateSourceProductName) {
       await connection.query(
-        'UPDATE companies SET address = COALESCE(address, ?), province = COALESCE(province, ?), city = COALESCE(city, ?), source_product_name = COALESCE(source_product_name, ?) WHERE id = ?',
-        [companyAddress || null, province || null, city || null, sourceProductName || null, existing.id]
+        'UPDATE companies SET type = ?, address = COALESCE(address, ?), province = COALESCE(province, ?), city = COALESCE(city, ?), source_product_name = COALESCE(source_product_name, ?) WHERE id = ?',
+        [normalizedType, companyAddress || null, province || null, city || null, sourceProductName || null, existing.id]
       );
     }
     return existing.id;
@@ -468,9 +485,9 @@ async function upsertCompany(connection, companyName, companyAddress, province, 
   const [result] = await connection.query(
     `
       INSERT INTO companies (name, type, address, province, city, source_product_name, sampled_count, last_sampled_at)
-      VALUES (?, 'manufacturer', ?, ?, ?, ?, 0, NULL)
+      VALUES (?, ?, ?, ?, ?, ?, 0, NULL)
     `,
-    [normalizedName, companyAddress || null, province || null, city || null, sourceProductName || null]
+    [normalizedName, normalizedType, companyAddress || null, province || null, city || null, sourceProductName || null]
   );
 
   return result.insertId;
@@ -531,6 +548,7 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
       }
     );
     const companyEntries = structured.company_entries || [];
+    const linkedDetailCompanyIds = new Set();
 
     for (const entry of companyEntries) {
       if (!entry?.name || isInvalidCompanyValue(entry.name)) {
@@ -546,7 +564,8 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
         companyAddress,
         region.province === '未标注' ? null : region.province,
         region.city === '未标注' ? null : region.city,
-        sourceProductName
+        sourceProductName,
+        entry.type
       );
 
       if (!companyId) {
@@ -554,6 +573,10 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
       }
 
       const normalizedCompanyId = Number(companyId);
+      if (linkedDetailCompanyIds.has(normalizedCompanyId)) {
+        continue;
+      }
+      linkedDetailCompanyIds.add(normalizedCompanyId);
       affectedCompanyIds.add(normalizedCompanyId);
       currentCompanyIds.add(normalizedCompanyId);
 
