@@ -33,9 +33,9 @@
             <el-option v-for="item in filterOptions.provinces" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="产品分类">
-          <el-select v-model="filters.product_category" placeholder="全部产品分类" clearable filterable style="width: 220px" @change="loadData">
-            <el-option v-for="item in filterOptions.product_categories" :key="item.value" :label="item.label" :value="item.value" />
+        <el-form-item label="来源产品名称">
+          <el-select v-model="filters.source_product_name" placeholder="全部来源产品" clearable filterable style="width: 220px" @change="loadData">
+            <el-option v-for="item in filterOptions.source_product_names" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="只看不合格">
@@ -63,7 +63,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="province" label="省份" width="100" />
-        <el-table-column prop="product_category" label="产品分类" width="140" show-overflow-tooltip />
+        <el-table-column prop="source_product_name" label="来源产品名称" width="180" show-overflow-tooltip />
         <!-- <el-table-column prop="city" label="城市" width="100" /> -->
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
@@ -106,13 +106,13 @@ const tableData = ref([])
 const companyStats = ref({})
 const filterOptions = ref({
   provinces: [],
-  product_categories: []
+  source_product_names: []
 })
 const filters = ref({
   name: '',
   brand: '',
   province: '',
-  product_category: '',
+  source_product_name: '',
   has_unqualified: false
 })
 const pagination = ref({
@@ -153,7 +153,7 @@ const loadFilterOptions = async () => {
     const res = await getCompanyFilterOptions()
     filterOptions.value = res.data || {
       provinces: [],
-      product_categories: []
+      source_product_names: []
     }
   } catch (error) {
     console.error('加载企业筛选项失败:', error)
@@ -165,7 +165,7 @@ const resetFilters = () => {
     name: '',
     brand: '',
     province: '',
-    product_category: '',
+    source_product_name: '',
     has_unqualified: false
   }
   pagination.value.page = 1

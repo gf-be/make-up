@@ -11,6 +11,7 @@ function requireFromBackendOrDefault(packageName) {
 }
 
 const XLSX = requireFromBackendOrDefault('xlsx');
+const { buildStructuredCompanyFields } = require(path.resolve(__dirname, '..', 'backend', 'utils', 'companyFieldParser'));
 
 const HEADER_ALIASES = {
   序号: 'sequence_no',
@@ -270,6 +271,41 @@ function isContinuationRow(row, fieldMap) {
   );
 }
 
+function applyFoodStructuredCompanyFields(productRow) {
+  if (!productRow) {
+    return productRow;
+  }
+  const structured = buildStructuredCompanyFields(
+    'food',
+    productRow.company_names || '',
+    productRow.company_addresses || '',
+    {
+      manufacturer_name: productRow.manufacturer_name,
+      manufacturer_address: productRow.manufacturer_address,
+      operator_name: productRow.operator_name,
+      operator_address: productRow.operator_address,
+      sample_unit_name: productRow.sample_unit_name,
+      sample_unit_address: productRow.sample_unit_address
+    }
+  );
+  productRow.company_names = structured.company_names;
+  productRow.company_addresses = structured.company_addresses;
+  productRow.manufacturer_name = structured.manufacturer_name;
+  productRow.manufacturer_address = structured.manufacturer_address;
+  productRow.operator_name = structured.operator_name;
+  productRow.operator_address = structured.operator_address;
+  if (structured.sample_unit_name && !productRow.sample_unit_name) {
+    productRow.sample_unit_name = structured.sample_unit_name;
+  }
+  if (structured.sample_unit_address && !productRow.sample_unit_address) {
+    productRow.sample_unit_address = structured.sample_unit_address;
+  }
+  if (Array.isArray(structured.company_entries) && structured.company_entries.length) {
+    productRow.company_entries = structured.company_entries;
+  }
+  return productRow;
+}
+
 function mergeContinuation(productRow, row, fieldMap) {
   const mergedName = mergeProductNames(productRow.product_name, byField(row, fieldMap, 'product_name'));
   if (mergedName) {
@@ -278,22 +314,18 @@ function mergeContinuation(productRow, row, fieldMap) {
   const co = mergeScalarPreferCompleteThenDistinct(productRow.company_names, byField(row, fieldMap, 'company_names'));
   if (co) {
     productRow.company_names = co;
-    productRow.manufacturer_name = co;
   }
   const addr = mergeScalarPreferCompleteThenDistinct(productRow.company_addresses, byField(row, fieldMap, 'company_addresses'));
   if (addr) {
     productRow.company_addresses = addr;
-    productRow.manufacturer_address = addr;
   }
   const su = mergeScalarPreferCompleteThenDistinct(productRow.sample_unit_name, byField(row, fieldMap, 'sample_unit_name'));
   if (su) {
     productRow.sample_unit_name = su;
-    productRow.operator_name = su;
   }
   const sua = mergeScalarPreferCompleteThenDistinct(productRow.sample_unit_address, byField(row, fieldMap, 'sample_unit_address'));
   if (sua) {
     productRow.sample_unit_address = sua;
-    productRow.operator_address = sua;
   }
   const spec = mergeScalarPreferCompleteThenDistinct(productRow.package_spec, byField(row, fieldMap, 'package_spec'));
   if (spec) productRow.package_spec = spec;
@@ -333,21 +365,22 @@ function mergeContinuation(productRow, row, fieldMap) {
   if (result) productRow.inspection_result = result;
   if (requirement) productRow.requirement = requirement;
   productRow.production_date = productRow.production_date || normalizeProductionDate(byField(row, fieldMap, 'production_date')) || null;
+  applyFoodStructuredCompanyFields(productRow);
 }
 
 function buildProductRow(row, fieldMap, sequenceNo, categoryFromAttachment) {
   const productName = stripTrailingProductNameCategoryNoise(byField(row, fieldMap, 'product_name'));
   if (!productName) return null;
   const excelFoodFine = normalizeText(byField(row, fieldMap, 'food_category'));
-  return {
+  const productRow = {
     sequence_no: sequenceNo,
     product_name: productName,
     company_names: byField(row, fieldMap, 'company_names') || null,
     company_addresses: byField(row, fieldMap, 'company_addresses') || null,
-    manufacturer_name: byField(row, fieldMap, 'company_names') || null,
-    manufacturer_address: byField(row, fieldMap, 'company_addresses') || null,
-    operator_name: byField(row, fieldMap, 'sample_unit_name') || null,
-    operator_address: byField(row, fieldMap, 'sample_unit_address') || null,
+    manufacturer_name: null,
+    manufacturer_address: null,
+    operator_name: null,
+    operator_address: null,
     sample_unit_name: byField(row, fieldMap, 'sample_unit_name') || null,
     sample_unit_address: byField(row, fieldMap, 'sample_unit_address') || null,
     package_spec: byField(row, fieldMap, 'package_spec') || null,
@@ -365,6 +398,7 @@ function buildProductRow(row, fieldMap, sequenceNo, categoryFromAttachment) {
     attachment_sampling_category: categoryFromAttachment || excelFoodFine || null,
     is_counterfeit: 0
   };
+  return applyFoodStructuredCompanyFields(productRow);
 }
 
 function isBlankSamplingCode(value) {

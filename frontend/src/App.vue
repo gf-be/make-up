@@ -374,6 +374,7 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
+
 .layout-container {
   height: 100vh;
   display: flex;

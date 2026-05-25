@@ -6,7 +6,7 @@ DrissionPage 抓取市场监管总局“通知通告”中的食品抽检不合�
 1. 访问 https://zwfw.samr.gov.cn/scjg/wyk/tbtg/ 列表页；
 2. 筛选“市场监管总局办公厅/总局关于 xx 批次食品抽检不合格情况的通报/通告”；
 3. 抓取正文，下载 Excel/ZIP/PDF 附件；
-4. 调用 data_get/parse_food_attachment.js 解析 Excel/ZIP（以表格第一列序号为分批主键，同序号多行合并；表头序号、同一抽样编号多行亦并入一条；抽样编号合并后续空白行沿用并入；不导入备注列），生成 data_get/output/items/*.json；
+4. 调用 data_get/parse_food_attachment.js 解析 Excel/ZIP（以表格第一列序号为分批主键，同序号多行合并；表头序号、同一抽样编号多行亦并入一条；抽样编号合并后续空白行沿用并入；生产企业名称/地址列按「标签：值」拆为 manufacturer_*、operator_*；被抽样单位名称/地址并入 company_entries；不导入备注列），生成 data_get/output/items/*.json；
 5. 可选调用后端接口，分别写入 food_inspection 原始拆解表和导入检查 staging；
 6. 可选确认发布，正式同步到 announcements、announcement_product_details、
    inspections、inspection_details、unqualified_products、companies。
@@ -321,7 +321,7 @@ def extract_content_text(soup: BeautifulSoup) -> str:
     candidates: List[str] = []
     seen = set()
     for selector in CONTENT_CONTAINER_SELECTORS:
-        for node in soup.select(selector):
+        for node in soup.find("div",class_="Three_xilan_01"):
             text = extract_content_candidate(node)
             if text and text not in seen:
                 seen.add(text)
@@ -457,6 +457,30 @@ def extract_next_page_url(soup: BeautifulSoup, current_url: str) -> Optional[str
     return None
 
 
+def enrich_food_row_company_entries(row: Dict[str, object]) -> Dict[str, object]:
+    """将被抽样单位名称/地址并入 company_entries，供企业表同步使用。"""
+    if not isinstance(row, dict):
+        return row
+    sample_name = normalize_whitespace(row.get("sample_unit_name") or "")
+    if not sample_name:
+        return row
+    entries = [item for item in (row.get("company_entries") or []) if isinstance(item, dict)]
+    sample_address = normalize_whitespace(row.get("sample_unit_address") or "") or None
+    dedupe_key = f"{sample_name}__{sample_address or ''}"
+    existing_keys = {
+        f"{normalize_whitespace(item.get('name') or '')}__{normalize_whitespace(item.get('address') or '') or ''}"
+        for item in entries
+    }
+    if dedupe_key not in existing_keys:
+        entries.append({
+            "label": "被抽样单位",
+            "name": sample_name,
+            "address": sample_address,
+        })
+        row["company_entries"] = entries
+    return row
+
+
 def parse_food_attachment_with_node(local_path: Path) -> Tuple[List[Dict[str, object]], str]:
     if not NODE_FOOD_ATTACHMENT_PARSER.is_file():
         raise RuntimeError(f"未找到食品附件解析脚本: {NODE_FOOD_ATTACHMENT_PARSER}")
@@ -473,7 +497,11 @@ def parse_food_attachment_with_node(local_path: Path) -> Tuple[List[Dict[str, ob
     rows = data.get("rows") if isinstance(data, dict) else []
     if not isinstance(rows, list):
         rows = []
-    rows = [row for row in rows if isinstance(row, dict) and normalize_whitespace(row.get("product_name"))]
+    rows = [
+        enrich_food_row_company_entries(row)
+        for row in rows
+        if isinstance(row, dict) and normalize_whitespace(row.get("product_name"))
+    ]
     message = clean_text(data.get("message") if isinstance(data, dict) else "")
     if not rows and not message:
         message = "未从食品抽检附件中识别到可导入表格明细。"
@@ -870,7 +898,7 @@ class SamrFoodCrawler:
             },
             "content_text": content_text,
             "content_preview": content_text[:1000],
-            "food_content_segments": parse_food_content_text_segments(content_text),
+            # "food_content_segments": parse_food_content_text_segments(content_text),
             "attachments": attachments,
             "success": True,
         }

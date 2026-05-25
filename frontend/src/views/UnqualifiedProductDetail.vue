@@ -28,12 +28,13 @@
         <el-descriptions-item label="来源标题">{{ detail.source_title || '-' }}</el-descriptions-item>
         <el-descriptions-item label="通告编号">{{ detail.announcement_no || '-' }}</el-descriptions-item>
         <el-descriptions-item label="发布日期">{{ formatDate(detail.source_publish_date) || '-' }}</el-descriptions-item>
-        <!-- <el-descriptions-item label="生产企业名称">{{ detail.manufacturer_name || detail.company_names || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="生产企业地址">{{ detail.manufacturer_address || detail.company_addresses || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="经营企业名称">{{ detail.operator_name || detail.sample_unit_name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="经营企业地址">{{ detail.operator_address || detail.sample_unit_address || '-' }}</el-descriptions-item> -->
         <el-descriptions-item label="原始标示企业">{{ detail.company_names || '-' }}</el-descriptions-item>
         <el-descriptions-item label="原始企业地址">{{ detail.company_addresses || '-' }}</el-descriptions-item>
+      
+        <el-descriptions-item label="生产企业名称">{{ detail.manufacturer_name || detail.company_names || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="生产企业地址">{{ detail.manufacturer_address || detail.company_addresses || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="经营企业名称">{{ detail.operator_name || detail.sample_unit_name || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="经营企业地址">{{ detail.operator_address || detail.sample_unit_address || '-' }}</el-descriptions-item>
         <el-descriptions-item label="被抽样单位">{{ detail.sample_unit_name || '-' }}</el-descriptions-item>
         <el-descriptions-item label="被抽样单位地址">{{ detail.sample_unit_address || '-' }}</el-descriptions-item>
         <el-descriptions-item label="产品分类">{{ detail.product_category || '-' }}</el-descriptions-item>

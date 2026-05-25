@@ -273,7 +273,7 @@
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.product_name" size="small" />
                             <span v-else>{{ row.product_name || '暂无' }}</span>
                           </el-descriptions-item>
-                          <el-descriptions-item label="序号">
+                          <!-- <el-descriptions-item label="序号">
                             <el-input-number
                               v-if="isEditingProductDetail(row)"
                               v-model="productDetailForm.sequence_no"
@@ -282,7 +282,7 @@
                               style="width: 100%"
                             />
                             <span v-else>{{ row.sequence_no || '暂无' }}</span>
-                          </el-descriptions-item>
+                          </el-descriptions-item> -->
                           <el-descriptions-item label="产品分类">
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.attachment_sampling_category" size="small" />
                             <span v-else>{{ row.attachment_sampling_category || '暂无' }}</span>
@@ -295,6 +295,14 @@
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.company_addresses" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.company_addresses || '暂无' }}</span>
                           </el-descriptions-item>
+                          <el-descriptions-item label="生产企业名称">
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.manufacturer_name" size="small" />
+                            <span v-else>{{ row.manufacturer_name || '暂无' }}</span>
+                          </el-descriptions-item>
+                          <el-descriptions-item label="生产企业地址">
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.manufacturer_address" type="textarea" :rows="1" size="small" />
+                            <span v-else>{{ row.manufacturer_address || '暂无' }}</span>
+                          </el-descriptions-item>
                           <el-descriptions-item label="被抽样单位名称">
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.sample_unit_name" size="small" />
                             <span v-else>{{ row.sample_unit_name || '暂无' }}</span>
@@ -302,7 +310,15 @@
                           <el-descriptions-item label="被抽样单位地址">
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.sample_unit_address" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.sample_unit_address || '暂无' }}</span>
+                           </el-descriptions-item>
+                          <!--<el-descriptions-item label="销售企业名称">
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.operator_name" type="textarea" :rows="1" size="small" />
+                            <span v-else>{{ row.operator_name || '暂无' }}</span>
                           </el-descriptions-item>
+                          <el-descriptions-item label="销售企业地址">
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.operator_address" type="textarea" :rows="1" size="small" />
+                            <span v-else>{{ row.operator_address || '暂无' }}</span>
+                          </el-descriptions-item> -->
                           <el-descriptions-item label="生产日期">
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.production_date" size="small" />
                             <span v-else>{{ row.production_date || '暂无' }}</span>
@@ -335,6 +351,10 @@
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.inspection_result" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.inspection_result || '暂无' }}</span>
                           </el-descriptions-item>
+                          <el-descriptions-item label="规定要求">
+                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.requirement" type="textarea" :rows="1" size="small" />
+                            <span v-else>{{ row.requirement || '暂无' }}</span>
+                          </el-descriptions-item>
                           <el-descriptions-item v-if="isFoodAnnouncement" label="正文文案" :span="2">
                             <el-input
                               v-if="isEditingProductDetail(row)"
@@ -348,10 +368,7 @@
                           </el-descriptions-item>
                          
                           
-                          <el-descriptions-item label="规定要求" :span="2">
-                            <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.requirement" type="textarea" :rows="1" size="small" />
-                            <span v-else>{{ row.requirement || '暂无' }}</span>
-                          </el-descriptions-item>
+                          
                           <el-descriptions-item label="备注" >
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.remarks" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.remarks || '暂无' }}</span>
@@ -488,7 +505,7 @@
     <el-dialog
       v-model="contentDialogVisible"
       :title="announcement ? `编辑正文：${announcement.title || '当前通告'}` : '编辑通告正文'"
-      width="820px"
+      width="620px"
       :close-on-click-modal="false"
     >
       <div style="margin-bottom: 16px; color: #606266; line-height: 1.7;">
@@ -547,7 +564,7 @@
 
     <el-dialog
       v-model="foodBodyTextDialogVisible"
-      width="960px"
+      width="760px"
       :close-on-click-modal="false"
       destroy-on-close
       draggable

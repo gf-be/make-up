@@ -1,11 +1,12 @@
 const {
   normalizeProductType,
   normalizeAnnouncementType
-} = require('./unqualifiedProducts');
-const { deriveProductCategory, extractProvinceCity } = require('./dataAnalysisHelpers');
+} = require('./productTypeHelpers');
+const { extractProvinceCity } = require('./dataAnalysisHelpers');
 const {
   normalizeText,
   splitCompanyEntries,
+  buildStructuredCompanyFields,
   isInvalidCompanyValue
 } = require('./companyFieldParser');
 
@@ -75,11 +76,40 @@ async function ensureCompaniesSamplingSchema(connection) {
     await connection.query('ALTER TABLE companies ADD COLUMN last_sampled_at DATE NULL AFTER sampled_count');
   }
 
+  const [sourceProductNameColumn] = await connection.query('SHOW COLUMNS FROM companies LIKE ?', ['source_product_name']);
   const [productCategoryColumn] = await connection.query('SHOW COLUMNS FROM companies LIKE ?', ['product_category']);
-  if (productCategoryColumn.length === 0) {
-    await connection.query("ALTER TABLE companies ADD COLUMN product_category VARCHAR(100) NULL AFTER city");
+  if (productCategoryColumn.length > 0 && sourceProductNameColumn.length === 0) {
+    await connection.query(
+      "ALTER TABLE companies CHANGE COLUMN product_category source_product_name VARCHAR(255) NULL COMMENT '来源产品名称'"
+    );
+  } else if (sourceProductNameColumn.length === 0) {
+    await connection.query(
+      "ALTER TABLE companies ADD COLUMN source_product_name VARCHAR(255) NULL COMMENT '来源产品名称' AFTER city"
+    );
+  } else {
+    const colType = String(sourceProductNameColumn[0].Type || '');
+    if (!colType.includes('255')) {
+      await connection.query(
+        "ALTER TABLE companies MODIFY COLUMN source_product_name VARCHAR(255) NULL COMMENT '来源产品名称'"
+      );
+    }
   }
-  await ensureIndexExists(connection, 'companies', 'idx_companies_product_category', 'INDEX idx_companies_product_category (product_category)');
+  const [oldCategoryIndex] = await connection.query('SHOW INDEX FROM companies WHERE Key_name = ?', ['idx_companies_product_category']);
+  if (oldCategoryIndex.length > 0) {
+    try {
+      await connection.query('ALTER TABLE companies DROP INDEX idx_companies_product_category');
+    } catch (error) {
+      if (error?.code !== 'ER_CANT_DROP_FIELD_OR_KEY') {
+        throw error;
+      }
+    }
+  }
+  await ensureIndexExists(
+    connection,
+    'companies',
+    'idx_companies_source_product_name',
+    'INDEX idx_companies_source_product_name (source_product_name)'
+  );
 
   await ensureColumnExists(connection, 'companies', 'credit_code', "VARCHAR(18) NULL COMMENT '统一社会信用代码' AFTER brand");
   await ensureIndexExists(
@@ -409,14 +439,14 @@ async function deleteOrphanCompanies(connection, companyIds = []) {
   };
 }
 
-async function upsertCompany(connection, companyName, companyAddress, province, city = null, productCategory = null) {
+async function upsertCompany(connection, companyName, companyAddress, province, city = null, sourceProductName = null) {
   const normalizedName = normalizeText(companyName);
   if (!normalizedName || isInvalidCompanyValue(normalizedName)) {
     return null;
   }
 
   const [existingRows] = await connection.query(
-    'SELECT id, address, province, city, product_category FROM companies WHERE name = ? LIMIT 1',
+    'SELECT id, address, province, city, source_product_name FROM companies WHERE name = ? LIMIT 1',
     [normalizedName]
   );
 
@@ -425,11 +455,11 @@ async function upsertCompany(connection, companyName, companyAddress, province, 
     const shouldUpdateAddress = (!existing.address && companyAddress);
     const shouldUpdateProvince = (!existing.province && province);
     const shouldUpdateCity = (!existing.city && city);
-    const shouldUpdateCategory = (!existing.product_category && productCategory);
-    if (shouldUpdateAddress || shouldUpdateProvince || shouldUpdateCity || shouldUpdateCategory) {
+    const shouldUpdateSourceProductName = (!existing.source_product_name && sourceProductName);
+    if (shouldUpdateAddress || shouldUpdateProvince || shouldUpdateCity || shouldUpdateSourceProductName) {
       await connection.query(
-        'UPDATE companies SET address = COALESCE(address, ?), province = COALESCE(province, ?), city = COALESCE(city, ?), product_category = COALESCE(product_category, ?) WHERE id = ?',
-        [companyAddress || null, province || null, city || null, productCategory || null, existing.id]
+        'UPDATE companies SET address = COALESCE(address, ?), province = COALESCE(province, ?), city = COALESCE(city, ?), source_product_name = COALESCE(source_product_name, ?) WHERE id = ?',
+        [companyAddress || null, province || null, city || null, sourceProductName || null, existing.id]
       );
     }
     return existing.id;
@@ -437,10 +467,10 @@ async function upsertCompany(connection, companyName, companyAddress, province, 
 
   const [result] = await connection.query(
     `
-      INSERT INTO companies (name, type, address, province, city, product_category, sampled_count, last_sampled_at)
+      INSERT INTO companies (name, type, address, province, city, source_product_name, sampled_count, last_sampled_at)
       VALUES (?, 'manufacturer', ?, ?, ?, ?, 0, NULL)
     `,
-    [normalizedName, companyAddress || null, province || null, city || null, productCategory || null]
+    [normalizedName, companyAddress || null, province || null, city || null, sourceProductName || null]
   );
 
   return result.insertId;
@@ -476,7 +506,8 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
   const [detailRows] = await connection.query(
     `
       SELECT id, product_name, company_names, company_addresses,
-             manufacturer_name, manufacturer_address, product_region
+             manufacturer_name, manufacturer_address, operator_name, operator_address,
+             sample_unit_name, sample_unit_address, product_region
       FROM announcement_product_details
       WHERE announcement_id = ?
       ORDER BY sequence_no ASC, id ASC
@@ -486,23 +517,36 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
 
 
   for (const detail of detailRows) {
-    const companyEntries = splitCompanyEntries(
-      detail.manufacturer_name || detail.company_names,
-      detail.manufacturer_address || detail.company_addresses
+    const structured = buildStructuredCompanyFields(
+      productType,
+      detail.company_names,
+      detail.company_addresses,
+      {
+        manufacturer_name: detail.manufacturer_name,
+        manufacturer_address: detail.manufacturer_address,
+        operator_name: detail.operator_name,
+        operator_address: detail.operator_address,
+        sample_unit_name: detail.sample_unit_name,
+        sample_unit_address: detail.sample_unit_address
+      }
     );
+    const companyEntries = structured.company_entries || [];
 
     for (const entry of companyEntries) {
+      if (!entry?.name || isInvalidCompanyValue(entry.name)) {
+        continue;
+      }
       const companyName = entry.name;
       const companyAddress = entry.address;
       const region = deriveProvinceCity(detail.product_region, companyAddress);
-      const productCategory = deriveProductCategory(detail.product_name);
+      const sourceProductName = normalizeText(detail.product_name) || null;
       const companyId = await upsertCompany(
         connection,
         companyName,
         companyAddress,
         region.province === '未标注' ? null : region.province,
         region.city === '未标注' ? null : region.city,
-        productCategory
+        sourceProductName
       );
 
       if (!companyId) {
@@ -598,14 +642,14 @@ async function syncCompaniesFromFlightInspectionDetails(connection, supervisionI
 
     const companyAddress = normalizeText(detail.company_address) || null;
     const region = deriveProvinceCity(null, companyAddress);
-    const productCategory = deriveProductCategory(detail.product_name);
+    const sourceProductName = normalizeText(detail.product_name) || null;
     const companyId = await upsertCompany(
       connection,
       companyName,
       companyAddress,
       region.province === '未标注' ? null : region.province,
       region.city === '未标注' ? null : region.city,
-      productCategory
+      sourceProductName
     );
 
     if (!companyId) {

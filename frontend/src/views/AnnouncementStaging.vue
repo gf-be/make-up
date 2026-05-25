@@ -153,15 +153,15 @@
           </el-form> -->
           <div class="workspace-layout workspace-layout-columns">
             <div class="batch-list-pane">
-              <div class="batch-list-pane-header">
+              <!-- <div class="batch-list-pane-header">
                 <div class="batch-drawer-header">
                   <div class="batch-drawer-header-main">
                     <span class="batch-drawer-header-title">待核验批次</span>
                     <span class="batch-drawer-header-badge">{{ batchListRows.length }}</span>
                   </div>
-                  <!-- <span class="batch-drawer-header-sub">点击行查看详情</span> -->
+                  <span class="batch-drawer-header-sub">点击行查看详情</span>
                 </div>
-              </div>
+              </div> -->
               <div class="batch-list-pane-body" v-loading="loading">
                 <el-table class="batch-table" :data="batchListRows" row-key="id"
                   :max-height="batchReviewTableMaxHeight" size="small" stripe empty-text="暂无待核验批次"
@@ -195,10 +195,10 @@
                         暂存
                       </el-button>
 
-                      <el-button v-if="nextBatch" type="primary" plain :loading="switchingBatchId === nextBatch.id"
+                      <!-- <el-button v-if="nextBatch" type="primary" plain :loading="switchingBatchId === nextBatch.id"
                         @click="handleGoNextBatch()">
                         下一个通告
-                      </el-button>
+                      </el-button> -->
 
 
                       <el-button type="success" :loading="confirmingId === currentBatch.id"
@@ -356,21 +356,29 @@
                                       <template v-if="isStagingMergedSamplingRowEditing(row)">
                                         <el-descriptions :column="2" border size="small" class="detail-expanded">
                                           <el-descriptions-item label="生产企业">
-                                            <el-input v-model="row.company_names" :autosize="{ minRows: 1, maxRows: 6 }"
+                                            <el-input v-model="row.manufacturer_name" :autosize="{ minRows: 1, maxRows: 6 }"
                                               size="small" placeholder="注册人/备案人等名称" />
                                           </el-descriptions-item>
                                           <el-descriptions-item label="生产企业地址">
-                                            <el-input v-model="row.company_addresses" type="textarea"
+                                            <el-input v-model="row.manufacturer_address" type="textarea"
                                               :autosize="{ minRows: 1, maxRows: 6 }" size="small" placeholder="地址" />
                                           </el-descriptions-item>
-                                          <el-descriptions-item label="被抽样单位名称">
+                                          <el-descriptions-item label="销售企业名称">
+                                            <el-input v-model="row.operator_name" size="small"
+                                              placeholder="销售企业名称" />
+                                          </el-descriptions-item>
+                                          <el-descriptions-item label="销售企业地址">
+                                            <el-input v-model="row.operator_address" type="textarea"
+                                              :autosize="{ minRows: 1, maxRows: 6 }" size="small" placeholder="地址" />
+                                          </el-descriptions-item>
+                                          <!-- <el-descriptions-item label="被抽样单位名称">
                                             <el-input v-model="row.sample_unit_name" size="small"
                                               placeholder="被抽样单位名称" />
                                           </el-descriptions-item>
                                           <el-descriptions-item label="被抽样单位地址">
                                             <el-input v-model="row.sample_unit_address" type="textarea"
                                               :autosize="{ minRows: 1, maxRows: 4 }" size="small" placeholder="地址" />
-                                          </el-descriptions-item>
+                                          </el-descriptions-item> -->
                                           <el-descriptions-item label="正文文案" :span="2">
                                             <el-input v-model="row.food_body_text" type="textarea"
                                               :autosize="{ minRows: 1, maxRows: 6 }" size="small" placeholder="正文文案" />
@@ -413,18 +421,27 @@
                                       </template>
                                       <el-descriptions v-else :column="2" border size="small" class="detail-expanded">
                                         <el-descriptions-item label="生产企业">
-                                          <span class="attachment-readonly-block">{{ row.company_names || '—' }}</span>
+                                          <span class="attachment-readonly-block">{{ row.manufacturer_name || '—' }}</span>
                                         </el-descriptions-item>
                                         <el-descriptions-item label="生产企业地址">
-                                          <span class="attachment-readonly-block">{{ row.company_addresses || '—'
+                                          <span class="attachment-readonly-block">{{ row.manufacturer_address || '—'
                                           }}</span>
                                         </el-descriptions-item>
-                                        <el-descriptions-item label="被抽样单位名称">
+                                        <!-- <el-descriptions-item label="被抽样单位名称">
                                           {{ row.sample_unit_name || '—' }}
                                         </el-descriptions-item>
                                         <el-descriptions-item label="被抽样单位地址">
                                           <span class="attachment-readonly-block">{{ row.sample_unit_address || '—'
                                           }}</span>
+                                        </el-descriptions-item> -->
+                                        <el-descriptions-item label="销售企业名称">
+                                          <span class="attachment-readonly-block">{{ row.operator_name || '—' }}</span>
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="销售企业地址">
+                                          <span class="attachment-readonly-block">{{ row.operator_address || '—' }}</span>
+                                        </el-descriptions-item>
+                                        <el-descriptions-item label="正文文案" :span="2">
+                                          <span class="attachment-readonly-block">{{ row.food_body_text || '—' }}</span>
                                         </el-descriptions-item>
                                         <el-descriptions-item label="生产日期">
                                           {{ row.production_date || '—' }}
@@ -878,6 +895,41 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="jsonUploadProgressVisible" title="JSON 上传进度" width="640px" class="bulk-publish-dialog"
+      destroy-on-close :close-on-click-modal="false" :close-on-press-escape="jsonUploadPhase !== 'running'"
+      :show-close="jsonUploadPhase !== 'running'">
+      <div v-if="jsonUploadPhase === 'running' && jsonUploadTotal" class="bulk-publish-head">
+        <p class="bulk-publish-line">
+          正在上传第 <strong>{{ jsonUploadCurrentIndex }}</strong> / {{ jsonUploadTotal }} 个文件
+          <span v-if="currentJsonUploadFileName" class="muted-text"> · {{ currentJsonUploadFileName }}</span>
+        </p>
+        <el-progress :percentage="jsonUploadPercent" :stroke-width="10" />
+      </div>
+      <el-alert v-if="jsonUploadPhase === 'done'" :type="jsonUploadSummary.error ? 'warning' : 'success'" show-icon
+        :closable="false" class="mb-16"
+        :title="`上传完成：新增 ${jsonUploadSummary.created} 个 · 重复跳过 ${jsonUploadSummary.duplicate} 个 · 待核验 ${jsonUploadSummary.parseWarning} 个 · 异常 ${jsonUploadSummary.error} 个`" />
+      <el-alert v-if="jsonUploadPhase === 'error'" type="error" show-icon :closable="false" class="mb-16"
+        title="上传未正常完成，请查看下方列表后重试。" />
+      <p v-if="jsonUploadPhase === 'running'" class="panel-tip bulk-publish-tip">
+        正在逐文件上传并写入临时区，请勿关闭本窗口。
+      </p>
+      <el-table :data="jsonUploadLogs" size="small" max-height="320" stripe class="bulk-publish-table">
+        <el-table-column type="index" label="#" width="50" />
+        <el-table-column prop="name" label="文件名" min-width="180" show-overflow-tooltip />
+        <el-table-column label="状态" width="88" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="bulkPublishLogTagType(row.phase)">{{ bulkPublishLogLabel(row.phase) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="message" label="说明" min-width="200" show-overflow-tooltip />
+      </el-table>
+      <template #footer>
+        <el-button v-if="jsonUploadPhase !== 'running'" type="primary" @click="jsonUploadProgressVisible = false">
+          关闭
+        </el-button>
+      </template>
+    </el-dialog>
+
 
     <el-dialog v-model="productImageUploadDialogVisible" width="760px" title="导入图片" draggable
       :close-on-click-modal="false">
@@ -1081,6 +1133,36 @@ const bulkPublishLogs = ref([])
 const bulkPublishTotal = ref(0)
 const bulkPublishCurrentIndex = ref(0)
 const bulkPublishSummary = ref({ success: 0, fail: 0 })
+
+/** JSON 多文件上传进度：`idle` | `running` | `done` | `error` */
+const jsonUploadPhase = ref('idle')
+const jsonUploadProgressVisible = ref(false)
+const jsonUploadLogs = ref([])
+const jsonUploadTotal = ref(0)
+const jsonUploadCurrentIndex = ref(0)
+const jsonUploadCurrentFilePercent = ref(0)
+const jsonUploadSummary = ref({ created: 0, duplicate: 0, parseWarning: 0, error: 0 })
+
+const jsonUploadPercent = computed(() => {
+  if (!jsonUploadTotal.value) {
+    return 0
+  }
+  const completed = jsonUploadLogs.value.filter((row) => row.phase === 'success' || row.phase === 'failed').length
+  const currentFileRatio = jsonUploadCurrentFilePercent.value / 100
+  const hasRunning = jsonUploadLogs.value.some((row) => row.phase === 'running')
+  if (hasRunning) {
+    return Math.min(100, Math.round(((completed + currentFileRatio) / jsonUploadTotal.value) * 100))
+  }
+  return Math.min(100, Math.round((completed / jsonUploadTotal.value) * 100))
+})
+
+const currentJsonUploadFileName = computed(() => {
+  if (jsonUploadPhase.value !== 'running' || jsonUploadCurrentIndex.value < 1) {
+    return ''
+  }
+  const row = jsonUploadLogs.value[jsonUploadCurrentIndex.value - 1]
+  return row?.name || ''
+})
 
 const bulkPublishPercent = computed(() => {
   if (!bulkPublishTotal.value || !bulkPublishLogs.value.length) {
@@ -1630,6 +1712,37 @@ function getSourceUserLabel(row = {}) {
   return row.imported_by_username || row.uploaded_by_username || row.created_by_username || row.username || '-'
 }
 
+function mergeJsonUploadBatchResult(accumulated = {}, batch = {}) {
+  const data = batch?.data || batch || {}
+  return {
+    created_count: Number(accumulated.created_count || 0) + Number(data.created_count || 0),
+    duplicate_count: Number(accumulated.duplicate_count || 0) + Number(data.duplicate_count || 0),
+    parse_warning_count: Number(accumulated.parse_warning_count || 0)
+      + Number(data.parse_warning_count ?? data.parse_failed_count ?? 0),
+    error_count: Number(accumulated.error_count || 0) + Number(data.error_count || 0),
+    items: [...(accumulated.items || []), ...(data.items || [])]
+  }
+}
+
+function summarizeJsonUploadItemResult(data = {}) {
+  const items = Array.isArray(data.items) ? data.items : []
+  const firstItem = items[0] || {}
+  if (Number(data.error_count || 0) > 0) {
+    const err = Array.isArray(data.errors) ? data.errors[0] : null
+    return err?.message || firstItem.warning_message || '导入异常'
+  }
+  if (firstItem.action === 'skipped_duplicate') {
+    return '重复跳过'
+  }
+  if (firstItem.needs_manual_review) {
+    return '已入临时区，待人工核验'
+  }
+  if (firstItem.action === 'created') {
+    return '新增临时批次'
+  }
+  return firstItem.warning_message || '处理完成'
+}
+
 async function handleUploadSelectedJson() {
   if (importing.value) {
     return
@@ -1659,41 +1772,107 @@ async function handleUploadSelectedJson() {
   }
 
   importing.value = true
+  jsonUploadPhase.value = 'running'
+  jsonUploadProgressVisible.value = true
+  jsonUploadTotal.value = rows.length
+  jsonUploadCurrentIndex.value = 0
+  jsonUploadCurrentFilePercent.value = 0
+  jsonUploadSummary.value = { created: 0, duplicate: 0, parseWarning: 0, error: 0 }
+  jsonUploadLogs.value = rows.map((row) => ({
+    name: row.name || row.relativePath || '未命名.json',
+    relativePath: row.relativePath || row.name || '',
+    phase: 'pending',
+    message: ''
+  }))
+  uploadPreviewDialogVisible.value = false
+
+  let mergedResult = {
+    created_count: 0,
+    duplicate_count: 0,
+    parse_warning_count: 0,
+    error_count: 0,
+    items: []
+  }
+
   try {
-    const formData = new FormData()
-    const paths = []
-    rows.forEach((row, index) => {
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index]
+      const logRow = jsonUploadLogs.value[index]
+      jsonUploadCurrentIndex.value = index + 1
+      jsonUploadCurrentFilePercent.value = 0
+      logRow.phase = 'running'
+      logRow.message = '上传中…'
+
+      const relativePath = row.relativePath || row.name || `file_${index}.json`
+      const formData = new FormData()
       formData.append('files', row.file, row.name)
-      paths.push(row.relativePath || row.name || `file_${index}.json`)
-    })
-    formData.append('relative_paths', JSON.stringify(paths))
+      formData.append('relative_paths', JSON.stringify([relativePath]))
 
-    const res = await uploadAnnouncementStagingJson(formData)
-    const data = res.data || {}
-    lastImportResult.value = data
+      try {
+        const res = await uploadAnnouncementStagingJson(formData, {
+          onUploadProgress: (event) => {
+            if (event.total) {
+              jsonUploadCurrentFilePercent.value = Math.min(
+                100,
+                Math.round((event.loaded / event.total) * 100)
+              )
+            }
+          }
+        })
+        const data = res.data || {}
+        mergedResult = mergeJsonUploadBatchResult(mergedResult, data)
+        logRow.message = summarizeJsonUploadItemResult(data)
+        if (Number(data.error_count || 0) > 0) {
+          logRow.phase = 'failed'
+        } else {
+          logRow.phase = 'success'
+        }
+      } catch (error) {
+        logRow.phase = 'failed'
+        logRow.message = error?.response?.data?.message || error?.message || '上传失败'
+        mergedResult.error_count += 1
+      } finally {
+        jsonUploadCurrentFilePercent.value = 100
+      }
+    }
 
-    const createdCount = data.created_count || 0
-    const duplicateCount = data.duplicate_count || 0
-    const parseWarningCount = data.parse_warning_count ?? data.parse_failed_count ?? 0
-    const errorCount = data.error_count || 0
+    lastImportResult.value = mergedResult
+    jsonUploadSummary.value = {
+      created: mergedResult.created_count || 0,
+      duplicate: mergedResult.duplicate_count || 0,
+      parseWarning: mergedResult.parse_warning_count || 0,
+      error: mergedResult.error_count || 0
+    }
 
-    if (duplicateCount > 0 || parseWarningCount > 0 || errorCount > 0) {
-      ElMessage.warning(
-        `上传导入完成：新增 ${createdCount} 个，重复跳过 ${duplicateCount} 个（不产生倒溯记录），待人工核验 ${parseWarningCount} 个，异常 ${errorCount} 个`
-      )
+    const { created, duplicate, parseWarning, error } = jsonUploadSummary.value
+    const failedUploads = jsonUploadLogs.value.filter((item) => item.phase === 'failed').length
+    if (failedUploads === rows.length) {
+      jsonUploadPhase.value = 'error'
+      ElMessage.error('全部文件上传失败，请查看进度列表')
     } else {
-      ElMessage.success(`上传导入完成：新增 ${createdCount} 个临时批次`)
+      jsonUploadPhase.value = 'done'
+      if (duplicate > 0 || parseWarning > 0 || error > 0) {
+        ElMessage.warning(
+          `上传导入完成：新增 ${created} 个，重复跳过 ${duplicate} 个，待人工核验 ${parseWarning} 个，异常 ${error} 个`
+        )
+      } else {
+        ElMessage.success(`上传导入完成：新增 ${created} 个临时批次`)
+      }
     }
 
     selectedUploadFiles.value = []
-    uploadPreviewDialogVisible.value = false
-    const firstCreatedItem = (data.items || []).find((item) => item.id)
-    await refreshAll({ preferredKey: firstCreatedItem?.id ? `body:${firstCreatedItem.id}` : selectedTreeKey.value, force: true })
+    const firstCreatedItem = (mergedResult.items || []).find((item) => item.id)
+    await refreshAll({
+      preferredKey: firstCreatedItem?.id ? `body:${firstCreatedItem.id}` : selectedTreeKey.value,
+      force: true
+    })
   } catch (error) {
     console.error('上传导入临时区失败:', error)
+    jsonUploadPhase.value = 'error'
     ElMessage.error(error?.response?.data?.message || error?.message || '上传导入失败')
   } finally {
     importing.value = false
+    jsonUploadCurrentFilePercent.value = 0
   }
 }
 
@@ -2108,12 +2287,26 @@ function getStagingPageCacheUserKey() {
   return getUserScopedStorageKey('announcementStaging.pageData')
 }
 
+/** 页面缓存需可序列化；structuredClone 无法克隆 Vue Proxy / File 等对象 */
+function clonePageCacheValue(value, fallback = null) {
+  if (value == null) {
+    return value
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value))
+  } catch (error) {
+    console.warn('页面缓存快照克隆失败，已回退为空值:', error)
+    return fallback
+  }
+}
+
 function buildPageDataCacheSnapshot() {
   return {
     filters: { ...filters },
     detailFilters: { ...detailFilters },
-    treeRows: structuredClone(toRaw(treeRows.value)),
-    detailMap: structuredClone(toRaw(detailMap.value)),
+    treeRows: clonePageCacheValue(toRaw(treeRows.value), []),
+    detailMap: clonePageCacheValue(toRaw(detailMap.value), {}),
     overview: { ...overview },
     stagingFilterYears: [...stagingFilterYears.value],
     selectedBatchId: selectedBatchId.value,
@@ -2159,7 +2352,11 @@ function applyPageDataCacheSnapshot(snapshot = {}) {
 }
 
 function savePageDataCacheSnapshot() {
-  stagingPageDataCacheByUser.set(getStagingPageCacheUserKey(), buildPageDataCacheSnapshot())
+  try {
+    stagingPageDataCacheByUser.set(getStagingPageCacheUserKey(), buildPageDataCacheSnapshot())
+  } catch (error) {
+    console.error('保存导入通告页内存缓存失败:', error)
+  }
 }
 
 function getStagingPageDataCache() {
@@ -3353,21 +3550,21 @@ async function handleDeleteCurrentBatch() {
 }
 
 
-async function handleGoNextBatch() {
-  if (!nextBatch.value?.id || switchingBatchId.value) {
-    return
-  }
+// async function handleGoNextBatch() {
+//   if (!nextBatch.value?.id || switchingBatchId.value) {
+//     return
+//   }
 
-  try {
-    switchingBatchId.value = nextBatch.value.id
-    await selectBatch(nextBatch.value, {
-      force: false,
-      tab: activeDetailTab.value === 'attachments' ? 'attachments' : 'body'
-    })
-  } finally {
-    switchingBatchId.value = null
-  }
-}
+//   try {
+//     switchingBatchId.value = nextBatch.value.id
+//     await selectBatch(nextBatch.value, {
+//       force: false,
+//       tab: activeDetailTab.value === 'attachments' ? 'attachments' : 'body'
+//     })
+//   } finally {
+//     switchingBatchId.value = null
+//   }
+// }
 
 
 async function handleConfirmAll() {
@@ -4132,7 +4329,7 @@ onBeforeUnmount(() => {
 }
 
 .batch-table :deep(.el-table__header-wrapper th.el-table__cell) {
-  background: #eff6ff !important;
+  background: #a2c1eb !important;
   color: #1e40af;
   font-weight: 600;
   border-bottom: 1px solid #dbeafe !important;
@@ -4155,7 +4352,7 @@ onBeforeUnmount(() => {
 .batch-table :deep(.el-table__body tr.is-active-batch > td.el-table__cell) {
   background: #e8f1ff !important;
   color: #1e3a8a;
-  box-shadow: inset 3px 0 0 #2563eb;
+  box-shadow: inset 3px 0 0 #97aad3;
 }
 
 .batch-table :deep(.el-table__body tr.is-active-batch:hover > td.el-table__cell) {
@@ -4313,6 +4510,8 @@ onBeforeUnmount(() => {
 
 .detail-content-card {
   min-width: 0;
+  border-radius: 10px;
+  box-shadow: 0 0 10px 0 rgba(73, 174, 213, 0.1);
   display: flex;
   flex-direction: column;
 }
@@ -4346,6 +4545,8 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   display: grid;
+  /* background: #5a8dda; */
+  border-radius: 10px;
   gap: 16px;
   grid-template-rows: auto minmax(0, 1fr);
 }

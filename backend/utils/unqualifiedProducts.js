@@ -1,7 +1,15 @@
 const DEFAULT_BATCH_TITLE = '40批次不符合规定化妆品信息';
 const DEFAULT_TOTAL_BATCHES = 40;
-const DEFAULT_PRODUCT_TYPE = 'cosmetics';
-const DEFAULT_ANNOUNCEMENT_TYPE = 'sampling';
+const {
+  DEFAULT_PRODUCT_TYPE,
+  DEFAULT_ANNOUNCEMENT_TYPE,
+  normalizeProductType,
+  normalizeAnnouncementType,
+  getProductTypeLabel,
+  getAnnouncementTypeLabel,
+  getProductTypeOptions,
+  getAnnouncementTypeOptions
+} = require('./productTypeHelpers');
 const {
   extractIssueItems,
   COSMETICS_PRODUCT_CATEGORIES,
@@ -12,54 +20,12 @@ const {
   ensureCompaniesSamplingSchema,
   upsertCompany
 } = require('./companySamplingSync');
-const { splitCompanyEntries } = require('./companyFieldParser');
+const { buildStructuredCompanyFields, isInvalidCompanyValue, normalizeText } = require('./companyFieldParser');
 const {
   ensureUnqualifiedProductTreeRollupTable,
   rebuildUnqualifiedProductTreeRollupsForSource,
   backfillUnqualifiedProductTreeRollupsIfNeeded
 } = require('./unqualifiedProductTreeRollup');
-
-const PRODUCT_TYPE_LABELS = {
-  cosmetics: '化妆品',
-  food: '食品',
-  medical_device: '医疗器械',
-  unknown: '未知'
-};
-
-const PRODUCT_TYPE_ALIASES = {
-  cosmetics: 'cosmetics',
-  '化妆品': 'cosmetics',
-  food: 'food',
-  '食品': 'food',
-  medical_device: 'medical_device',
-  'medical-device': 'medical_device',
-  medicaldevice: 'medical_device',
-  '医疗器械': 'medical_device',
-  unknown: 'unknown',
-  '未知': 'unknown',
-  '未分类': 'unknown',
-  '未回复': 'unknown',
-  '空值': 'unknown'
-};
-
-
-const ANNOUNCEMENT_TYPE_LABELS = {
-  sampling: '抽检通告',
-  flight_inspection: '飞行检查'
-};
-
-const ANNOUNCEMENT_TYPE_ALIASES = {
-  sampling: 'sampling',
-  '抽检通告': 'sampling',
-  '抽样检查': 'sampling',
-  '抽样检查公告': 'sampling',
-  flight_inspection: 'flight_inspection',
-  'flight-inspection': 'flight_inspection',
-  flightinspection: 'flight_inspection',
-  '飞行检查': 'flight_inspection',
-  '飞检': 'flight_inspection'
-};
-
 
 const UNQUALIFIED_PRODUCT_FIELDS = [
   'batch_title',
@@ -114,64 +80,6 @@ const SOURCE_LINK_FIELDS = [
   'supervision_detail_id',
   'is_counterfeit'
 ];
-
-function normalizeOptionValue(value, aliases, defaultValue) {
-  const rawValue = String(value || '').trim();
-  if (!rawValue) {
-    return defaultValue;
-  }
-
-  const normalizedKey = rawValue.toLowerCase().replace(/[\s-]+/g, '_');
-  return aliases[normalizedKey] || aliases[rawValue] || rawValue;
-}
-
-function buildTypeOptions(values = [], getLabel) {
-  const normalizedValues = Array.from(
-    new Set(
-      values
-        .map((item) => String(item || '').trim())
-        .filter(Boolean)
-    )
-  );
-
-  return normalizedValues.map((value) => ({
-    value,
-    label: getLabel(value)
-  }));
-}
-
-function normalizeProductType(value) {
-  return normalizeOptionValue(value, PRODUCT_TYPE_ALIASES, DEFAULT_PRODUCT_TYPE);
-}
-
-function normalizeAnnouncementType(value) {
-  return normalizeOptionValue(value, ANNOUNCEMENT_TYPE_ALIASES, DEFAULT_ANNOUNCEMENT_TYPE);
-}
-
-function getProductTypeLabel(value) {
-  const normalized = normalizeProductType(value);
-  return PRODUCT_TYPE_LABELS[normalized] || normalized || PRODUCT_TYPE_LABELS[DEFAULT_PRODUCT_TYPE];
-}
-
-function getAnnouncementTypeLabel(value) {
-  const normalized = normalizeAnnouncementType(value);
-  return ANNOUNCEMENT_TYPE_LABELS[normalized] || normalized || ANNOUNCEMENT_TYPE_LABELS[DEFAULT_ANNOUNCEMENT_TYPE];
-}
-
-function getProductTypeOptions(extraValues = []) {
-  return buildTypeOptions([
-    ...Object.keys(PRODUCT_TYPE_LABELS),
-    ...extraValues.map((item) => normalizeProductType(item))
-  ], getProductTypeLabel);
-}
-
-function getAnnouncementTypeOptions(extraValues = []) {
-  return buildTypeOptions([
-    ...Object.keys(ANNOUNCEMENT_TYPE_LABELS),
-    ...extraValues.map((item) => normalizeAnnouncementType(item))
-  ], getAnnouncementTypeLabel);
-}
-
 
 function getDefaultUnqualifiedProducts() {
   return [
@@ -243,6 +151,7 @@ function enrichPayload(payload = {}) {
   const productType = normalizeProductType(payload.product_type);
   const announcementType = normalizeAnnouncementType(payload.announcement_type);
   const derivedAnalyticsFields = buildDerivedAnalyticsFields(payload);
+  const useStructuredCompanyFields = Boolean(payload._structured_company_fields);
   const normalizedPayload = {
     ...payload,
     company_sub_index: Number.isFinite(Number(payload.company_sub_index))
@@ -250,16 +159,26 @@ function enrichPayload(payload = {}) {
       : 0,
     company_names: normalizeRequiredTextField(payload.company_names),
     company_addresses: normalizeRequiredTextField(payload.company_addresses),
-    manufacturer_name: normalizeRequiredTextField(payload.manufacturer_name || payload.company_names),
-    manufacturer_address: normalizeRequiredTextField(payload.manufacturer_address || payload.company_addresses),
-    operator_name: normalizeRequiredTextField(payload.operator_name || payload.sample_unit_name),
-    operator_address: normalizeRequiredTextField(payload.operator_address || payload.sample_unit_address),
+    manufacturer_name: normalizeRequiredTextField(
+      useStructuredCompanyFields ? payload.manufacturer_name : (payload.manufacturer_name || payload.company_names)
+    ),
+    manufacturer_address: normalizeRequiredTextField(
+      useStructuredCompanyFields ? payload.manufacturer_address : (payload.manufacturer_address || payload.company_addresses)
+    ),
+    operator_name: normalizeRequiredTextField(
+      useStructuredCompanyFields ? payload.operator_name : (payload.operator_name || payload.sample_unit_name)
+    ),
+    operator_address: normalizeRequiredTextField(
+      useStructuredCompanyFields ? payload.operator_address : (payload.operator_address || payload.sample_unit_address)
+    ),
     sample_unit_name: normalizeRequiredTextField(payload.sample_unit_name),
     sample_unit_address: normalizeRequiredTextField(payload.sample_unit_address),
     unqualified_items: normalizeRequiredTextField(payload.unqualified_items),
     inspection_result: normalizeRequiredTextField(payload.inspection_result),
     requirement: normalizeRequiredTextField(payload.requirement)
   };
+
+  delete normalizedPayload._structured_company_fields;
 
   return {
     ...normalizedPayload,
@@ -865,6 +784,8 @@ async function backfillProductCategoryIdIfNeeded(connection) {
 }
 
 async function backfillDerivedFields(connection) {
+  await backfillStructuredCompanyFieldsIfNeeded(connection);
+
   const [rows] = await connection.query(`
     SELECT id, product_name, company_addresses, manufacturer_address, product_region,
            sample_unit_address, operator_address, unqualified_items, inspection_result, requirement
@@ -898,6 +819,82 @@ async function backfillDerivedFields(connection) {
         derived.sampled_province,
         derived.sampled_city,
         derived.issue_category,
+        row.id
+      ]
+    );
+  }
+}
+
+async function backfillStructuredCompanyFieldsIfNeeded(connection) {
+  const [rows] = await connection.query(`
+    SELECT id, product_type, company_names, company_addresses,
+           manufacturer_name, manufacturer_address, operator_name, operator_address,
+           sample_unit_name, sample_unit_address
+    FROM unqualified_products
+    WHERE product_type = 'food'
+      AND (
+        COALESCE(manufacturer_name, '') REGEXP '[：:]'
+        OR (
+          COALESCE(manufacturer_name, '') = ''
+          AND COALESCE(company_names, '') REGEXP '(经销商|制作商|生产商|生产企业)[：:]'
+        )
+        OR COALESCE(company_names, '') REGEXP '(经销商|制作商|生产商|生产企业)[：:]'
+      )
+    LIMIT 5000
+  `);
+
+  for (const row of rows) {
+    const sourceNames = normalizeText(row.company_names)
+      || normalizeText(row.manufacturer_name);
+    if (!sourceNames || !/[：:]/.test(sourceNames)) {
+      continue;
+    }
+
+    const structured = buildStructuredCompanyFields(
+      'food',
+      sourceNames,
+      row.company_addresses || row.manufacturer_address || '',
+      {
+        manufacturer_name: row.manufacturer_name,
+        manufacturer_address: row.manufacturer_address,
+        operator_name: row.operator_name,
+        operator_address: row.operator_address,
+        sample_unit_name: row.sample_unit_name,
+        sample_unit_address: row.sample_unit_address
+      }
+    );
+
+    const derived = buildDerivedAnalyticsFields({
+      ...row,
+      manufacturer_name: structured.manufacturer_name,
+      manufacturer_address: structured.manufacturer_address,
+      operator_name: structured.operator_name,
+      operator_address: structured.operator_address,
+      company_names: structured.company_names,
+      company_addresses: structured.company_addresses
+    });
+
+    await connection.query(
+      `
+        UPDATE unqualified_products
+        SET company_names = ?, company_addresses = ?,
+            manufacturer_name = ?, manufacturer_address = ?,
+            operator_name = ?, operator_address = ?,
+            manufacturer_province = ?, manufacturer_city = ?,
+            sampled_province = ?, sampled_city = ?
+        WHERE id = ?
+      `,
+      [
+        structured.company_names,
+        structured.company_addresses,
+        structured.manufacturer_name,
+        structured.manufacturer_address,
+        structured.operator_name,
+        structured.operator_address,
+        derived.manufacturer_province,
+        derived.manufacturer_city,
+        derived.sampled_province,
+        derived.sampled_city,
         row.id
       ]
     );
@@ -1477,91 +1474,130 @@ async function buildAnnouncementDetailPayloadRows(connection, detailRows, announ
   const payloadRows = [];
 
   for (const row of detailRows) {
-    const companyEntries = splitCompanyEntries(row.company_names, row.company_addresses);
-    const fallbackEntries = companyEntries.length > 0
-      ? companyEntries
-      : (row.manufacturer_name
-        ? [{
-            name: row.manufacturer_name,
-            address: row.manufacturer_address || row.company_addresses || null
-          }]
-        : []);
-
-    const entries = fallbackEntries.length > 0
-      ? fallbackEntries
-      : [{ name: null, address: null }];
-
-    for (const [companySubIndex, entry] of entries.entries()) {
-      const companyName = entry.name || row.manufacturer_name || row.company_names || null;
-      const companyAddress = entry.address || row.manufacturer_address || row.company_addresses || null;
-      let companyId = null;
-
-      if (companyName) {
-        const derivedRegion = buildDerivedAnalyticsFields({
-          manufacturer_address: companyAddress,
-          company_addresses: companyAddress,
-          product_region: row.product_region,
-          operator_address: row.operator_address,
-          sample_unit_address: row.sample_unit_address,
-          product_name: row.product_name,
-          unqualified_items: row.unqualified_items,
-          inspection_result: row.inspection_result,
-          requirement: row.requirement,
-          attachment_sampling_category: row.attachment_sampling_category
-        });
-        const productCategory = deriveProductCategory(row.product_name);
-        companyId = await upsertCompany(
-          connection,
-          companyName,
-          companyAddress,
-          derivedRegion.manufacturer_province === '未标注' ? null : derivedRegion.manufacturer_province,
-          derivedRegion.manufacturer_city === '未标注' ? null : derivedRegion.manufacturer_city,
-          productCategory
-        );
-      }
-
-      payloadRows.push(enrichPayload({
-        batch_title: batchTitle,
-        total_batches: totalBatches,
-        sequence_no: row.sequence_no,
-        company_sub_index: companySubIndex,
-        product_name: row.product_name,
-        company_names: companyName,
-        company_addresses: companyAddress,
-        manufacturer_name: companyName,
-        manufacturer_address: companyAddress,
+    const structured = buildStructuredCompanyFields(
+      productType,
+      row.company_names,
+      row.company_addresses,
+      {
+        manufacturer_name: row.manufacturer_name,
+        manufacturer_address: row.manufacturer_address,
         operator_name: row.operator_name,
         operator_address: row.operator_address,
         sample_unit_name: row.sample_unit_name,
-        sample_unit_address: row.sample_unit_address,
-        package_spec: row.package_spec,
-        batch_no: row.batch_no,
-        production_date: row.production_date,
-        expiry_date: row.expiry_date,
+        sample_unit_address: row.sample_unit_address
+      }
+    );
+
+    const linkedCompanyIds = new Set();
+    let primaryCompanyId = null;
+
+    for (const entry of structured.company_entries) {
+      if (!entry?.name || isInvalidCompanyValue(entry.name)) {
+        continue;
+      }
+
+      const derivedRegion = buildDerivedAnalyticsFields({
+        manufacturer_address: entry.address,
+        company_addresses: entry.address,
         product_region: row.product_region,
-        attachment_sampling_category: row.attachment_sampling_category || null,
-        registration_no: row.registration_no,
-        production_license_no: row.production_license_no,
-        inspection_institution: row.inspection_institution,
+        operator_address: structured.operator_address,
+        sample_unit_address: structured.sample_unit_address,
+        product_name: row.product_name,
         unqualified_items: row.unqualified_items,
         inspection_result: row.inspection_result,
         requirement: row.requirement,
-        remarks: row.remarks,
-        picture_url: row.picture_url || null,
-        food_body_text: row.food_body_text || null,
-        product_type: productType,
-        announcement_type: announcementType,
-        announcement_id: Number(announcement.id),
-        announcement_detail_id: row.id,
-        supervision_id: null,
-        supervision_detail_id: null,
-        source_no: announcement.announcement_no,
-        source_title: announcement.title,
-        source_publish_date: announcement.publish_date || null,
-        company_id: companyId,
-        is_counterfeit: row.is_counterfeit ? 1 : 0
-      }));
+        attachment_sampling_category: row.attachment_sampling_category
+      });
+      const productCategory = deriveProductCategory(row.product_name);
+      const companyId = await upsertCompany(
+        connection,
+        entry.name,
+        entry.address,
+        derivedRegion.manufacturer_province === '未标注' ? null : derivedRegion.manufacturer_province,
+        derivedRegion.manufacturer_city === '未标注' ? null : derivedRegion.manufacturer_city,
+        productCategory
+      );
+
+      if (!companyId) {
+        continue;
+      }
+
+      linkedCompanyIds.add(Number(companyId));
+      if (!primaryCompanyId && structured.manufacturer_name && entry.name === structured.manufacturer_name) {
+        primaryCompanyId = Number(companyId);
+      }
     }
+
+    if (!primaryCompanyId && structured.manufacturer_name) {
+      const derivedRegion = buildDerivedAnalyticsFields({
+        manufacturer_address: structured.manufacturer_address,
+        company_addresses: structured.manufacturer_address,
+        product_region: row.product_region,
+        operator_address: structured.operator_address,
+        sample_unit_address: structured.sample_unit_address,
+        product_name: row.product_name,
+        unqualified_items: row.unqualified_items,
+        inspection_result: row.inspection_result,
+        requirement: row.requirement,
+        attachment_sampling_category: row.attachment_sampling_category
+      });
+      const productCategory = deriveProductCategory(row.product_name);
+      primaryCompanyId = await upsertCompany(
+        connection,
+        structured.manufacturer_name,
+        structured.manufacturer_address,
+        derivedRegion.manufacturer_province === '未标注' ? null : derivedRegion.manufacturer_province,
+        derivedRegion.manufacturer_city === '未标注' ? null : derivedRegion.manufacturer_city,
+        productCategory
+      );
+    }
+
+    if (!primaryCompanyId && structured.company_names) {
+      primaryCompanyId = linkedCompanyIds.values().next().value || null;
+    }
+
+    payloadRows.push(enrichPayload({
+      batch_title: batchTitle,
+      total_batches: totalBatches,
+      sequence_no: row.sequence_no,
+      company_sub_index: 0,
+      product_name: row.product_name,
+      company_names: structured.company_names,
+      company_addresses: structured.company_addresses,
+      manufacturer_name: structured.manufacturer_name,
+      manufacturer_address: structured.manufacturer_address,
+      operator_name: structured.operator_name,
+      operator_address: structured.operator_address,
+      sample_unit_name: structured.sample_unit_name,
+      sample_unit_address: structured.sample_unit_address,
+      package_spec: row.package_spec,
+      batch_no: row.batch_no,
+      production_date: row.production_date,
+      expiry_date: row.expiry_date,
+      product_region: row.product_region,
+      attachment_sampling_category: row.attachment_sampling_category || null,
+      registration_no: row.registration_no,
+      production_license_no: row.production_license_no,
+      inspection_institution: row.inspection_institution,
+      unqualified_items: row.unqualified_items,
+      inspection_result: row.inspection_result,
+      requirement: row.requirement,
+      remarks: row.remarks,
+      picture_url: row.picture_url || null,
+      food_body_text: row.food_body_text || null,
+      product_type: productType,
+      announcement_type: announcementType,
+      announcement_id: Number(announcement.id),
+      announcement_detail_id: row.id,
+      supervision_id: null,
+      supervision_detail_id: null,
+      source_no: announcement.announcement_no,
+      source_title: announcement.title,
+      source_publish_date: announcement.publish_date || null,
+      company_id: primaryCompanyId,
+      is_counterfeit: row.is_counterfeit ? 1 : 0,
+      _structured_company_fields: true
+    }));
   }
 
   return payloadRows;

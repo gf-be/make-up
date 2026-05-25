@@ -125,11 +125,11 @@ const PRODUCT_TYPE_LABELS = {
 }
 
 const productTypeOptions = Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => ({ value, label }))
-const statusOptions = [
-  { value: 'published', label: '已发布' },
-  { value: 'draft', label: '草稿' },
-  { value: 'archived', label: '已归档' }
-]
+// const statusOptions = [
+//   { value: 'published', label: '已发布' },
+//   { value: 'draft', label: '草稿' },
+//   { value: 'archived', label: '已归档' }
+// ]
 
 const loading = ref(false)
 const announcementRows = ref([])

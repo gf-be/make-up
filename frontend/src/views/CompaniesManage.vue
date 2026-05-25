@@ -144,7 +144,7 @@
                     {{ companyTypeLabel(detail.company.type) }}
                   </el-descriptions-item>
                   <!-- <el-descriptions-item label="品牌">{{ detail.company.brand || '-' }}</el-descriptions-item> -->
-                  <el-descriptions-item label="产品分类">{{ detail.company.product_category || '-' }}</el-descriptions-item>
+                  <el-descriptions-item label="来源产品名称">{{ detail.company.source_product_name || '-' }}</el-descriptions-item>
                   <el-descriptions-item label="省份">{{ detail.company.province || '-' }}</el-descriptions-item>
                   <el-descriptions-item label="城市">{{ detail.company.city || '-' }}</el-descriptions-item>
                   <el-descriptions-item label="地址" :span="2">{{ detail.company.address || '-' }}</el-descriptions-item>
@@ -200,8 +200,8 @@
                   <el-form-item label="品牌" >
                     <el-input v-model="editForm.brand" maxlength="120" clearable placeholder="可不填品牌名称" :disabled="!basicFormEditing" />
                   </el-form-item>
-                  <el-form-item label="产品分类">
-                    <el-input v-model="editForm.product_category" maxlength="100" placeholder="如：化妆品" clearable :disabled="!basicFormEditing" />
+                  <el-form-item label="来源产品名称">
+                    <el-input v-model="editForm.source_product_name" maxlength="255" placeholder="抽检/飞检来源产品名称" clearable :disabled="!basicFormEditing" />
                   </el-form-item>
                   <el-form-item label="省份">
                     <el-input v-model="editForm.province" maxlength="50" clearable :disabled="!basicFormEditing" />
@@ -402,7 +402,7 @@ const filters = reactive({
 /** 与 /companies/filter-options 一致：库内已有省份 */
 const filterOptions = ref({
   provinces: [],
-  product_categories: []
+  source_product_names: []
 })
 
 const importDialogVisible = ref(false)
@@ -793,7 +793,7 @@ const editForm = reactive({
   province: '',
   city: '',
   address: '',
-  product_category: ''
+  source_product_name: ''
 })
 
 function applyCompanyToForm(company = {}) {
@@ -804,7 +804,7 @@ function applyCompanyToForm(company = {}) {
   editForm.province = company.province ?? ''
   editForm.city = getCityName(company.address) ?? ''
   editForm.address = company.address ?? ''
-  editForm.product_category = company.product_category ?? ''
+  editForm.source_product_name = company.source_product_name ?? ''
 }
 
 function normalizeListRes(res) {
@@ -821,13 +821,13 @@ function resolveProvinceFilterParam(value) {
 async function loadFilterOptions() {
   try {
     const res = await getCompanyFilterOptions()
-    const data = res?.data || { provinces: [], product_categories: [] }
+    const data = res?.data || { provinces: [], source_product_names: [] }
     filterOptions.value = {
       provinces: mergeProvinceSelectOptions(data.provinces),
-      product_categories: Array.isArray(data.product_categories) ? data.product_categories : []
+      source_product_names: Array.isArray(data.source_product_names) ? data.source_product_names : []
     }
   } catch {
-    filterOptions.value = { provinces: [], product_categories: [] }
+    filterOptions.value = { provinces: [], source_product_names: [] }
   }
 }
 
@@ -1049,7 +1049,7 @@ async function saveBasic() {
       province: editForm.province?.trim() || null,
       city: editForm.city?.trim() || null,
       address: editForm.address?.trim() || null,
-      product_category: editForm.product_category?.trim() || null
+      source_product_name: editForm.source_product_name?.trim() || null
     })
     ElMessage.success('企业主档已保存')
     basicFormEditing.value = false

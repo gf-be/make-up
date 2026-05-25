@@ -211,6 +211,8 @@
                       }}</el-descriptions-item>
                       <el-descriptions-item label="经营企业地址">{{ row.operator_address || row.sample_unit_address || '-'
                       }}</el-descriptions-item>
+                      <el-descriptions-item label="被抽样单位">{{ row.sample_unit_name || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="被抽样单位地址">{{ row.sample_unit_address || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="原始标示企业">{{ row.company_names || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="原始企业地址">{{ row.company_addresses || '-' }}</el-descriptions-item>
                       <el-descriptions-item label="包装规格">{{ row.package_spec || '-' }}</el-descriptions-item>
@@ -271,7 +273,7 @@
       </el-row>
     </el-card>
 
-    <el-dialog v-model="detailChartDialogVisible" title="统计图表" width="min(1080px, 94vw)" height="min(400px, 94vh)"
+    <el-dialog v-model="detailChartDialogVisible" title="统计图表" width="min(680px, 54vw)" height="min(300px, 64vh)"
       align-center append-to-body destroy-on-close class="detail-chart-dialog" @opened="onDetailChartDialogOpened"
       @closed="onDetailChartDialogClosed">
       <div v-loading="detailChartDataLoading" class="detail-chart-dialog-body">

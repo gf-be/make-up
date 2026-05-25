@@ -256,7 +256,7 @@ router.get('/', async (req, res) => {
       name,
       brand,
       province,
-      product_category,
+      source_product_name,
       has_unqualified,
       credit_code,
       credit_code_empty,
@@ -271,7 +271,7 @@ router.get('/', async (req, res) => {
     let query = `
       SELECT
         c.id, c.name, c.brand, c.credit_code, c.type, c.province, c.city, c.address,
-        c.product_category, c.created_at, c.updated_at,
+        c.source_product_name, c.created_at, c.updated_at,
         COALESCE(c.sampled_count, 0) AS sampled_count,
         COALESCE(c.last_sampled_at, NULL) AS last_sampled_at
       FROM companies c
@@ -300,11 +300,11 @@ router.get('/', async (req, res) => {
         countQuery += ` AND ${appendProvinceColumnPredicate('c.province', canon, countParams)}`;
       }
     }
-    if (product_category) {
-      query += ' AND c.product_category = ?';
-      countQuery += ' AND c.product_category = ?';
-      params.push(product_category);
-      countParams.push(product_category);
+    if (source_product_name) {
+      query += ' AND c.source_product_name = ?';
+      countQuery += ' AND c.source_product_name = ?';
+      params.push(source_product_name);
+      countParams.push(source_product_name);
     }
 
     if (has_unqualified === 'true') {
@@ -566,7 +566,7 @@ router.get('/filter-options', async (req, res) => {
     await ensureCompaniesSamplingSchema(pool);
 
     const pnorm = sqlProvinceBaseNameExpr('province');
-    const [[provinceRows], [productCategoryRows]] = await Promise.all([
+    const [[provinceRows], [sourceProductNameRows]] = await Promise.all([
       pool.query(
         `
         SELECT DISTINCT ${pnorm} AS province_norm
@@ -577,10 +577,10 @@ router.get('/filter-options', async (req, res) => {
       `
       ),
       pool.query(`
-        SELECT DISTINCT product_category
+        SELECT DISTINCT source_product_name
         FROM companies
-        WHERE product_category IS NOT NULL AND TRIM(product_category) != ''
-        ORDER BY product_category ASC
+        WHERE source_product_name IS NOT NULL AND TRIM(source_product_name) != ''
+        ORDER BY source_product_name ASC
       `)
     ]);
 
@@ -588,7 +588,7 @@ router.get('/filter-options', async (req, res) => {
       success: true,
       data: {
         provinces: provinceRows.map((row) => ({ value: row.province_norm, label: row.province_norm })),
-        product_categories: productCategoryRows.map((row) => ({ value: row.product_category, label: row.product_category }))
+        source_product_names: sourceProductNameRows.map((row) => ({ value: row.source_product_name, label: row.source_product_name }))
       }
     });
   } catch (error) {
@@ -781,7 +781,7 @@ router.post('/bulk-credit-codes', requireCompanyManagers(), async (req, res) => 
             address,
             province,
             city,
-            product_category,
+            source_product_name,
             sampled_count,
             last_sampled_at
           )
@@ -1066,7 +1066,7 @@ router.post('/', requireCompanyManagers(), async (req, res) => {
   try {
     await ensureCompaniesSamplingSchema(pool);
 
-    const { name, brand, type, address, province, city, product_category } = req.body || {};
+    const { name, brand, type, address, province, city, source_product_name } = req.body || {};
 
 
     const normalizedName = typeof name === 'string' ? name.trim() : '';
@@ -1100,9 +1100,9 @@ router.post('/', requireCompanyManagers(), async (req, res) => {
 
     }
 
-    const normalizedCategory =
-      typeof product_category === 'string' && product_category.trim()
-        ? product_category.trim()
+    const normalizedSourceProductName =
+      typeof source_product_name === 'string' && source_product_name.trim()
+        ? source_product_name.trim()
         : null;
 
     const creditResolved = resolveCreditCodeFromBody(req.body || {}, null);
@@ -1119,7 +1119,7 @@ router.post('/', requireCompanyManagers(), async (req, res) => {
         address,
         province,
         city,
-        product_category,
+        source_product_name,
         sampled_count,
         last_sampled_at
       )
@@ -1132,7 +1132,7 @@ router.post('/', requireCompanyManagers(), async (req, res) => {
       address || null,
       province || null,
       city || null,
-      normalizedCategory
+      normalizedSourceProductName
     ]);
 
     res.json({ success: true, data: { id: result.insertId } });
@@ -1197,25 +1197,25 @@ router.put('/:id', requireCompanyManagers(), async (req, res) => {
 
 
 
-    const productCategoryRaw = body.product_category;
+    const sourceProductNameRaw = body.source_product_name;
 
 
 
-    let product_category = existingRows[0].product_category;
+    let source_product_name = existingRows[0].source_product_name;
 
 
 
-    if (productCategoryRaw === null || productCategoryRaw === '') {
+    if (sourceProductNameRaw === null || sourceProductNameRaw === '') {
 
 
-      product_category = null;
+      source_product_name = null;
 
 
 
-    } else if (typeof productCategoryRaw === 'string') {
+    } else if (typeof sourceProductNameRaw === 'string') {
 
 
-      product_category = productCategoryRaw.trim() || null;
+      source_product_name = sourceProductNameRaw.trim() || null;
 
 
     }
@@ -1254,10 +1254,10 @@ router.put('/:id', requireCompanyManagers(), async (req, res) => {
       await pool.query(
         `
       UPDATE companies
-      SET name = ?, brand = ?, credit_code = ?, type = ?, address = ?, province = ?, city = ?, product_category = ?
+      SET name = ?, brand = ?, credit_code = ?, type = ?, address = ?, province = ?, city = ?, source_product_name = ?
       WHERE id = ?
     `,
-        [name, brand, creditResolved.value, type, address, province, city, product_category, id]
+        [name, brand, creditResolved.value, type, address, province, city, source_product_name, id]
       );
     } catch (updateErr) {
       if (updateErr.code === 'ER_DUP_ENTRY') {
