@@ -70,7 +70,15 @@
     </el-header>
 
     <el-main class="main-content">
-      <router-view />
+      <router-view v-slot="{ Component, route: viewRoute }">
+        <keep-alive :include="KEEP_ALIVE_ROUTE_NAMES">
+          <component
+            :is="Component"
+            v-if="Component"
+            :key="viewRoute.meta.keepAlive ? viewRoute.name : viewRoute.fullPath"
+          />
+        </keep-alive>
+      </router-view>
     </el-main>
   </el-container>
 
@@ -120,17 +128,20 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { logout, updateCurrentUserPassword, updateCurrentUserProfile } from '@/api'
 import { MENU_ICONS } from '@/constants/menu-icons'
 import {
-  MODULE_PERMISSIONS,
+  // MODULE_PERMISSIONS,
   clearAuthSession,
   currentUser,
   getAuthToken,
-  getRoleLabel,
+  // getRoleLabel,
   hasModuleAccess,
   setAuthSession
 } from '@/utils/auth'
 
 const route = useRoute()
 const router = useRouter()
+
+/** 与路由 meta.keepAlive 及页面 defineOptions({ name }) 一致 */
+const KEEP_ALIVE_ROUTE_NAMES = ['UnqualifiedProducts']
 
 const menus = [
   { index: '/profile', key: 'profile', label: '个人中心', icon: 'User' },
@@ -157,24 +168,24 @@ const visibleMenus = computed(() =>
   })
 )
 
-const MODULE_LABELS = {
-  profile: '个人中心',
-  'admin-users': '用户管理',
-  // home: '首页',
-  'unqualified-products': '不合格产品',
-  'announcement-staging': '导入检查',
-  announcements: '抽检通告',
-  'announcements-manage': '通告管理',
-  inspections: '抽样检查',
-  companies: '企业管理',
-  'companies-manage': '企业管理',
-  'category-manage': '分类管理',
-  'products-manage': '产品管理',
-  'unqualified-companies': '不合格企业',
-  supervisions: '飞行检查',
-  'pivot-analysis': '数据透视',
-  'sampling-search': '抽样检索'
-}
+// const MODULE_LABELS = {
+//   profile: '个人中心',
+//   'admin-users': '用户管理',
+//   // home: '首页',
+//   'unqualified-products': '不合格产品',
+//   'announcement-staging': '导入检查',
+//   announcements: '抽检通告',
+//   'announcements-manage': '通告管理',
+//   inspections: '抽样检查',
+//   companies: '企业管理',
+//   'companies-manage': '企业管理',
+//   'category-manage': '分类管理',
+//   'products-manage': '产品管理',
+//   'unqualified-companies': '不合格企业',
+//   supervisions: '飞行检查',
+//   'pivot-analysis': '数据透视',
+//   'sampling-search': '抽样检索'
+// }
 
 // const visibleModuleLabels = computed(() =>
 //   (MODULE_PERMISSIONS[currentUser.value?.role] || []).map((key) => MODULE_LABELS[key] || key)

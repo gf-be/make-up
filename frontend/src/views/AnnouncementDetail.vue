@@ -550,6 +550,7 @@
       width="960px"
       :close-on-click-modal="false"
       destroy-on-close
+      draggable
       class="food-body-text-dialog"
       @closed="resetDetailFoodBodyTextPicker"
     >

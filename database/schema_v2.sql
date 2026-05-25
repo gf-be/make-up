@@ -388,6 +388,7 @@ CREATE TABLE IF NOT EXISTS unqualified_products (
     batch_title VARCHAR(255) NOT NULL,
     total_batches INT DEFAULT 0,
     sequence_no INT NOT NULL,
+    company_sub_index INT NOT NULL DEFAULT 0,
     product_name VARCHAR(255) NOT NULL,
     company_names TEXT,
     company_addresses TEXT,
@@ -427,7 +428,7 @@ CREATE TABLE IF NOT EXISTS unqualified_products (
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_unqualified_products_batch_sequence (batch_title, sequence_no),
+    UNIQUE KEY uk_unqualified_products_batch_sequence_company (batch_title, sequence_no, company_sub_index),
     INDEX idx_unqualified_products_product_name (product_name),
     INDEX idx_unqualified_products_manufacturer_name (manufacturer_name),
     INDEX idx_unqualified_products_operator_name (operator_name),

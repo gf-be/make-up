@@ -5,8 +5,14 @@ const DEFAULT_ANNOUNCEMENT_TYPE = 'sampling';
 const {
   extractIssueItems,
   COSMETICS_PRODUCT_CATEGORIES,
-  buildDerivedAnalyticsFields
+  buildDerivedAnalyticsFields,
+  deriveProductCategory
 } = require('./dataAnalysisHelpers');
+const {
+  ensureCompaniesSamplingSchema,
+  upsertCompany
+} = require('./companySamplingSync');
+const { splitCompanyEntries } = require('./companyFieldParser');
 const {
   ensureUnqualifiedProductTreeRollupTable,
   rebuildUnqualifiedProductTreeRollupsForSource,
@@ -59,6 +65,7 @@ const UNQUALIFIED_PRODUCT_FIELDS = [
   'batch_title',
   'total_batches',
   'sequence_no',
+  'company_sub_index',
   'product_name',
   'company_names',
   'company_addresses',
@@ -238,6 +245,9 @@ function enrichPayload(payload = {}) {
   const derivedAnalyticsFields = buildDerivedAnalyticsFields(payload);
   const normalizedPayload = {
     ...payload,
+    company_sub_index: Number.isFinite(Number(payload.company_sub_index))
+      ? Number(payload.company_sub_index)
+      : 0,
     company_names: normalizeRequiredTextField(payload.company_names),
     company_addresses: normalizeRequiredTextField(payload.company_addresses),
     manufacturer_name: normalizeRequiredTextField(payload.manufacturer_name || payload.company_names),
@@ -429,6 +439,23 @@ async function ensureIndex(connection, tableName, indexName, definitionSql) {
   if (rows.length === 0) {
     await connection.query(`ALTER TABLE ${tableName} ADD ${definitionSql}`);
   }
+}
+
+async function dropIndexIfExists(connection, tableName, indexName) {
+  const [rows] = await connection.query(`SHOW INDEX FROM ${tableName} WHERE Key_name = ?`, [indexName]);
+  if (rows.length > 0) {
+    await connection.query(`ALTER TABLE ${tableName} DROP INDEX ${indexName}`);
+  }
+}
+
+async function ensureMultiCompanyUniqueKey(connection) {
+  await dropIndexIfExists(connection, 'unqualified_products', 'uk_unqualified_products_batch_sequence');
+  await ensureIndex(
+    connection,
+    'unqualified_products',
+    'uk_unqualified_products_batch_sequence_company',
+    'UNIQUE INDEX uk_unqualified_products_batch_sequence_company (batch_title, sequence_no, company_sub_index)'
+  );
 }
 
 async function tableExists(connection, tableName) {
@@ -1139,6 +1166,7 @@ async function ensureUnqualifiedProductsTable(connection) {
       batch_title VARCHAR(255) NOT NULL DEFAULT '40批次不符合规定化妆品信息',
       total_batches INT DEFAULT 0,
       sequence_no INT NOT NULL,
+      company_sub_index INT NOT NULL DEFAULT 0,
       product_name VARCHAR(255) NOT NULL,
       company_names TEXT,
       company_addresses TEXT,
@@ -1190,6 +1218,7 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'batch_title', "VARCHAR(255) NOT NULL DEFAULT '40批次不符合规定化妆品信息' AFTER id");
   await ensureColumn(connection, 'total_batches', 'INT DEFAULT 0 AFTER batch_title');
   await ensureColumn(connection, 'sequence_no', 'INT NOT NULL');
+  await ensureColumn(connection, 'company_sub_index', 'INT NOT NULL DEFAULT 0 AFTER sequence_no');
   await ensureColumn(connection, 'product_name', 'VARCHAR(255) NOT NULL');
   await ensureColumn(connection, 'company_names', 'TEXT NULL');
   await ensureColumn(connection, 'company_addresses', 'TEXT NULL');
@@ -1278,6 +1307,7 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_tree_filters', 'INDEX idx_unqualified_products_tree_filters (source_year, announcement_type, product_type)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_province_year', 'INDEX idx_unqualified_products_province_year (province_display, source_year)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_source_order', 'INDEX idx_unqualified_products_source_order (source_publish_date, id)');
+  await ensureMultiCompanyUniqueKey(connection);
 
   if (await tableExists(connection, 'announcements')) {
     await ensureForeignKey(
@@ -1439,6 +1469,104 @@ async function seedDefaultUnqualifiedProducts(connection) {
   return rows.length;
 }
 
+async function buildAnnouncementDetailPayloadRows(connection, detailRows, announcement, batchTitle, totalBatches) {
+  await ensureCompaniesSamplingSchema(connection);
+
+  const productType = normalizeProductType(announcement.product_type);
+  const announcementType = normalizeAnnouncementType(announcement.announcement_type);
+  const payloadRows = [];
+
+  for (const row of detailRows) {
+    const companyEntries = splitCompanyEntries(row.company_names, row.company_addresses);
+    const fallbackEntries = companyEntries.length > 0
+      ? companyEntries
+      : (row.manufacturer_name
+        ? [{
+            name: row.manufacturer_name,
+            address: row.manufacturer_address || row.company_addresses || null
+          }]
+        : []);
+
+    const entries = fallbackEntries.length > 0
+      ? fallbackEntries
+      : [{ name: null, address: null }];
+
+    for (const [companySubIndex, entry] of entries.entries()) {
+      const companyName = entry.name || row.manufacturer_name || row.company_names || null;
+      const companyAddress = entry.address || row.manufacturer_address || row.company_addresses || null;
+      let companyId = null;
+
+      if (companyName) {
+        const derivedRegion = buildDerivedAnalyticsFields({
+          manufacturer_address: companyAddress,
+          company_addresses: companyAddress,
+          product_region: row.product_region,
+          operator_address: row.operator_address,
+          sample_unit_address: row.sample_unit_address,
+          product_name: row.product_name,
+          unqualified_items: row.unqualified_items,
+          inspection_result: row.inspection_result,
+          requirement: row.requirement,
+          attachment_sampling_category: row.attachment_sampling_category
+        });
+        const productCategory = deriveProductCategory(row.product_name);
+        companyId = await upsertCompany(
+          connection,
+          companyName,
+          companyAddress,
+          derivedRegion.manufacturer_province === '未标注' ? null : derivedRegion.manufacturer_province,
+          derivedRegion.manufacturer_city === '未标注' ? null : derivedRegion.manufacturer_city,
+          productCategory
+        );
+      }
+
+      payloadRows.push(enrichPayload({
+        batch_title: batchTitle,
+        total_batches: totalBatches,
+        sequence_no: row.sequence_no,
+        company_sub_index: companySubIndex,
+        product_name: row.product_name,
+        company_names: companyName,
+        company_addresses: companyAddress,
+        manufacturer_name: companyName,
+        manufacturer_address: companyAddress,
+        operator_name: row.operator_name,
+        operator_address: row.operator_address,
+        sample_unit_name: row.sample_unit_name,
+        sample_unit_address: row.sample_unit_address,
+        package_spec: row.package_spec,
+        batch_no: row.batch_no,
+        production_date: row.production_date,
+        expiry_date: row.expiry_date,
+        product_region: row.product_region,
+        attachment_sampling_category: row.attachment_sampling_category || null,
+        registration_no: row.registration_no,
+        production_license_no: row.production_license_no,
+        inspection_institution: row.inspection_institution,
+        unqualified_items: row.unqualified_items,
+        inspection_result: row.inspection_result,
+        requirement: row.requirement,
+        remarks: row.remarks,
+        picture_url: row.picture_url || null,
+        food_body_text: row.food_body_text || null,
+        product_type: productType,
+        announcement_type: announcementType,
+        announcement_id: Number(announcement.id),
+        announcement_detail_id: row.id,
+        supervision_id: null,
+        supervision_detail_id: null,
+        source_no: announcement.announcement_no,
+        source_title: announcement.title,
+        source_publish_date: announcement.publish_date || null,
+        company_id: companyId,
+        is_counterfeit: row.is_counterfeit ? 1 : 0
+      }));
+    }
+  }
+
+  return payloadRows;
+}
+
 async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, announcementId) {
   await ensureUnqualifiedProductsTable(connection);
 
@@ -1501,46 +1629,13 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
   const batchTitle = buildSourceBatchTitle(announcement, { productType, announcementType });
   const totalBatches = detailRows.length;
   const insertFields = [...UNQUALIFIED_PRODUCT_FIELDS, ...SOURCE_LINK_FIELDS];
-  const payloadRows = detailRows.map((row) => enrichPayload({
-    batch_title: batchTitle,
-    total_batches: totalBatches,
-    sequence_no: row.sequence_no,
-    product_name: row.product_name,
-    company_names: row.company_names,
-    company_addresses: row.company_addresses,
-    manufacturer_name: row.manufacturer_name,
-    manufacturer_address: row.manufacturer_address,
-    operator_name: row.operator_name,
-    operator_address: row.operator_address,
-    sample_unit_name: row.sample_unit_name,
-    sample_unit_address: row.sample_unit_address,
-    package_spec: row.package_spec,
-    batch_no: row.batch_no,
-    production_date: row.production_date,
-    expiry_date: row.expiry_date,
-    product_region: row.product_region,
-    attachment_sampling_category: row.attachment_sampling_category || null,
-    registration_no: row.registration_no,
-    production_license_no: row.production_license_no,
-    inspection_institution: row.inspection_institution,
-    unqualified_items: row.unqualified_items,
-    inspection_result: row.inspection_result,
-    requirement: row.requirement,
-    remarks: row.remarks,
-    picture_url: row.picture_url || null,
-    food_body_text: row.food_body_text || null,
-    product_type: productType,
-    announcement_type: announcementType,
-    announcement_id: Number(announcementId),
-    announcement_detail_id: row.id,
-    supervision_id: null,
-    supervision_detail_id: null,
-    source_no: announcement.announcement_no,
-    source_title: announcement.title,
-    source_publish_date: announcement.publish_date || null,
-    company_id: null,
-    is_counterfeit: row.is_counterfeit ? 1 : 0
-  }));
+  const payloadRows = await buildAnnouncementDetailPayloadRows(
+    connection,
+    detailRows,
+    announcement,
+    batchTitle,
+    totalBatches
+  );
 
   const chunkSize = 200;
   for (let index = 0; index < payloadRows.length; index += chunkSize) {
@@ -1559,7 +1654,8 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
   const rollupSyncResult = await rebuildUnqualifiedProductTreeRollupsForSource(connection, { announcementId });
 
   return {
-    synced_count: detailRows.length,
+    synced_count: payloadRows.length,
+    product_count: detailRows.length,
     batch_title: batchTitle,
     total_batches: totalBatches,
     synced_product_category_count: productCategorySyncResult.synced_product_category_count,
@@ -1635,6 +1731,7 @@ async function replaceUnqualifiedProductsFromFlightInspectionDetails(connection,
     batch_title: batchTitle,
     total_batches: totalBatches,
     sequence_no: Number(row.sequence_no || index + 1),
+    company_sub_index: 0,
     product_name: row.title || `${row.company_name || supervision.company_name || '企业'}飞行检查问题项`,
     company_names: row.company_name || supervision.company_name || null,
     company_addresses: row.company_address || supervision.company_address || null,

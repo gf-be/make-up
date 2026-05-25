@@ -19,8 +19,8 @@ const {
 const { removeInspectionsDerivedFromAnnouncement } = require('./announcementInspectionSync');
 const { linkFoodInspectionToPublishedAnnouncement } = require('./foodInspectionStore');
 
+const { splitCompanyEntries, splitCompanyValues } = require('./companyFieldParser');
 const {
-
   replaceUnqualifiedProductsFromAnnouncementDetails,
   replaceUnqualifiedProductsFromFlightInspectionDetails,
   normalizeProductType,
@@ -37,10 +37,10 @@ const STAGING_DETAIL_FIELDS = [
   'product_name',
   'company_names',
   'company_addresses',
-  'manufacturer_name',
-  'manufacturer_address',
-  'operator_name',
-  'operator_address',
+  // 'manufacturer_name',
+  // 'manufacturer_address',
+  // 'operator_name',
+  // 'operator_address',
   'sample_unit_name',
   'sample_unit_address',
   'package_spec',
@@ -108,13 +108,6 @@ function normalizeNullableText(value) {
 function normalizeNullableMultilineText(value) {
   const normalized = normalizeMultilineText(value);
   return normalized || null;
-}
-
-function splitCompanyValues(value) {
-  return String(value || '')
-    .split(/\r?\n|；|;/)
-    .map((item) => normalizeText(item))
-    .filter(Boolean);
 }
 
 function normalizeInspectionCount(value, fallback = 0) {
@@ -716,12 +709,12 @@ function buildCompanyPreview(items = [], typeInfo = resolveTypeInfo()) {
   const companyMap = new Map();
 
   items.forEach((item) => {
-    const companyNames = splitCompanyValues(item.company_names);
-    const companyAddresses = splitCompanyValues(item.company_addresses);
-    const defaultAddress = companyAddresses[0] || normalizeNullableText(item.company_addresses);
+    const companyEntries = splitCompanyEntries(item.company_names, item.company_addresses);
+    const defaultAddress = companyEntries[0]?.address || normalizeNullableText(item.company_addresses);
 
-    companyNames.forEach((companyName, index) => {
-      const companyAddress = companyAddresses[index] || defaultAddress || null;
+    companyEntries.forEach((entry) => {
+      const companyName = entry.name;
+      const companyAddress = entry.address || defaultAddress || null;
       const key = `${companyName}__${companyAddress || ''}`;
       const province = deriveProvince(item.product_region, companyAddress);
 

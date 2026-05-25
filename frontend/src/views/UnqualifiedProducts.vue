@@ -674,6 +674,8 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'UnqualifiedProducts' })
+
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Close, Rank } from '@element-plus/icons-vue'

@@ -151,25 +151,18 @@
               </el-button>
             </el-form-item>
           </el-form> -->
-          <div class="workspace-layout workspace-layout-simple">
-            <div class="batch-drawer-hover-edge" title="鼠标移入查看待核验批次列表" @mouseenter="openBatchDrawer"
-              @mouseleave="scheduleCloseBatchDrawer">
-              <span class="batch-drawer-edge-label">批次列表</span>
-            </div>
-
-            <el-drawer v-model="batchDrawerVisible" direction="ltr" :size="batchDrawerWidth"
-              :modal="false" :show-close="false" :append-to-body="false" :teleported="false" class="batch-list-drawer">
-              <template #header>
+          <div class="workspace-layout workspace-layout-columns">
+            <div class="batch-list-pane">
+              <div class="batch-list-pane-header">
                 <div class="batch-drawer-header">
                   <div class="batch-drawer-header-main">
                     <span class="batch-drawer-header-title">待核验批次</span>
-                    <!-- <span class="batch-drawer-header-badge">{{ batchListRows.length }}</span> -->
+                    <span class="batch-drawer-header-badge">{{ batchListRows.length }}</span>
                   </div>
                   <!-- <span class="batch-drawer-header-sub">点击行查看详情</span> -->
                 </div>
-              </template>
-              <div class="batch-drawer-body" v-loading="loading" @mouseenter="openBatchDrawer"
-                @mouseleave="scheduleCloseBatchDrawer">
+              </div>
+              <div class="batch-list-pane-body" v-loading="loading">
                 <el-table class="batch-table" :data="batchListRows" row-key="id"
                   :max-height="batchReviewTableMaxHeight" size="small" stripe empty-text="暂无待核验批次"
                   :row-class-name="batchRowClassName" @row-click="handleBatchRowClick">
@@ -180,7 +173,7 @@
                   </el-table-column>
                 </el-table>
               </div>
-            </el-drawer>
+            </div>
 
             <div class="detail-layout">
 
@@ -1043,6 +1036,11 @@ import {
   getFirstAnnouncementStagingUploadedPictureStoredPath,
   postAnnouncementStagingProductImages
 } from '@/utils/announcementStagingProductPictureUpload.js'
+import { getUserScopedStorageKey } from '@/utils/auth'
+
+/** 离开页后仍保留的列表/详情内存缓存（按用户隔离）；返回本页时优先恢复，避免重复 refreshAll */
+const stagingPageDataCacheByUser = new Map()
+let stagingPagePrefetchToken = 0
 
 
 const productTypeOptions = [
@@ -1136,27 +1134,6 @@ const stagingBatchDeleting = ref(false)
 
 const batchReviewTableMaxHeight = ref(480)
 const attachmentTableMaxHeight = ref(520)
-const batchDrawerVisible = ref(false)
-const batchDrawerWidth = '320px'
-let batchDrawerCloseTimer = null
-
-function openBatchDrawer() {
-  if (batchDrawerCloseTimer) {
-    clearTimeout(batchDrawerCloseTimer)
-    batchDrawerCloseTimer = null
-  }
-  batchDrawerVisible.value = true
-}
-
-function scheduleCloseBatchDrawer() {
-  if (batchDrawerCloseTimer) {
-    clearTimeout(batchDrawerCloseTimer)
-  }
-  batchDrawerCloseTimer = window.setTimeout(() => {
-    batchDrawerVisible.value = false
-    batchDrawerCloseTimer = null
-  }, 280)
-}
 
 function syncBatchReviewViewportHeights() {
   if (typeof window === 'undefined') {
@@ -2127,6 +2104,131 @@ function buildWorkspacePayload() {
   }
 }
 
+function getStagingPageCacheUserKey() {
+  return getUserScopedStorageKey('announcementStaging.pageData')
+}
+
+function buildPageDataCacheSnapshot() {
+  return {
+    filters: { ...filters },
+    detailFilters: { ...detailFilters },
+    treeRows: structuredClone(toRaw(treeRows.value)),
+    detailMap: structuredClone(toRaw(detailMap.value)),
+    overview: { ...overview },
+    stagingFilterYears: [...stagingFilterYears.value],
+    selectedBatchId: selectedBatchId.value,
+    selectedTreeKey: selectedTreeKey.value,
+    activeDetailTab: activeDetailTab.value,
+    selectedAttachmentIndex: selectedAttachmentIndex.value,
+    mainTab: mainTab.value,
+    mergedAttachmentPagination: { ...mergedAttachmentPagination },
+    cachedAt: Date.now()
+  }
+}
+
+function applyPageDataCacheSnapshot(snapshot = {}) {
+  const nextFilters = snapshot.filters || {}
+  filters.status = nextFilters.status ?? ''
+  filters.product_type = nextFilters.product_type ?? ''
+  filters.announcement_type = nextFilters.announcement_type ?? ''
+  filters.keyword = nextFilters.keyword ?? ''
+  filters.year = String(nextFilters.year ?? '')
+
+  const nextDetailFilters = snapshot.detailFilters || {}
+  detailFilters.keyword = nextDetailFilters.keyword ?? ''
+  detailFilters.companyKeyword = nextDetailFilters.companyKeyword ?? ''
+
+  treeRows.value = Array.isArray(snapshot.treeRows) ? snapshot.treeRows : []
+  detailMap.value = snapshot.detailMap && typeof snapshot.detailMap === 'object' ? snapshot.detailMap : {}
+  Object.assign(overview, createEmptyOverview(), snapshot.overview || {})
+  stagingFilterYears.value = Array.isArray(snapshot.stagingFilterYears) ? snapshot.stagingFilterYears : []
+
+  selectedBatchId.value = snapshot.selectedBatchId ?? null
+  selectedTreeKey.value = snapshot.selectedTreeKey || ''
+  activeDetailTab.value = snapshot.activeDetailTab || 'body'
+  selectedAttachmentIndex.value = snapshot.selectedAttachmentIndex ?? null
+
+  if (snapshot.mergedAttachmentPagination) {
+    mergedAttachmentPagination.page = Number(snapshot.mergedAttachmentPagination.page) || 1
+    mergedAttachmentPagination.limit = Number(snapshot.mergedAttachmentPagination.limit) || 10
+  }
+
+  if (snapshot.mainTab) {
+    mainTab.value = snapshot.mainTab
+  }
+}
+
+function savePageDataCacheSnapshot() {
+  stagingPageDataCacheByUser.set(getStagingPageCacheUserKey(), buildPageDataCacheSnapshot())
+}
+
+function getStagingPageDataCache() {
+  return stagingPageDataCacheByUser.get(getStagingPageCacheUserKey()) || null
+}
+
+async function prefetchStagingPageDataCache(sourceSnapshot, token) {
+  const userKey = getStagingPageCacheUserKey()
+  const filtersSnap = sourceSnapshot?.filters || {}
+  const batchId = Number(sourceSnapshot?.selectedBatchId || 0)
+
+  try {
+    const requests = [
+      getAnnouncementStagingOverview(),
+      getAnnouncementStagingFilterYears({ ...filtersSnap })
+    ]
+
+    if (sourceSnapshot?.mainTab !== 'traceback') {
+      requests.push(getAnnouncementStagingTree({ ...filtersSnap }))
+    }
+
+    const results = await Promise.all(requests)
+    const overviewRes = results[0]
+    const yearsRes = results[1]
+    const treeRes = sourceSnapshot?.mainTab !== 'traceback' ? results[2] : null
+
+    if (token !== stagingPagePrefetchToken) {
+      return
+    }
+
+    const nextSnapshot = {
+      ...sourceSnapshot,
+      overview: { ...createEmptyOverview(), ...(overviewRes.data || {}) },
+      stagingFilterYears: Array.isArray(yearsRes.data?.years) ? yearsRes.data.years : [],
+      cachedAt: Date.now()
+    }
+
+    if (treeRes) {
+      nextSnapshot.treeRows = treeRes.data || []
+    }
+
+    if (batchId) {
+      try {
+        const detailRes = await getAnnouncementStagingDetail(batchId)
+        if (token !== stagingPagePrefetchToken) {
+          return
+        }
+        nextSnapshot.detailMap = {
+          ...(sourceSnapshot.detailMap || {}),
+          [batchId]: {
+            ...createEmptyDetail(),
+            ...(detailRes.data || {})
+          }
+        }
+      } catch (error) {
+        console.error('后台预取批次详情失败:', error)
+      }
+    }
+
+    if (token !== stagingPagePrefetchToken) {
+      return
+    }
+
+    stagingPageDataCacheByUser.set(userKey, nextSnapshot)
+  } catch (error) {
+    console.error('后台预取导入通告页数据失败:', error)
+  }
+}
+
 function applyWorkspacePayload(payload = {}) {
   const nextFilters = payload.filters || {}
   filters.status = nextFilters.status ?? ''
@@ -2927,6 +3029,9 @@ async function refreshAll(options = {}) {
       loadOverview(),
       tracebacksPanelRef.value?.refreshAll?.() ?? Promise.resolve()
     ])
+    if (!options.skipPageCacheSave) {
+      savePageDataCacheSnapshot()
+    }
     return
   }
 
@@ -2939,6 +3044,10 @@ async function refreshAll(options = {}) {
 
   if (currentBatchId.value) {
     await ensureBatchDetailLoaded(currentBatchId.value, Boolean(options.force))
+  }
+
+  if (!options.skipPageCacheSave) {
+    savePageDataCacheSnapshot()
   }
 }
 
@@ -3507,14 +3616,33 @@ watch(
 )
 
 onMounted(async () => {
-  const cachePayload = await loadWorkspaceCache()
-  applyWorkspacePayload(cachePayload)
-  resolveMainTabFromRoute(cachePayload)
   await nextTick()
   syncBatchReviewViewportHeights()
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', syncBatchReviewViewportHeights)
   }
+
+  const pageCache = getStagingPageDataCache()
+  if (pageCache) {
+    applyPageDataCacheSnapshot(pageCache)
+    resolveMainTabFromRoute({ mainTab: pageCache.mainTab })
+    fillInlineStagingEditors()
+
+    const focusBatchId = Number(route.query.focusBatchId || 0)
+    if (focusBatchId) {
+      workspaceCacheReady.value = true
+      await focusBatchById(focusBatchId)
+      return
+    }
+
+    workspaceCacheReady.value = true
+    return
+  }
+
+  const cachePayload = await loadWorkspaceCache()
+  applyWorkspacePayload(cachePayload)
+  resolveMainTabFromRoute(cachePayload)
+
   const preferredKey = selectedTreeKey.value || (selectedBatchId.value ? `body:${selectedBatchId.value}` : '')
   await refreshAll({ preferredKey })
 
@@ -3537,10 +3665,11 @@ onBeforeUnmount(() => {
     clearTimeout(workspaceSaveTimer)
     workspaceSaveTimer = null
   }
-  if (batchDrawerCloseTimer) {
-    clearTimeout(batchDrawerCloseTimer)
-    batchDrawerCloseTimer = null
-  }
+
+  savePageDataCacheSnapshot()
+  stagingPagePrefetchToken += 1
+  const prefetchToken = stagingPagePrefetchToken
+  void prefetchStagingPageDataCache(buildPageDataCacheSnapshot(), prefetchToken)
 })
 
 </script>
@@ -3822,52 +3951,39 @@ onBeforeUnmount(() => {
   align-items: stretch;
 }
 
-.workspace-layout-simple {
-  min-height: 0;
-  grid-template-columns: minmax(0, 1fr);
-  position: relative;
-  padding-left: 18px;
-}
-
-.batch-drawer-hover-edge {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 14px;
-  z-index: 20;
+.workspace-layout-columns {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border-radius: 0 10px 10px 0;
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.12), rgba(59, 130, 246, 0.05));
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-left: none;
-  transition: background 0.2s ease, width 0.2s ease, box-shadow 0.2s ease;
+  gap: 16px;
+  align-items: stretch;
+  min-height: 0;
 }
 
-.batch-drawer-hover-edge:hover {
-  width: 18px;
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.2), rgba(59, 130, 246, 0.1));
-  box-shadow: 2px 0 12px rgba(37, 99, 235, 0.1);
+.batch-list-pane {
+  flex: 0 0 320px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f6ff 100%);
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  box-shadow: 8px 0 28px rgba(37, 99, 235, 0.1);
+  overflow: hidden;
 }
 
-.batch-drawer-edge-label {
-  writing-mode: vertical-rl;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: #2563eb;
-  user-select: none;
+.batch-list-pane-header {
+  flex-shrink: 0;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 52%, #3b82f6 100%);
 }
 
-.batch-drawer-body {
-  height: 100%;
+.batch-list-pane-body {
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 10px 12px 12px;
+  overflow: hidden;
 }
 
 .batch-drawer-header {
@@ -3892,11 +4008,12 @@ onBeforeUnmount(() => {
 
 .batch-drawer-header-badge {
   display: inline-flex;
+  margin-left: 4px;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 7px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
@@ -3907,37 +4024,6 @@ onBeforeUnmount(() => {
 .batch-drawer-header-sub {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.84);
-}
-
-:deep(.batch-list-drawer.el-drawer) {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  height: auto;
-  max-height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: linear-gradient(180deg, #f8fbff 0%, #f1f6ff 100%);
-  border-right: 1px solid #dbeafe;
-  box-shadow: 8px 0 28px rgba(37, 99, 235, 0.1);
-}
-
-:deep(.batch-list-drawer .el-drawer__header) {
-  margin: 0;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
-  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 52%, #3b82f6 100%);
-  flex-shrink: 0;
-}
-
-:deep(.batch-list-drawer .el-drawer__body) {
-  padding: 0;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
 
 .staging-main-tabs :deep(.el-tabs__header) {
@@ -4256,15 +4342,12 @@ onBeforeUnmount(() => {
   height: auto;
 }
 
-.left-column,
 .detail-layout {
+  flex: 1;
+  min-width: 0;
   display: grid;
   gap: 16px;
-}
-
-.detail-layout {
   grid-template-rows: auto minmax(0, 1fr);
-  min-width: 0;
 }
 
 .directory-title {
@@ -4960,7 +5043,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1400px) {
-  .workspace-layout:not(.workspace-layout-simple) {
+  .workspace-layout:not(.workspace-layout-columns) {
     grid-template-columns: minmax(260px, 1fr) minmax(0, 2.4fr);
   }
 
@@ -4975,8 +5058,13 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .workspace-layout-simple {
-    grid-template-columns: 1fr;
+  .workspace-layout-columns {
+    flex-direction: column;
+  }
+
+  .batch-list-pane {
+    flex: none;
+    width: 100%;
   }
 
   .workspace-layout-review {

@@ -53,26 +53,12 @@
     </el-card>
 
     <div class="manage-layout">
-      <div class="list-drawer-workspace">
-        <div
-          class="list-drawer-hover-edge"
-          title="鼠标移入查看通告列表"
-          @mouseenter="openListDrawer"
-          @mouseleave="scheduleCloseListDrawer"
-        >
-          <span class="list-drawer-edge-label">通告列表</span>
-        </div>
-
-        <el-drawer
-          v-model="listDrawerVisible"
-          v-bind="listDrawerProps"
-          class="announcement-list-drawer"
-        >
-          <div
-            class="list-drawer-body"
-            @mouseenter="openListDrawer"
-            @mouseleave="scheduleCloseListDrawer"
-          >
+      <div class="manage-columns">
+        <div class="list-pane">
+          <div class="list-pane-header">
+            <span class="list-pane-title">通告列表</span>
+          </div>
+          <div class="list-pane-body">
             <el-table
               v-loading="loading"
               :data="announcementRows"
@@ -110,7 +96,7 @@
               @current-change="loadAnnouncements"
             />
           </div>
-        </el-drawer>
+        </div>
 
         <div class="detail-pane">
           <div v-if="selectedAnnouncement" class="detail-toolbar">
@@ -129,22 +115,7 @@ import { Refresh, Search } from '@element-plus/icons-vue'
 import AnnouncementDetail from './AnnouncementDetail.vue'
 import { getAnnouncements } from '@/api/index'
 
-/** @typedef {import('element-plus').DrawerProps} DrawerProps */
-
-/** @type {DrawerProps} */
-const listDrawerProps = {
-  direction: 'ltr',
-  size: '380px',
-  modal: false,
-  showClose: false,
-  appendToBody: false,
-  teleported: false,
-  title: '通告列表'
-}
-
-const listDrawerVisible = ref(false)
 const announcementListTableMaxHeight = ref(520)
-let listDrawerCloseTimer = null
 
 const PRODUCT_TYPE_LABELS = {
   cosmetics: '化妆品',
@@ -267,24 +238,6 @@ function syncAnnouncementListTableMaxHeight() {
   announcementListTableMaxHeight.value = Math.max(320, Math.min(760, Math.round(window.innerHeight - 280)))
 }
 
-function openListDrawer() {
-  if (listDrawerCloseTimer) {
-    clearTimeout(listDrawerCloseTimer)
-    listDrawerCloseTimer = null
-  }
-  listDrawerVisible.value = true
-}
-
-function scheduleCloseListDrawer() {
-  if (listDrawerCloseTimer) {
-    clearTimeout(listDrawerCloseTimer)
-  }
-  listDrawerCloseTimer = window.setTimeout(() => {
-    listDrawerVisible.value = false
-    listDrawerCloseTimer = null
-  }, 280)
-}
-
 syncAnnouncementListTableMaxHeight()
 if (typeof window !== 'undefined') {
   window.addEventListener('resize', syncAnnouncementListTableMaxHeight)
@@ -295,10 +248,6 @@ loadAnnouncements()
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', syncAnnouncementListTableMaxHeight)
-  }
-  if (listDrawerCloseTimer) {
-    clearTimeout(listDrawerCloseTimer)
-    listDrawerCloseTimer = null
   }
 })
 </script>
@@ -343,89 +292,50 @@ onBeforeUnmount(() => {
   min-height: calc(100vh - 230px);
 }
 
-.list-drawer-workspace {
-  position: relative;
+.manage-columns {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
   min-height: calc(100vh - 230px);
-  padding-left: 18px;
 }
 
-.list-drawer-hover-edge {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 14px;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border-radius: 0 10px 10px 0;
-  background: linear-gradient(90deg, rgba(96, 165, 250, 0.1), rgba(147, 197, 253, 0.04));
-  border: 1px solid rgba(147, 197, 253, 0.28);
-  border-left: none;
-  transition: background 0.2s ease, width 0.2s ease, box-shadow 0.2s ease;
-}
-
-.list-drawer-hover-edge:hover {
-  width: 18px;
-  background: linear-gradient(90deg, rgba(96, 165, 250, 0.16), rgba(147, 197, 253, 0.08));
-  box-shadow: 2px 0 10px rgba(96, 165, 250, 0.08);
-}
-
-.list-drawer-edge-label {
-  writing-mode: vertical-rl;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: #7da7d9;
-  user-select: none;
-}
-
-.list-drawer-body {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-:deep(.announcement-list-drawer.el-drawer) {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  height: auto;
-  max-height: 100%;
+.list-pane {
+  flex: 0 0 380px;
+  width: 380px;
+  min-height: calc(100vh - 230px);
   display: flex;
   flex-direction: column;
   background: #fcfdff;
-  border-right: 1px solid #edf2f8;
+  border: 1px solid #edf2f8;
+  border-radius: 4px;
   box-shadow: 6px 0 20px rgba(100, 130, 170, 0.06);
+  overflow: hidden;
 }
 
-:deep(.announcement-list-drawer .el-drawer__header) {
-  margin-bottom: 8px;
-  padding-bottom: 12px;
+.list-pane-header {
+  flex-shrink: 0;
+  padding: 16px 12px 12px;
   border-bottom: 1px solid #e8eef6;
   background: linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
-  flex-shrink: 0;
 }
 
-:deep(.announcement-list-drawer .el-drawer__title) {
+.list-pane-title {
   color: #5b7ea8;
   font-weight: 600;
 }
 
-:deep(.announcement-list-drawer .el-drawer__body) {
-  padding: 0 12px 12px;
+.list-pane-body {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  padding: 0 12px 12px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .detail-pane {
+  flex: 1;
+  min-width: 0;
   min-height: calc(100vh - 230px);
   background: #fff;
   border: 1px solid #ebeef5;

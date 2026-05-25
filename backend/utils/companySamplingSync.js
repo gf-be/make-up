@@ -2,26 +2,13 @@ const {
   normalizeProductType,
   normalizeAnnouncementType
 } = require('./unqualifiedProducts');
-const { deriveProductCategory } = require('./dataAnalysisHelpers');
+const { deriveProductCategory, extractProvinceCity } = require('./dataAnalysisHelpers');
+const {
+  normalizeText,
+  splitCompanyEntries,
+  isInvalidCompanyValue
+} = require('./companyFieldParser');
 
-
-function normalizeText(value) {
-  return String(value || '')
-    .replace(/\u0007/g, ' ')
-    .replace(/[\r\n]+/g, ' ')
-    .replace(/[ \t]+/g, ' ')
-    .trim();
-}
-
-
-function splitCompanyValues(value) {
-  const normalized = String(value || '')
-    .split(/\r?\n|；|;/)
-    .map((item) => normalizeText(item))
-    .filter(Boolean);
-
-  return normalized.length > 0 ? normalized : [];
-}
 
 function deriveProvince(region, address) {
   const normalizedRegion = normalizeText(region);
@@ -29,9 +16,24 @@ function deriveProvince(region, address) {
     return normalizedRegion;
   }
 
-  const normalizedAddress = normalizeText(address);
-  const match = normalizedAddress.match(/^(.*?(?:省|市|自治区|特别行政区))/);
-  return match ? match[1] : null;
+  return extractProvinceCity(address).province === '未标注'
+    ? null
+    : extractProvinceCity(address).province;
+}
+
+function deriveProvinceCity(region, address) {
+  const regionProvince = normalizeText(region);
+  const fromAddress = extractProvinceCity(address);
+  if (fromAddress.province && fromAddress.province !== '未标注') {
+    return fromAddress;
+  }
+  if (regionProvince) {
+    return {
+      province: regionProvince,
+      city: fromAddress.city && fromAddress.city !== '未标注' ? fromAddress.city : '未标注'
+    };
+  }
+  return fromAddress;
 }
 
 async function ensureColumnExists(connection, tableName, columnName, definition) {
@@ -407,22 +409,27 @@ async function deleteOrphanCompanies(connection, companyIds = []) {
   };
 }
 
-async function upsertCompany(connection, companyName, companyAddress, province, productCategory = null) {
+async function upsertCompany(connection, companyName, companyAddress, province, city = null, productCategory = null) {
+  const normalizedName = normalizeText(companyName);
+  if (!normalizedName || isInvalidCompanyValue(normalizedName)) {
+    return null;
+  }
 
   const [existingRows] = await connection.query(
-    'SELECT id, address, province, product_category FROM companies WHERE name = ? LIMIT 1',
-    [companyName]
+    'SELECT id, address, province, city, product_category FROM companies WHERE name = ? LIMIT 1',
+    [normalizedName]
   );
 
   if (existingRows.length > 0) {
     const existing = existingRows[0];
     const shouldUpdateAddress = (!existing.address && companyAddress);
     const shouldUpdateProvince = (!existing.province && province);
+    const shouldUpdateCity = (!existing.city && city);
     const shouldUpdateCategory = (!existing.product_category && productCategory);
-    if (shouldUpdateAddress || shouldUpdateProvince || shouldUpdateCategory) {
+    if (shouldUpdateAddress || shouldUpdateProvince || shouldUpdateCity || shouldUpdateCategory) {
       await connection.query(
-        'UPDATE companies SET address = COALESCE(address, ?), province = COALESCE(province, ?), product_category = COALESCE(product_category, ?) WHERE id = ?',
-        [companyAddress || null, province || null, productCategory || null, existing.id]
+        'UPDATE companies SET address = COALESCE(address, ?), province = COALESCE(province, ?), city = COALESCE(city, ?), product_category = COALESCE(product_category, ?) WHERE id = ?',
+        [companyAddress || null, province || null, city || null, productCategory || null, existing.id]
       );
     }
     return existing.id;
@@ -430,10 +437,10 @@ async function upsertCompany(connection, companyName, companyAddress, province, 
 
   const [result] = await connection.query(
     `
-      INSERT INTO companies (name, type, address, province, product_category, sampled_count, last_sampled_at)
-      VALUES (?, 'manufacturer', ?, ?, ?, 0, NULL)
+      INSERT INTO companies (name, type, address, province, city, product_category, sampled_count, last_sampled_at)
+      VALUES (?, 'manufacturer', ?, ?, ?, ?, 0, NULL)
     `,
-    [companyName, companyAddress || null, province || null, productCategory || null]
+    [normalizedName, companyAddress || null, province || null, city || null, productCategory || null]
   );
 
   return result.insertId;
@@ -479,15 +486,28 @@ async function syncCompaniesFromAnnouncementDetails(connection, announcementId, 
 
 
   for (const detail of detailRows) {
-    const companyNames = splitCompanyValues(detail.manufacturer_name || detail.company_names);
-    const companyAddresses = splitCompanyValues(detail.manufacturer_address || detail.company_addresses);
-    const defaultAddress = companyAddresses[0] || normalizeText(detail.manufacturer_address || detail.company_addresses) || null;
+    const companyEntries = splitCompanyEntries(
+      detail.manufacturer_name || detail.company_names,
+      detail.manufacturer_address || detail.company_addresses
+    );
 
-    for (const [index, companyName] of companyNames.entries()) {
-      const companyAddress = companyAddresses[index] || defaultAddress;
-      const province = deriveProvince(detail.product_region, companyAddress);
+    for (const entry of companyEntries) {
+      const companyName = entry.name;
+      const companyAddress = entry.address;
+      const region = deriveProvinceCity(detail.product_region, companyAddress);
       const productCategory = deriveProductCategory(detail.product_name);
-      const companyId = await upsertCompany(connection, companyName, companyAddress, province, productCategory);
+      const companyId = await upsertCompany(
+        connection,
+        companyName,
+        companyAddress,
+        region.province === '未标注' ? null : region.province,
+        region.city === '未标注' ? null : region.city,
+        productCategory
+      );
+
+      if (!companyId) {
+        continue;
+      }
 
       const normalizedCompanyId = Number(companyId);
       affectedCompanyIds.add(normalizedCompanyId);
@@ -577,9 +597,20 @@ async function syncCompaniesFromFlightInspectionDetails(connection, supervisionI
     }
 
     const companyAddress = normalizeText(detail.company_address) || null;
-    const province = deriveProvince(null, companyAddress);
+    const region = deriveProvinceCity(null, companyAddress);
     const productCategory = deriveProductCategory(detail.product_name);
-    const companyId = await upsertCompany(connection, companyName, companyAddress, province, productCategory);
+    const companyId = await upsertCompany(
+      connection,
+      companyName,
+      companyAddress,
+      region.province === '未标注' ? null : region.province,
+      region.city === '未标注' ? null : region.city,
+      productCategory
+    );
+
+    if (!companyId) {
+      continue;
+    }
 
     const normalizedCompanyId = Number(companyId);
     affectedCompanyIds.add(normalizedCompanyId);

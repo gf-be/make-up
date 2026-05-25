@@ -117,8 +117,8 @@ const routes = [
     path: '/unqualified-products',
     name: 'UnqualifiedProducts',
     component: () => import('../views/UnqualifiedProducts.vue'),
-    meta: { module: 'unqualified-products' }
-  },
+    meta: { module: 'unqualified-products', keepAlive: true }
+   },
   {
     path: '/unqualified-products/:id/usage',
     name: 'UnqualifiedProductUsageRecords',
