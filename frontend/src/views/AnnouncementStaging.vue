@@ -124,7 +124,7 @@
 
         <el-tab-pane label="待核验批次" name="batchReview">
 
-          <!-- <el-form :model="filters" inline class="filter-form-batch">
+           <el-form :model="filters" inline class="filter-form-batch">
             <el-form-item label="年份">
               <el-select v-model="filters.year" clearable placeholder="全部" style="width: 120px" @change="applyFilters">
                 <el-option v-for="opt in yearOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
@@ -150,7 +150,7 @@
                 一键入库（{{ overview.pending_batch_count || 0 }}）
               </el-button>
             </el-form-item>
-          </el-form> -->
+          </el-form> 
           <div class="workspace-layout workspace-layout-columns">
             <div class="batch-list-pane">
               <!-- <div class="batch-list-pane-header">

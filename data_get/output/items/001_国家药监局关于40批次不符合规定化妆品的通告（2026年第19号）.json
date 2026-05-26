@@ -1,0 +1,1731 @@
+{
+  "sequence": 1,
+  "title": "国家药监局关于40批次不符合规定化妆品的通告（2026年第19号）",
+  "announcement_no": "2026年第19号",
+  "publish_date": "2026-05-22",
+  "detail_url": "https://www.nmpa.gov.cn/xxgk/ggtg/hzhpggtg/hzhpchjgg/hzhpcjgjj/20260522162510165.html",
+  "source_page": "https://www.nmpa.gov.cn/hzhp/hzhpcjgg/index.html",
+  "product_type": "cosmetics",
+  "crawl_record": {
+    "product_type": "cosmetics",
+    "source_page": "https://www.nmpa.gov.cn/hzhp/hzhpcjgg/index.html",
+    "detail_url": "https://www.nmpa.gov.cn/xxgk/ggtg/hzhpggtg/hzhpchjgg/hzhpcjgjj/20260522162510165.html"
+  },
+  "content_text": "在2025年国家化妆品抽样检验工作中，经广西壮族自治区药品检验研究院等单位检验，产品标签标示名称为茜妃隔离防晒乳SPF50PA+++等40批次化妆品不符合规定（见附件）。其中，广州市白云区茜妃化妆品厂提出样品真实性异议申请，经广东省药品监督管理局审查，被抽检不符合规定的产品确为该企业生产。\n根据《化妆品监督管理条例》《化妆品生产经营监督管理办法》《化妆品抽样检验管理办法》，国家药监局已要求江苏、浙江、广东省药品监督管理部门对上述不符合规定化妆品涉及的注册人、备案人、受托生产企业等依法立案调查，责令相关企业依法采取风险控制措施并开展自查整改。各省级药品监督管理部门要依法责令相关化妆品经营者停止经营上述化妆品，并依法调查其进货查验记录等情况，对违法产品进行追根溯源，发现违法行为的，依法严肃查处；涉嫌犯罪的，依法移送公安机关。\n广州市白云区茜妃化妆品厂提供虚假信息、隐瞒真实情况的行为属于《化妆品监督管理条例》规定的情节严重的情形，将依法从重从严处罚。\n特此通告。\n附件：40批次不符合规定化妆品信息\n国家药监局\n2026年5月20日\n国家药品监督管理局2026年第19号通告附件.doc",
+  "content_preview": "在2025年国家化妆品抽样检验工作中，经广西壮族自治区药品检验研究院等单位检验，产品标签标示名称为茜妃隔离防晒乳SPF50PA+++等40批次化妆品不符合规定（见附件）。其中，广州市白云区茜妃化妆品厂提出样品真实性异议申请，经广东省药品监督管理局审查，被抽检不符合规定的产品确为该企业生产。\n根据《化妆品监督管理条例》《化妆品生产经营监督管理办法》《化妆品抽样检验管理办法》，国家药监局已要求江苏、浙江、广东省药品监督管理部门对上述不符合规定化妆品涉及的注册人、备案人、受托生产企业等依法立案调查，责令相关企业依法采取风险控制措施并开展自查整改。各省级药品监督管理部门要依法责令相关化妆品经营者停止经营上述化妆品，并依法调查其进货查验记录等情况，对违法产品进行追根溯源，发现违法行为的，依法严肃查处；涉嫌犯罪的，依法移送公安机关。\n广州市白云区茜妃化妆品厂提供虚假信息、隐瞒真实情况的行为属于《化妆品监督管理条例》规定的情节严重的情形，将依法从重从严处罚。\n特此通告。\n附件：40批次不符合规定化妆品信息\n国家药监局\n2026年5月20日\n国家药品监督管理局2026年第19号通告附件.doc",
+  "attachments": [
+    {
+      "attachment_name": "国家药品监督管理局2026年第19号通告附件.doc",
+      "attachment_url": "https://www.nmpa.gov.cn/directory/web/nmpa/images/1779438304931015256.doc",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\announcements\\国家药监局关于40批次不符合规定化妆品的通告（2026年第19号）\\1779438304931015256.doc",
+      "file_ext": ".doc",
+      "download": {
+        "success": true,
+        "status_code": 200,
+        "file_size": 316416
+      },
+      "parse_result": {
+        "file_path": "F:\\daoke\\化妆品\\data_get\\downloads\\announcements\\国家药监局关于40批次不符合规定化妆品的通告（2026年第19号）\\1779438304931015256.doc",
+        "supported": true,
+        "attachment_type": "word",
+        "parsedCount": 40,
+        "counterfeitCount": 8,
+        "message": "",
+        "rows": [
+          {
+            "sequence_no": 1,
+            "product_name": "茜妃隔离防晒乳SPF50PA+++",
+            "company_names": "广州市白云区茜妃化妆品厂",
+            "company_addresses": "广州市白云区太和镇永兴石坑东街5号",
+            "sample_unit_name": "宁明县爱淘宝百货店",
+            "sample_unit_address": "广西壮族自治区崇左市宁明县城中镇中华街43号",
+            "package_spec": "50g",
+            "batch_no": "XF1115250224",
+            "production_date": "/",
+            "expiry_date": "2027/02/24",
+            "product_region": "广东",
+            "registration_no": "国妆特字G20201819",
+            "production_license_no": "粤妆20160199",
+            "inspection_institution": "广西壮族自治区药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：二苯酮-3、丁基甲氧基二苯甲酰基甲烷、甲氧基肉桂酸乙基己酯",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "广州市白云区茜妃化妆品厂提出样品真实性异议。经广东省药品监督管理局审查，该企业提供虚假信息、隐瞒真实情况，虚假否认生产或者进口过该批次抽检不符合规定产品。",
+            "is_counterfeit": 1,
+            "manufacturer_name": "广州市白云区茜妃化妆品厂",
+            "manufacturer_address": "广州市白云区太和镇永兴石坑东街5号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州市白云区茜妃化妆品厂",
+                "address": "广州市白云区太和镇永兴石坑东街5号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "宁明县爱淘宝百货店",
+                "address": "广西壮族自治区崇左市宁明县城中镇中华街43号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 2,
+            "product_name": "茜妃隔离防晒乳SPF50PA+++",
+            "company_names": "广州市白云区茜妃化妆品厂",
+            "company_addresses": "广州市白云区太和镇永兴石坑东街5号",
+            "sample_unit_name": "罗定市壹号货仓超市有限公司五里桥店",
+            "sample_unit_address": "广东省云浮市罗定市罗城街道工业大道三路18号嘉达广场一层1010、1013、1018号商铺",
+            "package_spec": "50g",
+            "batch_no": "XF1118030524",
+            "production_date": "/",
+            "expiry_date": "2027/05/02",
+            "product_region": "广东",
+            "registration_no": "国妆特字G20201819",
+            "production_license_no": "粤妆20160199",
+            "inspection_institution": "广州市药品检验所",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：二苯酮-3、丁基甲氧基二苯甲酰基甲烷、甲氧基肉桂酸乙基己酯",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "广州市白云区茜妃化妆品厂提出样品真实性异议。经广东省药品监督管理局审查，该企业提供虚假信息、隐瞒真实情况，虚假否认生产或者进口过该批次抽检不符合规定产品。",
+            "is_counterfeit": 1,
+            "manufacturer_name": "广州市白云区茜妃化妆品厂",
+            "manufacturer_address": "广州市白云区太和镇永兴石坑东街5号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州市白云区茜妃化妆品厂",
+                "address": "广州市白云区太和镇永兴石坑东街5号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "罗定市壹号货仓超市有限公司五里桥店",
+                "address": "广东省云浮市罗定市罗城街道工业大道三路18号嘉达广场一层1010、1013、1018号商铺",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 3,
+            "product_name": "Ruila Feier DELIGHT MYSELF胶原蛋白发光面膜",
+            "company_names": "广东省古草集生物科技有限公司",
+            "company_addresses": "广州市花都区秀全街大布路17号慧妮工业园自编二期3栋",
+            "sample_unit_name": "红花岗区金鼎山镇靓丽美妆化妆品店",
+            "sample_unit_address": "贵州省遵义市红花岗区金鼎山镇玉石街49号",
+            "package_spec": "65g",
+            "batch_no": "20250303",
+            "production_date": "/",
+            "expiry_date": "2028/03/02",
+            "product_region": "广东",
+            "registration_no": "粤G妆网备字2025057538",
+            "production_license_no": "粤妆20210089",
+            "inspection_institution": "贵州省食品药品检验所",
+            "unqualified_items": "菌落总数",
+            "inspection_result": "1.7×105CFU/g",
+            "requirement": "≤1000CFU/g",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广东省古草集生物科技有限公司",
+            "manufacturer_address": "广州市花都区秀全街大布路17号慧妮工业园自编二期3栋",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广东省古草集生物科技有限公司",
+                "address": "广州市花都区秀全街大布路17号慧妮工业园自编二期3栋",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "红花岗区金鼎山镇靓丽美妆化妆品店",
+                "address": "贵州省遵义市红花岗区金鼎山镇玉石街49号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 4,
+            "product_name": "天峰本草护理染发霜M4",
+            "company_names": "注册人/生产企业：浙江章华保健美发实业有限公司",
+            "company_addresses": "注册人/生产企业：浙江省台州市黄岩区东城开发区龙浦路16号",
+            "sample_unit_name": "姑苏区天一骄美容美发用品商行",
+            "sample_unit_address": "江苏省苏州市姑苏区大竹园1号南侧1-2层",
+            "package_spec": "60ml+60ml",
+            "batch_no": "M4938011",
+            "production_date": "/",
+            "expiry_date": "20270721",
+            "product_region": "浙江",
+            "registration_no": "国妆特字G20212933",
+            "production_license_no": "浙妆20160040",
+            "inspection_institution": "江苏省药品监督检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "检出产品标签及注册资料载明的技术要求未标示的染发剂：间苯二酚",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": null,
+            "manufacturer_address": null,
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": "注册人/生产企业",
+                "name": "浙江章华保健美发实业有限公司",
+                "address": "浙江省台州市黄岩区东城开发区龙浦路16号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "姑苏区天一骄美容美发用品商行",
+                "address": "江苏省苏州市姑苏区大竹园1号南侧1-2层",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 5,
+            "product_name": "自诗堂美白隔离防晒霜SPF50+ PA+++",
+            "company_names": "广州奥琪生物科技有限公司",
+            "company_addresses": "广州市白云区钟落潭镇红旗路88号2栋501、601房（自主申报）",
+            "sample_unit_name": "鹤壁芝吻商贸有限公司，网店商铺名称：拼多多娆惑化妆品官方旗舰店",
+            "sample_unit_address": "河南省鹤壁市淇滨区黎阳路街道淇河路天泰建材市场二区27号",
+            "package_spec": "60g",
+            "batch_no": "AQ20240902F1",
+            "production_date": "/",
+            "expiry_date": "2027/09/01",
+            "product_region": "广东",
+            "registration_no": "国妆特字20242657",
+            "production_license_no": "粤妆20200005",
+            "inspection_institution": "河南省药品医疗器械检验院（河南省疫苗批签中心）",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：双-乙基己氧苯酚甲氧苯基三嗪、二乙氨羟苯甲酰基苯甲酸己酯、甲氧基肉桂酸乙基己酯、水杨酸乙基己酯、乙基己基三嗪酮、亚甲基双-苯并三唑基四甲基丁基酚",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州奥琪生物科技有限公司",
+            "manufacturer_address": "广州市白云区钟落潭镇红旗路88号2栋501、601房（自主申报）",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州奥琪生物科技有限公司",
+                "address": "广州市白云区钟落潭镇红旗路88号2栋501、601房（自主申报）",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "鹤壁芝吻商贸有限公司，网店商铺名称：拼多多娆惑化妆品官方旗舰店",
+                "address": "河南省鹤壁市淇滨区黎阳路街道淇河路天泰建材市场二区27号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 6,
+            "product_name": "自诗堂美白隔离防晒霜SPF50+ PA+++",
+            "company_names": "广州奥琪生物科技有限公司",
+            "company_addresses": "广州市白云区钟落潭镇红旗路88号2栋501、601房（自主申报）",
+            "sample_unit_name": "南宁市青秀区怡轩化妆品部（个体工商户），网店商铺名称：美团怡轩美妆",
+            "sample_unit_address": "广西壮族自治区南宁市青秀区金花路2号2号楼一单元三层132号",
+            "package_spec": "50g",
+            "batch_no": "2024/08/15",
+            "production_date": "/",
+            "expiry_date": "限期使用日期：2027/08/14，保质期：三年",
+            "product_region": "广东",
+            "registration_no": "国妆特字20242657",
+            "production_license_no": "粤妆20200005",
+            "inspection_institution": "广西壮族自治区药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：双-乙基己氧苯酚甲氧苯基三嗪、二乙氨羟苯甲酰基苯甲酸己酯、甲氧基肉桂酸乙基己酯、水杨酸乙基己酯、乙基己基三嗪酮、亚甲基双-苯并三唑基四甲基丁基酚",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州奥琪生物科技有限公司",
+            "manufacturer_address": "广州市白云区钟落潭镇红旗路88号2栋501、601房（自主申报）",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州奥琪生物科技有限公司",
+                "address": "广州市白云区钟落潭镇红旗路88号2栋501、601房（自主申报）",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "南宁市青秀区怡轩化妆品部（个体工商户），网店商铺名称：美团怡轩美妆",
+                "address": "广西壮族自治区南宁市青秀区金花路2号2号楼一单元三层132号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 7,
+            "product_name": "探色专研轻松染发剂02",
+            "company_names": "注册人/生产企业：佛山市喜妆化妆品有限公司；总经销商：探色化妆品（江苏）有限公司",
+            "company_addresses": "注册人/生产企业：佛山市三水区乐平镇西二环东辅道19号2座；总经销商：苏州市吴江区东太湖生态旅游度假区（太湖新城）迎宾大道333号融汇万金商务中心8号楼",
+            "sample_unit_name": "阿唐妮化妆品（苏州）有限公司，网店商铺名称：拼多多TOCU染发官方旗舰店",
+            "sample_unit_address": "江苏省苏州市吴江区东太湖生态旅游度假区（太湖新城）开平路3888号水秀天地生活广场15幢7楼",
+            "package_spec": "（1号剂10g+2号剂10g）/袋×10袋",
+            "batch_no": "X151021/X14C281",
+            "production_date": "/",
+            "expiry_date": "20271227",
+            "product_region": "广东",
+            "registration_no": "国妆特字202411385",
+            "production_license_no": "粤妆20170011",
+            "inspection_institution": "初检机构：江苏省药品监督检验研究院，复检机构：浙江省食品药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "检出产品标签及注册资料载明的技术要求未标示的染发剂：苯基甲基吡唑啉酮（复检结果）",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": null,
+            "manufacturer_address": null,
+            "operator_name": "探色化妆品（江苏）有限公司",
+            "operator_address": "苏州市吴江区东太湖生态旅游度假区（太湖新城）迎宾大道333号融汇万金商务中心8号楼",
+            "company_entries": [
+              {
+                "label": "注册人/生产企业",
+                "name": "佛山市喜妆化妆品有限公司",
+                "address": "佛山市三水区乐平镇西二环东辅道19号2座",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "总经销商",
+                "name": "探色化妆品（江苏）有限公司",
+                "address": "苏州市吴江区东太湖生态旅游度假区（太湖新城）迎宾大道333号融汇万金商务中心8号楼",
+                "type": "distributor",
+                "type_label": "经销商"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "阿唐妮化妆品（苏州）有限公司，网店商铺名称：拼多多TOCU染发官方旗舰店",
+                "address": "江苏省苏州市吴江区东太湖生态旅游度假区（太湖新城）开平路3888号水秀天地生活广场15幢7楼",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 8,
+            "product_name": "PVPV美白防晒隔离乳",
+            "company_names": "广州市唯纳化妆品有限公司",
+            "company_addresses": "广州市花都区花山镇两龙村育才东路11号",
+            "sample_unit_name": "初坤（绿春）生活用品馆（个人独资），网店商铺名称：淘宝大马猴精选美妆",
+            "sample_unit_address": "云南省红河哈尼族彝族自治州绿春县大兴镇街心花园原乡镇企业局办公楼3楼-10301号",
+            "package_spec": "30g",
+            "batch_no": "250102C1",
+            "production_date": "/",
+            "expiry_date": "2028/01/01",
+            "product_region": "广东",
+            "registration_no": "国妆特字20234418",
+            "production_license_no": "粤妆20170157",
+            "inspection_institution": "上海市食品药品检验研究院",
+            "unqualified_items": "甲氧基肉桂酸乙基己酯\n水杨酸乙基己酯\n苯基苯并咪唑磺酸\n双-乙基己氧苯酚甲氧苯基三嗪\n二乙氨羟苯甲酰基苯甲酸己酯\n乙基己基三嗪酮\n亚甲基双-苯并三唑基四甲基丁基酚",
+            "inspection_result": "0.398%\n0.330%\n0.194%\n0.203%\n0.242%\n0.186%\n0.163%",
+            "requirement": "6.558%-9.836%\n2.4%-3.6%\n2.4%-3.6%（以酸计）\n0.4%-0.6%\n1.76%-2.64%\n0.48%-0.72%\n0.594%-0.891%",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州市唯纳化妆品有限公司",
+            "manufacturer_address": "广州市花都区花山镇两龙村育才东路11号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州市唯纳化妆品有限公司",
+                "address": "广州市花都区花山镇两龙村育才东路11号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "初坤（绿春）生活用品馆（个人独资），网店商铺名称：淘宝大马猴精选美妆",
+                "address": "云南省红河哈尼族彝族自治州绿春县大兴镇街心花园原乡镇企业局办公楼3楼-10301号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 9,
+            "product_name": "圣薇娜染发膏77号（配合圣薇娜双氧乳6%使用）",
+            "company_names": "广东圣薇娜精细化工有限公司",
+            "company_addresses": "佛山市南海区狮山镇松夏工业园长盛路",
+            "sample_unit_name": "巴宜区八一镇白天鹅美容美发用品商行",
+            "sample_unit_address": "西藏自治区林芝市巴宜区八一镇八一大街345号",
+            "package_spec": "90g",
+            "batch_no": "2027110612",
+            "production_date": "/",
+            "expiry_date": "20261030",
+            "product_region": "广东",
+            "registration_no": "国妆特字G20202518",
+            "production_license_no": "粤妆20170011",
+            "inspection_institution": "天津市药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "检出产品标签及注册资料载明的技术要求未标示的染发剂：HC黄2号",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "佛山市喜妆化妆品有限公司",
+            "manufacturer_address": "佛山市三水区乐平镇西二环东辅道19号2座",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": "注册人",
+                "name": "广东圣薇娜精细化工有限公司",
+                "address": "佛山市南海区狮山镇松夏工业园长盛路",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "生产企业",
+                "name": "佛山市喜妆化妆品有限公司",
+                "address": "佛山市三水区乐平镇西二环东辅道19号2座",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "巴宜区八一镇白天鹅美容美发用品商行",
+                "address": "西藏自治区林芝市巴宜区八一镇八一大街345号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 10,
+            "product_name": "维美纳多重隔离美白防晒乳SPF50+ PA+++",
+            "company_names": "广州市唯纳化妆品有限公司",
+            "company_addresses": "广州市花都区花山镇两龙村育才东路11号",
+            "sample_unit_name": "南宁良庆区颜妍化妆品店",
+            "sample_unit_address": "广西壮族自治区南宁市良庆区公平街11号一楼",
+            "package_spec": "30g",
+            "batch_no": "250105C2",
+            "production_date": "/",
+            "expiry_date": "2028/01/04",
+            "product_region": "广东",
+            "registration_no": "国妆特字20247977",
+            "production_license_no": "粤妆20170157",
+            "inspection_institution": "广西壮族自治区药品检验研究院",
+            "unqualified_items": "双-乙基己氧苯酚甲氧苯基三嗪\n二乙氨羟苯甲酰基苯甲酸己酯\n甲氧基肉桂酸乙基己酯\n水杨酸乙基己酯\n乙基己基三嗪酮\n亚甲基双-苯并三唑基四甲基丁基酚\n苯基苯并咪唑磺酸",
+            "inspection_result": "检出，＜0.10%（最低定量浓度为0.10%）\n检出，＜0.21%（最低定量浓度为0.21%）\n0.33%\n0.25%\n0.090%\n0.10%\n0.19%",
+            "requirement": "0.4%-0.6%\n1.76%-2.64%\n6.558%-9.836%\n2.4%-3.6%\n0.48%-0.72%\n0.594%-0.891%\n2.4%-3.6%（以酸计）",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州市唯纳化妆品有限公司",
+            "manufacturer_address": "广州市花都区花山镇两龙村育才东路11号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州市唯纳化妆品有限公司",
+                "address": "广州市花都区花山镇两龙村育才东路11号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "南宁良庆区颜妍化妆品店",
+                "address": "广西壮族自治区南宁市良庆区公平街11号一楼",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 11,
+            "product_name": "Brimles泡泡染发剂（蓝色）",
+            "company_names": "生产企业：广州市奥采生物科技有限公司；总经销：广州市凌浩美妆用品有限公司",
+            "company_addresses": "生产企业：广州市白云区钟落潭镇长腰岭村石龙岗工业区10号D幢",
+            "sample_unit_name": "信州区金蕴美容美发用品商行",
+            "sample_unit_address": "江西省上饶市信州区站前路3号",
+            "package_spec": "100ML",
+            "batch_no": "/",
+            "production_date": "07/02/2023",
+            "expiry_date": "限期使用日期：06/02/2026，保质期：3年",
+            "product_region": "广东",
+            "registration_no": "国妆特字G20212620",
+            "production_license_no": "粤妆20180202",
+            "inspection_institution": "江西省药品检验检测研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "检出产品标签及注册资料载明的技术要求未标示的染发剂：2,6-二羟乙基氨甲苯、5-氨基-6-氯邻甲酚",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州市奥采生物科技有限公司",
+            "manufacturer_address": "广州市白云区钟落潭镇长腰岭村石龙岗工业区10号D幢",
+            "operator_name": "广州市凌浩美妆用品有限公司",
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": "生产企业",
+                "name": "广州市奥采生物科技有限公司",
+                "address": "广州市白云区钟落潭镇长腰岭村石龙岗工业区10号D幢",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "总经销",
+                "name": "广州市凌浩美妆用品有限公司",
+                "address": null,
+                "type": "distributor",
+                "type_label": "经销商"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "信州区金蕴美容美发用品商行",
+                "address": "江西省上饶市信州区站前路3号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 12,
+            "product_name": "迪悦朵防晒乳SPF50+PA+++",
+            "company_names": "广州名秀生物科技有限公司",
+            "company_addresses": "广州市白云区均禾街罗岗五社22号A栋、B栋1楼",
+            "sample_unit_name": "鹿寨县鹿寨镇金凤化妆品店",
+            "sample_unit_address": "广西壮族自治区柳州市鹿寨县鹿寨镇建中北路29号",
+            "package_spec": "60ml",
+            "batch_no": "DYD31015",
+            "production_date": "/",
+            "expiry_date": "2027/01/01",
+            "product_region": "广东",
+            "registration_no": "国妆特字20231057",
+            "production_license_no": "粤妆20190200",
+            "inspection_institution": "广西壮族自治区药品检验研究院",
+            "unqualified_items": "丁基甲氧基二苯甲酰基甲烷\n二乙氨羟苯甲酰基苯甲酸己酯\n甲氧基肉桂酸乙基己酯\n水杨酸乙基己酯\n乙基己基三嗪酮\n奥克立林",
+            "inspection_result": "检出，＜0.13%（最低定量浓度为0.13%）\n检出，＜0.21%（最低定量浓度为0.21%）\n检出，＜0.09%（最低定量浓度为0.09%）\n检出，＜0.24%（最低定量浓度为0.24%）\n检出，＜0.06%（最低定量浓度为0.06%）\n检出，＜0.20%（最低定量浓度为0.20%）",
+            "requirement": "2.4%（w/w）-3.6%（w/w）\n2.4%（w/w）-3.6%（w/w）\n7.2%（w/w）-10.0%（w/w）\n3.2%（w/w）-4.8%（w/w）\n3.2%（w/w）-4.8%（w/w）\n2.76%（w/w）-4.14%（w/w）（以酸计）",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州名秀生物科技有限公司",
+            "manufacturer_address": "广州市白云区均禾街罗岗五社22号A栋、B栋1楼",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州名秀生物科技有限公司",
+                "address": "广州市白云区均禾街罗岗五社22号A栋、B栋1楼",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "鹿寨县鹿寨镇金凤化妆品店",
+                "address": "广西壮族自治区柳州市鹿寨县鹿寨镇建中北路29号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 13,
+            "product_name": "首邦炫彩染发膏",
+            "company_names": "生产商：广州市白云区爱梦丝美发用品用具厂；总经销：广州首邦化妆品有限公司",
+            "company_addresses": "生产商：广州市白云区人和镇大巷村二社工业园6号",
+            "sample_unit_name": "莱州市平里店镇青丝秀化妆品店，网店商铺名称：淘宝正妆发品",
+            "sample_unit_address": "山东省烟台市莱州市平里店镇沟北王家村",
+            "package_spec": "500ml×2",
+            "batch_no": "2024/04/08",
+            "production_date": "/",
+            "expiry_date": "2027/04/07",
+            "product_region": "广东",
+            "registration_no": "国妆特字G20150855",
+            "production_license_no": "粤妆20161337",
+            "inspection_institution": "山东省食品药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "检出产品标签及注册资料载明的技术要求未标示的染发剂：间苯二酚",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州市白云区爱梦丝美发用品用具厂",
+            "manufacturer_address": "广州市白云区人和镇大巷村二社工业园6号",
+            "operator_name": "广州首邦化妆品有限公司",
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": "生产商",
+                "name": "广州市白云区爱梦丝美发用品用具厂",
+                "address": "广州市白云区人和镇大巷村二社工业园6号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "总经销",
+                "name": "广州首邦化妆品有限公司",
+                "address": null,
+                "type": "distributor",
+                "type_label": "经销商"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "莱州市平里店镇青丝秀化妆品店，网店商铺名称：淘宝正妆发品",
+                "address": "山东省烟台市莱州市平里店镇沟北王家村",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 14,
+            "product_name": "卡莉莱美白隔离防晒乳 SPF50+PA+++",
+            "company_names": "注册人/生产企业：广州俪妍化妆品技术有限公司",
+            "company_addresses": "注册人/生产企业：广州市白云区人和镇鹤亭工业区南一路1号（自主申报）",
+            "sample_unit_name": "南宁良庆区颜妍化妆品店",
+            "sample_unit_address": "广西壮族自治区南宁市良庆区公平街11号一楼",
+            "package_spec": "30g",
+            "batch_no": "2025011202",
+            "production_date": "/",
+            "expiry_date": "20280111",
+            "product_region": "广东",
+            "registration_no": "国妆特字20240100",
+            "production_license_no": "粤妆20190116",
+            "inspection_institution": "广西壮族自治区药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：水杨酸乙基己酯、亚甲基双-苯并三唑基四甲基丁基酚",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": null,
+            "manufacturer_address": null,
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": "注册人/生产企业",
+                "name": "广州俪妍化妆品技术有限公司",
+                "address": "广州市白云区人和镇鹤亭工业区南一路1号（自主申报）",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "南宁良庆区颜妍化妆品店",
+                "address": "广西壮族自治区南宁市良庆区公平街11号一楼",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 15,
+            "product_name": "彰彩焗油染发霜 棕黑色",
+            "company_names": "广州彰彩保健化妆品有限公司",
+            "company_addresses": "广州市白云区白云湖街夏茅村十六社工业区3栋4楼",
+            "sample_unit_name": "古塔区诗美美发用品商行",
+            "sample_unit_address": "辽宁省锦州市古塔区上海路三段64号",
+            "package_spec": "80ml×2",
+            "batch_no": "ZC2024110306",
+            "production_date": "/",
+            "expiry_date": "限期使用日期：2027/11/02，保质期：三年",
+            "product_region": "广东",
+            "registration_no": "国妆特字20223251",
+            "production_license_no": "粤妆20160245",
+            "inspection_institution": "辽宁省药品检验检测院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "检出产品标签及注册资料载明的技术要求未标示的染发剂：N,N-双(2-羟乙基)对苯二胺硫酸盐",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州彰彩保健化妆品有限公司",
+            "manufacturer_address": "广州市白云区白云湖街夏茅村十六社工业区3栋4楼",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州彰彩保健化妆品有限公司",
+                "address": "广州市白云区白云湖街夏茅村十六社工业区3栋4楼",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "古塔区诗美美发用品商行",
+                "address": "辽宁省锦州市古塔区上海路三段64号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 16,
+            "product_name": "花萃肌密美白防晒霜SPF50+PA+++",
+            "company_names": "广州市臣采日化有限公司",
+            "company_addresses": "广州市白云区均禾街罗岗村织罗村路45号",
+            "sample_unit_name": "深圳市雪儿生物科技有限公司，网店商铺名称：天猫美美的天空旗舰店",
+            "sample_unit_address": "广东省深圳市龙岗区坂田街道新雪社区上雪科技城北区11号C1栋厂房402",
+            "package_spec": "200g",
+            "batch_no": "HCJM65547",
+            "production_date": "/",
+            "expiry_date": "2028/04/20",
+            "product_region": "广东",
+            "registration_no": "国妆特字20241391",
+            "production_license_no": "粤妆20161348",
+            "inspection_institution": "广州市药品检验所",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：丁基甲氧基二苯甲酰基甲烷、奥克立林、甲氧基肉桂酸乙基己酯、水杨酸乙基己酯、苯基苯并咪唑磺酸",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州市臣采日化有限公司",
+            "manufacturer_address": "广州市白云区均禾街罗岗村织罗村路45号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州市臣采日化有限公司",
+                "address": "广州市白云区均禾街罗岗村织罗村路45号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "深圳市雪儿生物科技有限公司，网店商铺名称：天猫美美的天空旗舰店",
+                "address": "广东省深圳市龙岗区坂田街道新雪社区上雪科技城北区11号C1栋厂房402",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 17,
+            "product_name": "秀色独艳染发膏（栗棕）",
+            "company_names": "广东大展生物医药科技有限公司",
+            "company_addresses": "佛山市三水区大塘镇三水中心科技工业区大塘园A区52-1号",
+            "sample_unit_name": "柳城县青寒家纺经营部（个人独资），网店商铺名称：淘宝美欣护肤小店",
+            "sample_unit_address": "广西壮族自治区柳州市柳城县大埔镇柳城县农村电子商务物流中心办公楼3-81室001号（柳城县工业园河西片区）",
+            "package_spec": "500ml×2",
+            "batch_no": "DZP250207",
+            "production_date": "2025/02/07",
+            "expiry_date": "限期使用日期：2028/02/06，保质期：三年",
+            "product_region": "广东",
+            "registration_no": "国妆特字20231849",
+            "production_license_no": "粤妆20210336",
+            "inspection_institution": "浙江省食品药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "检出产品标签及注册资料载明的技术要求未标示的染发剂：1-萘酚",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广东大展生物医药科技有限公司",
+            "manufacturer_address": "佛山市三水区大塘镇三水中心科技工业区大塘园A区52-1号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广东大展生物医药科技有限公司",
+                "address": "佛山市三水区大塘镇三水中心科技工业区大塘园A区52-1号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "柳城县青寒家纺经营部（个人独资），网店商铺名称：淘宝美欣护肤小店",
+                "address": "广西壮族自治区柳州市柳城县大埔镇柳城县农村电子商务物流中心办公楼3-81室001号（柳城县工业园河西片区）",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 18,
+            "product_name": "雪贝雅隔离防晒乳SPF50+PA+++",
+            "company_names": "广州翌美化妆品有限公司",
+            "company_addresses": "广州市白云区机场路1438-2号正阳大厦8楼K413房",
+            "sample_unit_name": "广州市天汇百货有限公司榄核分公司",
+            "sample_unit_address": "广东省广州市南沙区榄核镇民生路69号",
+            "package_spec": "40g",
+            "batch_no": "2024/03/29",
+            "production_date": "/",
+            "expiry_date": "2027/03/28",
+            "product_region": "广东",
+            "registration_no": "国妆特字20240001",
+            "production_license_no": "粤妆20161461",
+            "inspection_institution": "广州市药品检验所",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：奥克立林、甲氧基肉桂酸乙基己酯、水杨酸乙基己酯",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州市如馨化妆品有限公司",
+            "manufacturer_address": "广州市白云区良田北路9号3栋301室，3栋401室",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": "注册人",
+                "name": "广州翌美化妆品有限公司",
+                "address": "广州市白云区机场路1438-2号正阳大厦8楼K413房",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "生产企业",
+                "name": "广州市如馨化妆品有限公司",
+                "address": "广州市白云区良田北路9号3栋301室，3栋401室",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "广州市天汇百货有限公司榄核分公司",
+                "address": "广东省广州市南沙区榄核镇民生路69号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 19,
+            "product_name": "金皇女染发膏-黄色",
+            "company_names": "广州市中粤大圣化妆品有限公司",
+            "company_addresses": "广州市白云区嘉禾街长红村长湴大街251号",
+            "sample_unit_name": "三明市梅列区利民日用品商行",
+            "sample_unit_address": "福建省三明市三元区列东街97号",
+            "package_spec": "22克×2",
+            "batch_no": "P1231011A01CP21",
+            "production_date": "/",
+            "expiry_date": "限期使用日期：2026/10/10，保质期：三年",
+            "product_region": "广东",
+            "registration_no": "国妆特字G20190335",
+            "production_license_no": "粤妆20170042",
+            "inspection_institution": "福建省食品药品质量检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "检出产品标签及注册资料载明的技术要求未标示的染发剂：HC黄2号",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州市中粤大圣化妆品有限公司",
+            "manufacturer_address": "广州市白云区嘉禾街长红村长湴大街251号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州市中粤大圣化妆品有限公司",
+                "address": "广州市白云区嘉禾街长红村长湴大街251号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "三明市梅列区利民日用品商行",
+                "address": "福建省三明市三元区列东街97号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 20,
+            "product_name": "琪瑟水润倍护隔离防晒乳 SPF50+",
+            "company_names": "广州市盛好佳化妆品有限公司",
+            "company_addresses": "广州市白云区石井街夏茅村第十一经济合作社（土名：山草拢）地段64栋一、二、三、四、五层",
+            "sample_unit_name": "梁溪柠萌家化妆品店，网店商铺名称：抖音商城柠檬家美妆个护",
+            "sample_unit_address": "淘宝平台：https://shop216402607.taobao.com",
+            "package_spec": "40g",
+            "batch_no": "20240309",
+            "production_date": "/",
+            "expiry_date": "20270308",
+            "product_region": "广东",
+            "registration_no": "国妆特字20233279",
+            "production_license_no": "粤妆20161057",
+            "inspection_institution": "江苏省药品监督检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：双-乙基己氧苯酚甲氧苯基三嗪、二乙氨羟苯甲酰基苯甲酸己酯、甲氧基肉桂酸乙基己酯、水杨酸乙基己酯、乙基己基三嗪酮、亚甲基双-苯并三唑基四甲基丁基酚、苯基苯并咪唑磺酸",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州市盛好佳化妆品有限公司",
+            "manufacturer_address": "广州市白云区石井街夏茅村第十一经济合作社（土名：山草拢）地段64栋一、二、三、四、五层",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州市盛好佳化妆品有限公司",
+                "address": "广州市白云区石井街夏茅村第十一经济合作社（土名：山草拢）地段64栋一、二、三、四、五层",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "梁溪柠萌家化妆品店，网店商铺名称：抖音商城柠檬家美妆个护",
+                "address": "淘宝平台：https://shop216402607.taobao.com",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 21,
+            "product_name": "绘染晊美染发膏7.7（配合绘染晊美双氧乳6%使用）",
+            "company_names": "佛山市喜妆化妆品有限公司",
+            "company_addresses": "佛山市三水区乐平镇西二环东辅道19号2座",
+            "sample_unit_name": "北京名秀美场美容美发有限公司",
+            "sample_unit_address": "北京市顺义区前进花园玉兰苑甲1号楼1层101内F1-038",
+            "package_spec": "90g",
+            "batch_no": "24022811",
+            "production_date": "/",
+            "expiry_date": "20280227",
+            "product_region": "广东",
+            "registration_no": "国妆特字20230793",
+            "production_license_no": "粤妆20170011",
+            "inspection_institution": "北京市药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "检出产品标签及注册资料载明的技术要求未标示的染发剂：HC黄2号",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "佛山市喜妆化妆品有限公司",
+            "manufacturer_address": "佛山市三水区乐平镇西二环东辅道19号2座",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "佛山市喜妆化妆品有限公司",
+                "address": "佛山市三水区乐平镇西二环东辅道19号2座",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "北京名秀美场美容美发有限公司",
+                "address": "北京市顺义区前进花园玉兰苑甲1号楼1层101内F1-038",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 22,
+            "product_name": "TJE防晒隔离霜SPF50+PA+++",
+            "company_names": "广州市合盛化妆品有限公司",
+            "company_addresses": "广州市白云区罗岗村新星工业区1号",
+            "sample_unit_name": "广州市鹏发电子商务有限公司，网店商铺名称：饷店TJE",
+            "sample_unit_address": "广东省广州市白云区云城街齐富路34号505室",
+            "package_spec": "45g",
+            "batch_no": "23C24A46",
+            "production_date": "/",
+            "expiry_date": "20260323",
+            "product_region": "广东",
+            "registration_no": "国妆特字20230399",
+            "production_license_no": "粤妆20160522",
+            "inspection_institution": "上海市食品药品检验研究院",
+            "unqualified_items": "苯基苯并咪唑磺酸\n二乙氨羟苯甲酰基苯甲酸己酯",
+            "inspection_result": "2.17%\n0.502%",
+            "requirement": "3.20%-4.80%（以酸计）\n0.80%-1.20%",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州市合盛化妆品有限公司",
+            "manufacturer_address": "广州市白云区罗岗村新星工业区1号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州市合盛化妆品有限公司",
+                "address": "广州市白云区罗岗村新星工业区1号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "广州市鹏发电子商务有限公司，网店商铺名称：饷店TJE",
+                "address": "广东省广州市白云区云城街齐富路34号505室",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 23,
+            "product_name": "澜之诺防晒霜SPF50+PA+++",
+            "company_names": "广东省古草集生物科技有限公司",
+            "company_addresses": "广州市花都区秀全街大布路17号慧妮工业园自编二期3栋",
+            "sample_unit_name": "上海秋美贵贸易商行（个人独资），网店商铺名称：阿里巴巴（1688）上海秋美贵贸易商行",
+            "sample_unit_address": "上海市嘉定区静塘路988号2幢J",
+            "package_spec": "50g",
+            "batch_no": "HMS25022001D",
+            "production_date": "/",
+            "expiry_date": "20280219",
+            "product_region": "广东",
+            "registration_no": "国妆特字20241587",
+            "production_license_no": "粤妆20210089",
+            "inspection_institution": "上海市食品药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：双-乙基己氧苯酚甲氧苯基三嗪、二乙氨羟苯甲酰基苯甲酸己酯、甲氧基肉桂酸乙基己酯、水杨酸乙基己酯、乙基己基三嗪酮、亚甲基双-苯并三唑基四甲基丁基酚、苯基苯并咪唑磺酸",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广东省古草集生物科技有限公司",
+            "manufacturer_address": "广州市花都区秀全街大布路17号慧妮工业园自编二期3栋",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广东省古草集生物科技有限公司",
+                "address": "广州市花都区秀全街大布路17号慧妮工业园自编二期3栋",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "上海秋美贵贸易商行（个人独资），网店商铺名称：阿里巴巴（1688）上海秋美贵贸易商行",
+                "address": "上海市嘉定区静塘路988号2幢J",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 24,
+            "product_name": "花依林滋润柔顺洗发露",
+            "company_names": "广州市慧藤日用品有限公司",
+            "company_addresses": "广州市白云区均禾街七星岗路44号之三凯盈国际科技园402",
+            "sample_unit_name": "西安蓝溪科技企业（集团）有限责任公司",
+            "sample_unit_address": "陕西省西安市高新区高新四路高新九号3号楼",
+            "package_spec": "300ml",
+            "batch_no": "2023-09-15",
+            "production_date": "/",
+            "expiry_date": "2026-09-14",
+            "product_region": "广东",
+            "registration_no": "粤G妆网备字2022317166",
+            "production_license_no": "粤妆20161403",
+            "inspection_institution": "陕西省食品药品检验研究院",
+            "unqualified_items": "甲基氯异噻唑啉酮和甲基异噻唑啉酮与氯化镁及硝酸镁的混合物（甲基氯异噻唑啉酮:甲基异噻唑啉酮为3:1）",
+            "inspection_result": "0.0020%",
+            "requirement": "≤0.0015%",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州雅太兰化妆品有限公司",
+            "manufacturer_address": "广州市白云区望岗工业区三路25号1栋102号、202号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": "备案人",
+                "name": "广州市慧藤日用品有限公司",
+                "address": "广州市白云区均禾街七星岗路44号之三凯盈国际科技园402",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "生产企业",
+                "name": "广州雅太兰化妆品有限公司",
+                "address": "广州市白云区望岗工业区三路25号1栋102号、202号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "西安蓝溪科技企业（集团）有限责任公司",
+                "address": "陕西省西安市高新区高新四路高新九号3号楼",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 25,
+            "product_name": "BABI水感美白防晒喷雾SPF50 PA+++",
+            "company_names": "珠海市聚力生物科技有限公司",
+            "company_addresses": "珠海市金湾区红旗镇虹晖二路北侧568号",
+            "sample_unit_name": "青山湖区嘉美化妆品店（个体工商户）",
+            "sample_unit_address": "江西省南昌市青山湖区京东安居小区G组团6栋3单元101室",
+            "package_spec": "150ml",
+            "batch_no": "2024.05.25.02",
+            "production_date": "/",
+            "expiry_date": "2027.05.24",
+            "product_region": "广东",
+            "registration_no": "国妆特字20233359",
+            "production_license_no": "粤妆20180096",
+            "inspection_institution": "江西省药品检验检测研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：二乙氨羟苯甲酰基苯甲酸己酯、水杨酸乙基己酯、乙基己基三嗪酮、亚甲基双-苯并三唑基四甲基丁基酚、奥克立林",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "珠海市聚力生物科技有限公司",
+            "manufacturer_address": "珠海市金湾区红旗镇虹晖二路北侧568号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "珠海市聚力生物科技有限公司",
+                "address": "珠海市金湾区红旗镇虹晖二路北侧568号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "青山湖区嘉美化妆品店（个体工商户）",
+                "address": "江西省南昌市青山湖区京东安居小区G组团6栋3单元101室",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 26,
+            "product_name": "荣凯洗发液",
+            "company_names": "扬州新雅琪日用品有限公司",
+            "company_addresses": "扬州市杭集工业园通洲路创业园2-9",
+            "sample_unit_name": "会昌县文武坝中华旅馆",
+            "sample_unit_address": "江西省赣州市会昌县文武坝镇南外街",
+            "package_spec": "8ml",
+            "batch_no": "/",
+            "production_date": "20240203",
+            "expiry_date": "2年",
+            "product_region": "江苏",
+            "registration_no": "苏G妆网备字2022002598",
+            "production_license_no": "苏妆20160217",
+            "inspection_institution": "江西省药品检验检测研究院",
+            "unqualified_items": "甲基氯异噻唑啉酮和甲基异噻唑啉酮与氯化镁及硝酸镁的混合物（甲基氯异噻唑啉酮:甲基异噻唑啉酮为3:1）",
+            "inspection_result": "0.00239%",
+            "requirement": "≤0.0015%",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "扬州新雅琪日用品有限公司",
+            "manufacturer_address": "扬州市杭集工业园通洲路创业园2-9",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "扬州新雅琪日用品有限公司",
+                "address": "扬州市杭集工业园通洲路创业园2-9",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "会昌县文武坝中华旅馆",
+                "address": "江西省赣州市会昌县文武坝镇南外街",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 27,
+            "product_name": "CYCY焕颜隔离防晒霜",
+            "company_names": "广州昕雅生物科技有限公司",
+            "company_addresses": "广州市白云区钟落潭镇良园三横路3号之一第3层",
+            "sample_unit_name": "鹤壁市淇滨区鼎级商贸有限公司，网店商铺名称：拼多多芊汶美容个护旗舰店",
+            "sample_unit_address": "河南省鹤壁市淇滨区泰山办事处黄河路世纪广场商业街东区35号",
+            "package_spec": "50g",
+            "batch_no": "2024/01/20",
+            "production_date": "/",
+            "expiry_date": "限期使用日期：2027/01/19，保质期：三年",
+            "product_region": "广东",
+            "registration_no": "国妆特字20232444",
+            "production_license_no": "粤妆20210186",
+            "inspection_institution": "河南省药品医疗器械检验院（河南省疫苗批签中心）",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：乙基己基三嗪酮、苯基苯并咪唑磺酸",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州昕雅生物科技有限公司",
+            "manufacturer_address": "广州市白云区钟落潭镇良园三横路3号之一第3层",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州昕雅生物科技有限公司",
+                "address": "广州市白云区钟落潭镇良园三横路3号之一第3层",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "鹤壁市淇滨区鼎级商贸有限公司，网店商铺名称：拼多多芊汶美容个护旗舰店",
+                "address": "河南省鹤壁市淇滨区泰山办事处黄河路世纪广场商业街东区35号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 28,
+            "product_name": "丝絮珠光沐浴露",
+            "company_names": "扬州华士达日化有限公司",
+            "company_addresses": "扬州市生态科技新城杭集兴园路产业园2-12号",
+            "sample_unit_name": "怀安宏升大酒店有限公司",
+            "sample_unit_address": "河北省张家口市怀安县柴沟堡镇振兴大街北文苑路东转角处",
+            "package_spec": "20ml",
+            "batch_no": "HSD240928",
+            "production_date": "/",
+            "expiry_date": "2027.09.27",
+            "product_region": "江苏",
+            "registration_no": "苏G妆网备字2023003481",
+            "production_license_no": "苏妆20160102",
+            "inspection_institution": "河北省药品医疗器械检验研究院",
+            "unqualified_items": "菌落总数",
+            "inspection_result": "6.9×105CFU/g",
+            "requirement": "≤1000CFU/g",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "扬州华士达日化有限公司",
+            "manufacturer_address": "扬州市生态科技新城杭集兴园路产业园2-12号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "扬州华士达日化有限公司",
+                "address": "扬州市生态科技新城杭集兴园路产业园2-12号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "怀安宏升大酒店有限公司",
+                "address": "河北省张家口市怀安县柴沟堡镇振兴大街北文苑路东转角处",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 29,
+            "product_name": "润可盈防晒乳SPF50+PA+++",
+            "company_names": "广东全力医药科技有限公司",
+            "company_addresses": "广州市花都区金田路3号",
+            "sample_unit_name": "江达县诚信日化",
+            "sample_unit_address": "西藏自治区昌都市江达县幸福街8-2号",
+            "package_spec": "50g",
+            "batch_no": "QL20230630/01",
+            "production_date": "/",
+            "expiry_date": "2026/06/29",
+            "product_region": "广东",
+            "registration_no": "国妆特字20221584",
+            "production_license_no": "粤妆20200203",
+            "inspection_institution": "西藏自治区食品药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：双-乙基己氧苯酚甲氧苯基三嗪、二乙氨羟苯甲酰基苯甲酸己酯、甲氧基肉桂酸乙基己酯、乙基己基三嗪酮、亚甲基双-苯并三唑基四甲基丁基酚、苯基苯并咪唑磺酸",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广东全力医药科技有限公司",
+            "manufacturer_address": "广州市花都区金田路3号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广东全力医药科技有限公司",
+                "address": "广州市花都区金田路3号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "江达县诚信日化",
+                "address": "西藏自治区昌都市江达县幸福街8-2号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 30,
+            "product_name": "妍芳之花沐浴露",
+            "company_names": "扬州荣芳化妆日用品厂",
+            "company_addresses": "扬州市杭集镇利民路10号",
+            "sample_unit_name": "甘肃佳冠金阳国际酒店管理有限公司",
+            "sample_unit_address": "甘肃省张掖市甘州区西街街道西环路299号金阳大厦3-6层",
+            "package_spec": "25ml",
+            "batch_no": "/",
+            "production_date": "2024/06/22",
+            "expiry_date": "二年",
+            "product_region": "江苏",
+            "registration_no": "苏G妆网备字2022002386",
+            "production_license_no": "苏妆20160226",
+            "inspection_institution": "甘肃省药品检验研究院",
+            "unqualified_items": "菌落总数",
+            "inspection_result": "340000CFU/mL",
+            "requirement": "≤1000CFU/mL",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "扬州荣芳化妆日用品厂",
+            "manufacturer_address": "扬州市杭集镇利民路10号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "扬州荣芳化妆日用品厂",
+                "address": "扬州市杭集镇利民路10号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "甘肃佳冠金阳国际酒店管理有限公司",
+                "address": "甘肃省张掖市甘州区西街街道西环路299号金阳大厦3-6层",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 31,
+            "product_name": "TITIAN缇田美白隔离防晒乳SPF50PA+++",
+            "company_names": "广州市壹佰雅化妆品有限公司",
+            "company_addresses": "广州市白云区人和镇蚌湖中心村一街27号1楼、2楼",
+            "sample_unit_name": "厦门碧乐薇贸易有限公司，网店商铺名称：天猫薇薇妍社旗舰店",
+            "sample_unit_address": "福建省厦门市湖里区悦华路168号408室",
+            "package_spec": "50ml",
+            "batch_no": "YBY20250305",
+            "production_date": "/",
+            "expiry_date": "20280304",
+            "product_region": "广东",
+            "registration_no": "国妆特字20251660",
+            "production_license_no": "粤妆20170018",
+            "inspection_institution": "福建省食品药品质量检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：二乙氨羟苯甲酰基苯甲酸己酯、甲氧基肉桂酸乙基己酯、水杨酸乙基己酯、乙基己基三嗪酮",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州市壹佰雅化妆品有限公司",
+            "manufacturer_address": "广州市白云区人和镇蚌湖中心村一街27号1楼、2楼",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州市壹佰雅化妆品有限公司",
+                "address": "广州市白云区人和镇蚌湖中心村一街27号1楼、2楼",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "厦门碧乐薇贸易有限公司，网店商铺名称：天猫薇薇妍社旗舰店",
+                "address": "福建省厦门市湖里区悦华路168号408室",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 32,
+            "product_name": "Bety&Clov贝茵希光感轻盈防晒乳SPF50 PA+++",
+            "company_names": "珠海市厚生药业有限公司",
+            "company_addresses": "珠海市金湾区红旗镇双林东路3号2栋2层",
+            "sample_unit_name": "厦门市集美区美界百货店（个体工商户）",
+            "sample_unit_address": "福建省厦门市集美区杏林街道杏锦路163-114、115号",
+            "package_spec": "40g",
+            "batch_no": "25022001",
+            "production_date": "/",
+            "expiry_date": "20280219",
+            "product_region": "广东",
+            "registration_no": "国妆特字20248286",
+            "production_license_no": "粤妆20210206",
+            "inspection_institution": "初检机构：福建省食品药品质量检验研究院，复检机构：河北省药品医疗器械检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "检出产品标签及注册资料载明的技术要求未标示的防晒剂：奥克立林（复检结果）",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "珠海市厚生药业有限公司",
+            "manufacturer_address": "珠海市金湾区红旗镇双林东路3号2栋2层",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "珠海市厚生药业有限公司",
+                "address": "珠海市金湾区红旗镇双林东路3号2栋2层",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "厦门市集美区美界百货店（个体工商户）",
+                "address": "福建省厦门市集美区杏林街道杏锦路163-114、115号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 33,
+            "product_name": "CALMANY清透持妆防晒隔离乳",
+            "company_names": "广州家亿生物科技有限公司",
+            "company_addresses": "广州市白云区人和镇人汉公路188号A1栋1-3楼",
+            "sample_unit_name": "小额经营者：乔聪玲，网店商铺名称：拼多多佳洋美妆店",
+            "sample_unit_address": "宁夏回族自治区银川市兴庆区银川商场一楼",
+            "package_spec": "30ml",
+            "batch_no": "2024/01/05",
+            "production_date": "/",
+            "expiry_date": "2027/01/04",
+            "product_region": "广东",
+            "registration_no": "国妆特字20233843",
+            "production_license_no": "粤妆20220010",
+            "inspection_institution": "天津市药品检验研究院",
+            "unqualified_items": "成分比对",
+            "inspection_result": "未检出产品标签及注册资料载明的技术要求标示的防晒剂：双-乙基己氧苯酚甲氧苯基三嗪、甲氧基肉桂酸乙基己酯、亚甲基双-苯并三唑基四甲基丁基酚、奥克立林",
+            "requirement": "产品检出成分、产品标签应当与该产品注册资料载明的技术要求一致",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广州家亿生物科技有限公司",
+            "manufacturer_address": "广州市白云区人和镇人汉公路188号A1栋1-3楼",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广州家亿生物科技有限公司",
+                "address": "广州市白云区人和镇人汉公路188号A1栋1-3楼",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "小额经营者：乔聪玲，网店商铺名称：拼多多佳洋美妆店",
+                "address": "宁夏回族自治区银川市兴庆区银川商场一楼",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 34,
+            "product_name": "ODSE奇焕精油多效发膜",
+            "company_names": "广东省古草集生物科技有限公司",
+            "company_addresses": "广州市花都区秀全街大布路17号慧妮工业园自编二期3栋",
+            "sample_unit_name": "广州半桃化妆品有限公司，网店商铺名称：天猫EKBK旗舰店",
+            "sample_unit_address": "广东省广州市天河区迎新路6号1栋401室-E786",
+            "package_spec": "400g",
+            "batch_no": "/",
+            "production_date": "2025/02/11",
+            "expiry_date": "2028/02/10",
+            "product_region": "广东",
+            "registration_no": "粤G妆网备字2023165843",
+            "production_license_no": "粤妆20210089",
+            "inspection_institution": "浙江省食品药品检验研究院",
+            "unqualified_items": "菌落总数\n霉菌和酵母菌总数",
+            "inspection_result": "650000CFU/g\n650CFU/g",
+            "requirement": "≤1000CFU/g\n≤100CFU/g",
+            "remarks": "/",
+            "is_counterfeit": 0,
+            "manufacturer_name": "广东省古草集生物科技有限公司",
+            "manufacturer_address": "广州市花都区秀全街大布路17号慧妮工业园自编二期3栋",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "广东省古草集生物科技有限公司",
+                "address": "广州市花都区秀全街大布路17号慧妮工业园自编二期3栋",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "广州半桃化妆品有限公司，网店商铺名称：天猫EKBK旗舰店",
+                "address": "广东省广州市天河区迎新路6号1栋401室-E786",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 35,
+            "product_name": "蓝荀LANXUN去烟渍牙膏",
+            "company_names": "广州市轩杨日化有限公司",
+            "company_addresses": "广州市黄埔区开创大道728号自编3栋5层507房B284室",
+            "sample_unit_name": "生态科技新城奇磊百货商行（个体工商户），网店商铺名称：阿里巴巴（1688）生态科技新城奇磊百货商行",
+            "sample_unit_address": "江苏省扬州市生态科技新城杭集镇杭府街319-5号",
+            "package_spec": "100g",
+            "batch_no": "2025/04/08",
+            "production_date": "/",
+            "expiry_date": "2028/04/07",
+            "product_region": "广东",
+            "registration_no": "粤国牙膏网备字2025707530",
+            "production_license_no": "粤妆20220307",
+            "inspection_institution": "淮安市食品药品检验所",
+            "unqualified_items": "菌落总数",
+            "inspection_result": "3.2×106CFU/g",
+            "requirement": "≤500CFU/g",
+            "remarks": "以下批次抽检不符合规定化妆品涉嫌假冒，相关异议审查情况见备注列。",
+            "is_counterfeit": 1,
+            "manufacturer_name": "邦健口腔用品（佛山）有限公司",
+            "manufacturer_address": "佛山市南海区里水镇麻奢村麻石路东隅工业区14号B栋4楼",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": "备案人",
+                "name": "广州市轩杨日化有限公司",
+                "address": "广州市黄埔区开创大道728号自编3栋5层507房B284室",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "生产企业",
+                "name": "邦健口腔用品（佛山）有限公司",
+                "address": "佛山市南海区里水镇麻奢村麻石路东隅工业区14号B栋4楼",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "生态科技新城奇磊百货商行（个体工商户），网店商铺名称：阿里巴巴（1688）生态科技新城奇磊百货商行",
+                "address": "江苏省扬州市生态科技新城杭集镇杭府街319-5号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 36,
+            "product_name": "怡人雅护发素",
+            "company_names": "扬州奇丽化妆品有限公司",
+            "company_addresses": "江苏省扬州市杭集工业园伟业路13号",
+            "sample_unit_name": "安徽帅旺五洲酒店有限公司",
+            "sample_unit_address": "安徽省六安市舒城县经济技术开发区鼓楼北街166号",
+            "package_spec": "30ml",
+            "batch_no": "/",
+            "production_date": "2023年11月15日",
+            "expiry_date": "三年",
+            "product_region": "江苏",
+            "registration_no": "苏G妆网备字2023002266",
+            "production_license_no": "苏妆20220044",
+            "inspection_institution": "安徽省食品药品检验研究院",
+            "unqualified_items": "菌落总数\n霉菌和酵母菌总数",
+            "inspection_result": "2.6×105CFU/g\n5.5×103CFU/g",
+            "requirement": "≤1000CFU/g\n≤100CFU/g",
+            "remarks": "扬州奇丽化妆品有限公司提出样品真实性异议。经江苏省药品监督管理局审查，该企业未生产或者进口过该批次抽检不符合规定产品。",
+            "is_counterfeit": 1,
+            "manufacturer_name": "扬州奇丽化妆品有限公司",
+            "manufacturer_address": "江苏省扬州市杭集工业园伟业路13号",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "扬州奇丽化妆品有限公司",
+                "address": "江苏省扬州市杭集工业园伟业路13号",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "安徽帅旺五洲酒店有限公司",
+                "address": "安徽省六安市舒城县经济技术开发区鼓楼北街166号",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 37,
+            "product_name": "Yonlheei尹熙洗发露",
+            "company_names": "扬州市德之馨化妆品厂",
+            "company_addresses": "扬州市杭集镇创业园",
+            "sample_unit_name": "新余高新区天龙商务酒店",
+            "sample_unit_address": "江西省新余市高新区龙潭洲北二横",
+            "package_spec": "8ml",
+            "batch_no": "/",
+            "production_date": "20240701",
+            "expiry_date": "2年",
+            "product_region": "江苏",
+            "registration_no": "苏G妆网备字2024002051",
+            "production_license_no": "苏妆20160105",
+            "inspection_institution": "江西省药品检验检测研究院",
+            "unqualified_items": "甲基氯异噻唑啉酮和甲基异噻唑啉酮与氯化镁及硝酸镁的混合物（甲基氯异噻唑啉酮:甲基异噻唑啉酮为3:1）",
+            "inspection_result": "0.00207%",
+            "requirement": "≤0.0015%",
+            "remarks": "扬州市德之馨化妆品厂提出样品真实性异议。经江苏省药品监督管理局审查，该企业未生产或者进口过该批次抽检不符合规定产品。",
+            "is_counterfeit": 1,
+            "manufacturer_name": "扬州市德之馨化妆品厂",
+            "manufacturer_address": "扬州市杭集镇创业园",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "扬州市德之馨化妆品厂",
+                "address": "扬州市杭集镇创业园",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "新余高新区天龙商务酒店",
+                "address": "江西省新余市高新区龙潭洲北二横",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 38,
+            "product_name": "VEARLSULL花速洗发液",
+            "company_names": "扬州市德之馨化妆品厂",
+            "company_addresses": "扬州市杭集镇创业园",
+            "sample_unit_name": "汉中明珠商务酒店有限公司",
+            "sample_unit_address": "陕西省汉中市汉台区明珠路",
+            "package_spec": "8ml",
+            "batch_no": "/",
+            "production_date": "20240506",
+            "expiry_date": "2年",
+            "product_region": "江苏",
+            "registration_no": "苏G妆网备字2022007348",
+            "production_license_no": "苏妆20160105",
+            "inspection_institution": "陕西省食品药品检验研究院",
+            "unqualified_items": "甲基氯异噻唑啉酮和甲基异噻唑啉酮与氯化镁及硝酸镁的混合物（甲基氯异噻唑啉酮:甲基异噻唑啉酮为3:1）",
+            "inspection_result": "0.0020%",
+            "requirement": "≤0.0015%",
+            "remarks": "扬州市德之馨化妆品厂提出样品真实性异议。经江苏省药品监督管理局审查，该企业未生产或者进口过该批次抽检不符合规定产品。",
+            "is_counterfeit": 1,
+            "manufacturer_name": "扬州市德之馨化妆品厂",
+            "manufacturer_address": "扬州市杭集镇创业园",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "扬州市德之馨化妆品厂",
+                "address": "扬州市杭集镇创业园",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "汉中明珠商务酒店有限公司",
+                "address": "陕西省汉中市汉台区明珠路",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 39,
+            "product_name": "叶蓓洗发液（透明蓝）",
+            "company_names": "扬州市德圣日化厂",
+            "company_addresses": "扬州市杭集镇新生村周庄",
+            "sample_unit_name": "禄丰罗次永鑫温泉旅游度假有限公司",
+            "sample_unit_address": "云南省楚雄彝族自治州禄丰市碧城镇洪流村委会温泉村",
+            "package_spec": "20ml",
+            "batch_no": "/",
+            "production_date": "2024/09/02",
+            "expiry_date": "三年",
+            "product_region": "江苏",
+            "registration_no": "苏G妆网备字2022003728",
+            "production_license_no": "苏妆20160175",
+            "inspection_institution": "云南省食品药品监督检验研究院",
+            "unqualified_items": "甲基氯异噻唑啉酮和甲基异噻唑啉酮与氯化镁及硝酸镁的混合物（甲基氯异噻唑啉酮:甲基异噻唑啉酮为3:1）",
+            "inspection_result": "0.0025%",
+            "requirement": "≤0.0015%",
+            "remarks": "扬州市德圣日化厂提出样品真实性异议。经江苏省药品监督管理局审查，该企业未生产或者进口过该批次抽检不符合规定产品。",
+            "is_counterfeit": 1,
+            "manufacturer_name": "扬州市德圣日化厂",
+            "manufacturer_address": "扬州市杭集镇新生村周庄",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "扬州市德圣日化厂",
+                "address": "扬州市杭集镇新生村周庄",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "禄丰罗次永鑫温泉旅游度假有限公司",
+                "address": "云南省楚雄彝族自治州禄丰市碧城镇洪流村委会温泉村",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          },
+          {
+            "sequence_no": 40,
+            "product_name": "叶蓓沐浴液（透明黄）",
+            "company_names": "扬州市德圣日化厂",
+            "company_addresses": "扬州市杭集镇新生村周庄",
+            "sample_unit_name": "禄丰罗次永鑫温泉旅游度假有限公司",
+            "sample_unit_address": "云南省楚雄彝族自治州禄丰市碧城镇洪流村委会温泉村",
+            "package_spec": "20ml",
+            "batch_no": "/",
+            "production_date": "2024/09/18",
+            "expiry_date": "三年",
+            "product_region": "江苏",
+            "registration_no": "苏G妆网备字2022003727",
+            "production_license_no": "苏妆20160175",
+            "inspection_institution": "云南省食品药品监督检验研究院",
+            "unqualified_items": "甲基氯异噻唑啉酮和甲基异噻唑啉酮与氯化镁及硝酸镁的混合物（甲基氯异噻唑啉酮:甲基异噻唑啉酮为3:1）",
+            "inspection_result": "0.0024%",
+            "requirement": "≤0.0015%",
+            "remarks": "扬州市德圣日化厂提出样品真实性异议。经江苏省药品监督管理局审查，该企业未生产或者进口过该批次抽检不符合规定产品。 注：该不符合规定项目的判定依据为产品注册、备案资料载明的技术要求",
+            "is_counterfeit": 1,
+            "manufacturer_name": "扬州市德圣日化厂",
+            "manufacturer_address": "扬州市杭集镇新生村周庄",
+            "operator_name": null,
+            "operator_address": null,
+            "company_entries": [
+              {
+                "label": null,
+                "name": "扬州市德圣日化厂",
+                "address": "扬州市杭集镇新生村周庄",
+                "type": "manufacturer",
+                "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "禄丰罗次永鑫温泉旅游度假有限公司",
+                "address": "云南省楚雄彝族自治州禄丰市碧城镇洪流村委会温泉村",
+                "type": "seller",
+                "type_label": "销售商"
+              }
+            ]
+          }
+        ]
+      },
+      "parse_error": null
+    }
+  ],
+  "success": true,
+  "output_file": "F:\\daoke\\化妆品\\data_get\\output\\items\\001_国家药监局关于40批次不符合规定化妆品的通告（2026年第19号）.json"
+}
