@@ -144,7 +144,7 @@
                     {{ companyTypeLabel(detail.company.type) }}
                   </el-descriptions-item>
                   <!-- <el-descriptions-item label="品牌">{{ detail.company.brand || '-' }}</el-descriptions-item> -->
-                  <el-descriptions-item label="来源产品名称">{{ detail.company.source_product_name || '-' }}</el-descriptions-item>
+                  <el-descriptions-item label="来源产品名称">{{ formatSourceProductNames(detail.company.source_product_name) }}</el-descriptions-item>
                   <el-descriptions-item label="省份">{{ detail.company.province || '-' }}</el-descriptions-item>
                   <el-descriptions-item label="城市">{{ detail.company.city || '-' }}</el-descriptions-item>
                   <el-descriptions-item label="地址" :span="2">{{ detail.company.address || '-' }}</el-descriptions-item>
@@ -201,7 +201,7 @@
                     <el-input v-model="editForm.brand" maxlength="120" clearable placeholder="可不填品牌名称" :disabled="!basicFormEditing" />
                   </el-form-item>
                   <el-form-item label="来源产品名称">
-                    <el-input v-model="editForm.source_product_name" maxlength="255" placeholder="抽检/飞检来源产品名称" clearable :disabled="!basicFormEditing" />
+                    <el-input v-model="editForm.source_product_name" maxlength="1000" placeholder="多个产品可用顿号、逗号或分号分隔" clearable :disabled="!basicFormEditing" />
                   </el-form-item>
                   <el-form-item label="省份">
                     <el-input v-model="editForm.province" maxlength="50" clearable :disabled="!basicFormEditing" />
@@ -804,7 +804,26 @@ function applyCompanyToForm(company = {}) {
   editForm.province = company.province ?? ''
   editForm.city = getCityName(company.address) ?? ''
   editForm.address = company.address ?? ''
-  editForm.source_product_name = company.source_product_name ?? ''
+  editForm.source_product_name = formatSourceProductNames(company.source_product_name, '')
+}
+
+function parseSourceProductNames(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean)
+  if (value == null || value === '') return []
+  const text = String(value).trim()
+  if (!text) return []
+  try {
+    const parsed = JSON.parse(text)
+    if (Array.isArray(parsed)) return parsed.map((item) => String(item || '').trim()).filter(Boolean)
+  } catch {
+    // Legacy scalar values are handled below.
+  }
+  return text.split(/[、,，;；|｜\n]+/).map((item) => item.trim()).filter(Boolean)
+}
+
+function formatSourceProductNames(value, emptyText = '-') {
+  const names = parseSourceProductNames(value)
+  return names.length ? names.join('、') : emptyText
 }
 
 function normalizeListRes(res) {

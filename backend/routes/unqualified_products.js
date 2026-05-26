@@ -1109,6 +1109,7 @@ function clearUnqualifiedProductTreeQueryCache() {
 function pickTreeFilterSnapshot(filters = {}) {
   const keys = [
     'keyword',
+    'product_name',
     'company_keyword',
     'source_keyword',
     'unqualified_item',
@@ -1198,6 +1199,7 @@ function buildCategoryFilterClause(productCategory, params) {
 
 function appendUnqualifiedProductFilters(conditions, params, filters = {}) {
   const normalizedKeyword = normalizeOptionalText(filters.keyword);
+  const normalizedProductName = normalizeOptionalText(filters.product_name);
   const normalizedCompanyKeyword = normalizeOptionalText(filters.company_keyword);
   const normalizedSourceKeyword = normalizeOptionalText(filters.source_keyword);
   const normalizedItem = normalizeOptionalText(filters.unqualified_item);
@@ -1241,6 +1243,11 @@ function appendUnqualifiedProductFilters(conditions, params, filters = {}) {
       `%${normalizedKeyword}%`,
       `%${normalizedKeyword}%`
     );
+  }
+
+  if (normalizedProductName) {
+    conditions.push('up.product_name LIKE ?');
+    params.push(`%${normalizedProductName}%`);
   }
 
   if (normalizedCompanyKeyword) {

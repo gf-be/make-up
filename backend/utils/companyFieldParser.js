@@ -250,7 +250,7 @@ function splitCompanyAddressValues(value) {
 }
 
 const REGISTRANT_LABELS = ['注册人', '备案人'];
-
+//匹配词
 const MANUFACTURER_LABELS_COSMETICS = [
   '受托生产企业',
   '委托生产企业',
@@ -281,6 +281,7 @@ const MANUFACTURER_LABELS_FOOD = [
   '标称生产企业',
   '标称生产企业名称',
   '受委托方',
+  '受委托方单位',
   '供应商',
   '生产商（分装）'
 ];

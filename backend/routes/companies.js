@@ -52,6 +52,50 @@ function mergeCompanyTypes(...values) {
   return merged.length ? merged : ['manufacturer'];
 }
 
+function parseSourceProductNames(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  const text = String(value || '').trim();
+  if (!text) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item || '').trim()).filter(Boolean);
+    }
+  } catch {
+    // Legacy scalar values are split below.
+  }
+  return text
+    .split(/[、,，;；|｜\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function mergeSourceProductNames(...values) {
+  const merged = [];
+  values.flatMap(parseSourceProductNames).forEach((name) => {
+    if (!merged.includes(name)) {
+      merged.push(name);
+    }
+  });
+  return merged;
+}
+
+function encodeSourceProductNames(value) {
+  const names = mergeSourceProductNames(value);
+  return names.length ? JSON.stringify(names) : null;
+}
+
+function normalizeCompanyRows(rows = []) {
+  return rows.map((row) => ({
+    ...row,
+    source_product_name: parseSourceProductNames(row.source_product_name)
+  }));
+}
+
 function normalizeUsEinDigits(raw) {
   const compact = String(raw || '').replace(/\s+/g, '').replace(/-/g, '');
   return US_EIN_DIGITS_RE.test(compact) ? compact : null;
@@ -108,6 +152,28 @@ ensureCompaniesSamplingSchema(pool).catch((error) => {
 
 /** 仅限开发管理员 / 数据管理员修改或创建企业档案（与企业管理页对齐） */
 const requireCompanyManagers = () => requireRoles(['developer', 'data_admin']);
+
+function normalizeComplaintDate(value) {
+  const raw = normalizeOptionalText(value);
+  if (!raw) {
+    return null;
+  }
+
+  const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (dateOnly) {
+    return `${dateOnly[1]}-${dateOnly[2]}-${dateOnly[3]} 00:00:00`;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+  const d = String(parsed.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d} 00:00:00`;
+}
 
 function normalizeOptionalText(value) {
   const normalized = String(value || '').trim();
@@ -306,7 +372,7 @@ router.get('/', async (req, res) => {
     let query = `
       SELECT
         c.id, c.name, c.brand, c.credit_code, c.type, c.types, c.province, c.city, c.address,
-        c.source_product_name, c.created_at, c.updated_at,
+        c.is_complained, c.source_product_name, c.created_at, c.updated_at,
         COALESCE(c.sampled_count, 0) AS sampled_count,
         COALESCE(c.last_sampled_at, NULL) AS last_sampled_at
       FROM companies c
@@ -336,8 +402,8 @@ router.get('/', async (req, res) => {
       }
     }
     if (source_product_name) {
-      query += ' AND c.source_product_name = ?';
-      countQuery += ' AND c.source_product_name = ?';
+      query += ' AND JSON_CONTAINS(c.source_product_name, JSON_QUOTE(?))';
+      countQuery += ' AND JSON_CONTAINS(c.source_product_name, JSON_QUOTE(?))';
       params.push(source_product_name);
       countParams.push(source_product_name);
     }
@@ -370,7 +436,7 @@ router.get('/', async (req, res) => {
 
     res.json({
       success: true,
-      data: rows,
+      data: normalizeCompanyRows(rows),
       pagination: {
         total: Number(countResult[0].total || 0),
         page: currentPage,
@@ -612,10 +678,9 @@ router.get('/filter-options', async (req, res) => {
       `
       ),
       pool.query(`
-        SELECT DISTINCT source_product_name
+        SELECT source_product_name
         FROM companies
-        WHERE source_product_name IS NOT NULL AND TRIM(source_product_name) != ''
-        ORDER BY source_product_name ASC
+        WHERE source_product_name IS NOT NULL
       `)
     ]);
 
@@ -623,7 +688,11 @@ router.get('/filter-options', async (req, res) => {
       success: true,
       data: {
         provinces: provinceRows.map((row) => ({ value: row.province_norm, label: row.province_norm })),
-        source_product_names: sourceProductNameRows.map((row) => ({ value: row.source_product_name, label: row.source_product_name }))
+        source_product_names: Array.from(
+          new Set(sourceProductNameRows.flatMap((row) => parseSourceProductNames(row.source_product_name)))
+        )
+          .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+          .map((name) => ({ value: name, label: name }))
       }
     });
   } catch (error) {
@@ -927,7 +996,7 @@ router.post('/confirm-import-name-change', requireCompanyManagers(), async (req,
         [companyId]
       );
 
-      res.json({ success: true, message: '企业名称已更新', data: updatedRows[0] });
+      res.json({ success: true, message: '企业名称已更新', data: normalizeCompanyRows(updatedRows)[0] });
     } catch (e) {
       await conn.rollback();
       throw e;
@@ -1049,6 +1118,15 @@ router.get('/:id', async (req, res) => {
     if (includeHistory) {
       aggPromises.push(pool.query(historySql, [id, id, historyLimit]));
     }
+    aggPromises.push(pool.query(
+      `
+        SELECT id, company_id, complaint_content, complaint_date, created_at
+        FROM company_complaints
+        WHERE company_id = ?
+        ORDER BY complaint_date DESC, id DESC
+      `,
+      [id]
+    ));
 
     const results = await Promise.all(aggPromises);
     const [statsRows] = results[0];
@@ -1058,6 +1136,8 @@ router.get('/:id', async (req, res) => {
       const [hRows] = results[2];
       historyRows = hRows;
     }
+    const complaintResultIndex = includeHistory ? 3 : 2;
+    const [complaintRows] = results[complaintResultIndex];
 
     const stats = statsRows[0] || {};
     const supervisionStats = supervisionStatsRows[0] || {};
@@ -1065,12 +1145,13 @@ router.get('/:id', async (req, res) => {
     const qualifiedCount = Number(stats.qualified_count || 0);
     const unqualifiedCount = Number(stats.unqualified_count || 0);
     const supervisionCount = Number(supervisionStats.unique_supervision_count || 0);
-    const sampledCount = Number(companyRows[0].sampled_count || 0);
+    const company = normalizeCompanyRows(companyRows)[0];
+    const sampledCount = Number(company.sampled_count || 0);
 
     res.json({
       success: true,
       data: {
-        company: companyRows[0],
+        company,
         stats: {
           sampled_count: sampledCount,
           inspection_count: Number(stats.inspection_count || 0),
@@ -1079,9 +1160,10 @@ router.get('/:id', async (req, res) => {
           qualified_count: qualifiedCount,
           unqualified_count: unqualifiedCount,
           qualified_rate: recordCount > 0 ? Number(((qualifiedCount / recordCount) * 100).toFixed(1)) : 0,
-          last_sampled_at: companyRows[0].last_sampled_at || null
+          last_sampled_at: company.last_sampled_at || null
         },
         history: historyRows,
+        complaints: complaintRows,
         history_meta: {
           included: includeHistory,
           limit: includeHistory ? historyLimit : 0,
@@ -1092,6 +1174,71 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     console.error('获取企业详情失败:', error);
     res.status(500).json({ success: false, message: '获取企业详情失败' });
+  }
+});
+
+// 新增企业投诉记录
+router.post('/:id/complaints', async (req, res) => {
+  let connection;
+  try {
+    await ensureCompaniesSamplingSchema(pool);
+
+    const { id } = req.params;
+    const complaintContent = normalizeOptionalText(req.body?.complaint_content || req.body?.content);
+    if (!complaintContent) {
+      return res.status(400).json({ success: false, message: '投诉内容不能为空' });
+    }
+
+    const complaintDate = normalizeComplaintDate(req.body?.complaint_date);
+    if (req.body?.complaint_date && !complaintDate) {
+      return res.status(400).json({ success: false, message: '投诉日期格式无效，请使用 YYYY-MM-DD' });
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [companyRows] = await connection.query('SELECT id FROM companies WHERE id = ? LIMIT 1', [id]);
+    if (companyRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '企业不存在' });
+    }
+
+    const [result] = await connection.query(
+      complaintDate
+        ? `
+        INSERT INTO company_complaints (company_id, complaint_content, complaint_date)
+        VALUES (?, ?, ?)
+      `
+        : `
+        INSERT INTO company_complaints (company_id, complaint_content)
+        VALUES (?, ?)
+      `,
+      complaintDate ? [id, complaintContent, complaintDate] : [id, complaintContent]
+    );
+    await connection.query('UPDATE companies SET is_complained = 1 WHERE id = ?', [id]);
+
+    const [rows] = await connection.query(
+      `
+        SELECT id, company_id, complaint_content, complaint_date, created_at
+        FROM company_complaints
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [result.insertId]
+    );
+
+    await connection.commit();
+    res.json({ success: true, message: '投诉记录已保存', data: rows[0] });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('新增企业投诉记录失败:', error);
+    res.status(500).json({ success: false, message: '新增企业投诉记录失败' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 
@@ -1133,10 +1280,7 @@ router.post('/', requireCompanyManagers(), async (req, res) => {
 
     }
 
-    const normalizedSourceProductName =
-      typeof source_product_name === 'string' && source_product_name.trim()
-        ? source_product_name.trim()
-        : null;
+    const normalizedSourceProductName = encodeSourceProductNames(source_product_name);
 
     const creditResolved = resolveCreditCodeFromBody(req.body || {}, null);
     if (creditResolved.error) {
@@ -1157,7 +1301,7 @@ router.post('/', requireCompanyManagers(), async (req, res) => {
         sampled_count,
         last_sampled_at
       )
-      VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?, ?, 0, NULL)
+      VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?, CAST(? AS JSON), 0, NULL)
     `, [
       normalizedName,
       brand || null,
@@ -1236,7 +1380,7 @@ router.put('/:id', requireCompanyManagers(), async (req, res) => {
 
 
 
-    let source_product_name = existingRows[0].source_product_name;
+    let source_product_name = encodeSourceProductNames(existingRows[0].source_product_name);
 
 
 
@@ -1250,7 +1394,7 @@ router.put('/:id', requireCompanyManagers(), async (req, res) => {
     } else if (typeof sourceProductNameRaw === 'string') {
 
 
-      source_product_name = sourceProductNameRaw.trim() || null;
+      source_product_name = encodeSourceProductNames(sourceProductNameRaw);
 
 
     }
@@ -1285,7 +1429,7 @@ router.put('/:id', requireCompanyManagers(), async (req, res) => {
       await pool.query(
         `
       UPDATE companies
-      SET name = ?, brand = ?, credit_code = ?, type = ?, types = CAST(? AS JSON), address = ?, province = ?, city = ?, source_product_name = ?
+      SET name = ?, brand = ?, credit_code = ?, type = ?, types = CAST(? AS JSON), address = ?, province = ?, city = ?, source_product_name = CAST(? AS JSON)
       WHERE id = ?
     `,
         [
@@ -1313,7 +1457,7 @@ router.put('/:id', requireCompanyManagers(), async (req, res) => {
       [id]
     );
 
-    res.json({ success: true, message: '企业信息已更新', data: updatedRows[0] });
+    res.json({ success: true, message: '企业信息已更新', data: normalizeCompanyRows(updatedRows)[0] });
   } catch (error) {
     console.error('更新企业失败:', error);
 

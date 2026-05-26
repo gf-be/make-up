@@ -8,7 +8,9 @@
             <!-- <div class="page-subtitle">筛选通告后，在右侧直接查看详情与问题产品明细</div> -->
           </div>
           <el-button :loading="loading" @click="loadAnnouncements">
-            <el-icon><Refresh /></el-icon>
+            <el-icon>
+              <Refresh />
+            </el-icon>
             刷新
           </el-button>
         </div>
@@ -16,7 +18,8 @@
 
       <el-form :model="filters" inline class="filter-form">
         <el-form-item label="产品类型">
-          <el-select v-model="filters.product_type" clearable placeholder="全部产品类型" style="width: 150px" @change="applyFilters">
+          <el-select v-model="filters.product_type" clearable placeholder="全部产品类型" style="width: 150px"
+            @change="applyFilters">
             <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
@@ -26,15 +29,8 @@
           </el-select>
         </el-form-item> -->
         <el-form-item label="年份">
-          <el-date-picker
-            v-model="filters.year"
-            type="year"
-            value-format="YYYY"
-            placeholder="全部年份"
-            clearable
-            style="width: 130px"
-            @change="applyFilters"
-          />
+          <el-date-picker v-model="filters.year" type="year" value-format="YYYY" placeholder="全部年份" clearable
+            style="width: 130px" @change="applyFilters" />
         </el-form-item>
         <!-- <el-form-item label="涉及地区">
           <el-input v-model="filters.location" clearable placeholder="省份/地区" style="width: 150px" @keyup.enter="applyFilters" />
@@ -42,9 +38,11 @@
         <el-form-item label="关键词">
           <el-input v-model="filters.keyword" clearable placeholder="标题、编号、内容、检验单位" style="width: 240px" @keyup.enter="applyFilters" />
         </el-form-item>-->
-        <el-form-item> 
+        <el-form-item>
           <el-button type="primary" @click="applyFilters">
-            <el-icon><Search /></el-icon>
+            <el-icon>
+              <Search />
+            </el-icon>
             搜索
           </el-button>
           <el-button @click="resetFilters">重置</el-button>
@@ -59,18 +57,9 @@
             <span class="list-pane-title">通告列表</span>
           </div>
           <div class="list-pane-body">
-            <el-table
-              v-loading="loading"
-              :data="announcementRows"
-              row-key="id"
-              stripe
-              highlight-current-row
-              empty-text="暂无通告"
-              class="announcement-table"
-              :max-height="announcementListTableMaxHeight"
-              :row-class-name="getRowClassName"
-              @row-click="selectAnnouncement"
-            >
+            <el-table v-loading="loading" :data="announcementRows" row-key="id" stripe highlight-current-row
+              empty-text="暂无通告" class="announcement-table" :max-height="announcementListTableMaxHeight"
+              :row-class-name="getRowClassName" @row-click="selectAnnouncement">
               <el-table-column label="通告信息" min-width="260" show-overflow-tooltip>
                 <template #default="{ row }">
                   <div class="announcement-title">{{ row.title || '（无标题）' }}</div>
@@ -82,27 +71,23 @@
               </el-table-column>
             </el-table>
 
-            <el-pagination
-              v-if="announcementPaginationVisible"
-              v-model:current-page="pagination.page"
-              v-model:page-size="pagination.limit"
-              :total="pagination.total"
-              :page-sizes="[10, 20]"
-              layout="total, sizes, prev, pager, next"
-              small
-              background
-              class="pagination"
-              @size-change="handlePageSizeChange"
-              @current-change="loadAnnouncements"
-            />
+            <el-pagination v-if="announcementPaginationVisible" v-model:current-page="pagination.page"
+              v-model:page-size="pagination.limit" :total="pagination.total" :page-sizes="[10, 20]"
+              layout="total, sizes, prev, pager, next" small background class="pagination"
+              @size-change="handlePageSizeChange" @current-change="loadAnnouncements" />
           </div>
         </div>
 
         <div class="detail-pane">
           <div v-if="selectedAnnouncement" class="detail-toolbar">
             <div class="selected-title">{{ selectedAnnouncement.title || '通告详情' }}</div>
+            <el-button type="danger" plain size="small" :loading="deletingAnnouncement"
+              @click="handleDeleteAnnouncement">
+              删除通告
+            </el-button>
           </div>
-          <AnnouncementDetail :announcement-id="selectedAnnouncementId" embedded />
+          <AnnouncementDetail :announcement-id="selectedAnnouncementId" embedded
+            @deleted="handleEmbeddedAnnouncementDeleted" />
         </div>
       </div>
     </div>
@@ -113,7 +98,7 @@
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import AnnouncementDetail from './AnnouncementDetail.vue'
-import { getAnnouncements } from '@/api/index'
+import { deleteAnnouncement, getAnnouncements } from '@/api/index'
 
 const announcementListTableMaxHeight = ref(520)
 
@@ -132,10 +117,13 @@ const productTypeOptions = Object.entries(PRODUCT_TYPE_LABELS).map(([value, labe
 // ]
 
 const loading = ref(false)
+const deletingAnnouncement = ref(false)
 const announcementRows = ref([])
 const selectedAnnouncementId = ref('')
 const filters = reactive({
-  product_type: PRODUCT_TYPE_LABELS.food,
+  // product_type: PRODUCT_TYPE_LABELS.food,
+  product_type: '',
+
   status: '',
   year: '',
   location: '',
@@ -182,6 +170,57 @@ function syncSelectedAnnouncement(list) {
   const hasSelected = list.some((row) => String(row.id) === String(selectedAnnouncementId.value))
   if (!hasSelected) {
     selectedAnnouncementId.value = list[0].id
+  }
+}
+
+async function handleEmbeddedAnnouncementDeleted(deletedId) {
+  if (String(selectedAnnouncementId.value) === String(deletedId)) {
+    selectedAnnouncementId.value = ''
+  }
+  await loadAnnouncements()
+}
+
+async function handleDeleteAnnouncement() {
+  const row = selectedAnnouncement.value
+  if (!row?.id || deletingAnnouncement.value) {
+    return
+  }
+
+  const title = row.title || '该通告'
+  try {
+    await ElMessageBox.confirm(
+      `确认删除「${title}」吗？删除后将同步清理该通告的产品明细、不合格产品、企业抽检关联等数据。`,
+      '删除通告确认',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消'
+      }
+    )
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    throw error
+  }
+
+  deletingAnnouncement.value = true
+  const deletedId = row.id
+  try {
+    await deleteAnnouncement(deletedId)
+    if (announcementRows.value.length === 1 && pagination.page > 1) {
+      pagination.page -= 1
+    }
+    if (String(selectedAnnouncementId.value) === String(deletedId)) {
+      selectedAnnouncementId.value = ''
+    }
+    await loadAnnouncements()
+    ElMessage.success('通告删除成功')
+  } catch (error) {
+    console.error('删除通告失败:', error)
+    ElMessage.error(error?.response?.data?.message || error?.message || '删除通告失败')
+  } finally {
+    deletingAnnouncement.value = false
   }
 }
 

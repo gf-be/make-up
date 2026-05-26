@@ -12,7 +12,12 @@
                 @keyup.enter="handleSearch" />
             </el-form-item>
           </el-col>
-         
+          <el-col :span="5">
+            <el-form-item label="产品名称">
+              <el-input v-model="filters.product_name" placeholder="搜索产品名称" clearable
+                @keyup.enter="handleSearch" />
+            </el-form-item>
+          </el-col>
           <!-- <el-col :span="4">
             <el-form-item label="结束年份">
               <el-select v-model="filters.year_end" clearable filterable placeholder="不限" style="width: 100%">
@@ -48,7 +53,10 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="4">
+         
+        </el-row>
+        <el-row :gutter="32">
+          <el-col :span="5">
             <el-form-item label="产品类型">
               <el-select v-model="filters.product_type" clearable placeholder="全部产品类型" style="width: 100%">
                 <el-option v-for="item in filterOptions.product_types" :key="item.value" :label="item.label"
@@ -56,9 +64,6 @@
               </el-select>
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="32">
-        
           <el-col :span="5">
             <el-form-item label="年份" style="width: 100%">
               <el-select v-model="filters.year_start" clearable filterable placeholder="不限" >
@@ -1962,6 +1967,7 @@ const DEFAULT_FILTER_FOOD_TYPE = 'food'
 function createDefaultFilters() {
   return {
     keyword: '',
+    product_name: '',
     company_keyword: '',
     source_keyword: '',
     unqualified_item: '',
@@ -1995,6 +2001,7 @@ function applyRouteFilters() {
   filters.value = {
     ...createDefaultFilters(),
     keyword: String(route.query.keyword || ''),
+    product_name: String(route.query.product_name || ''),
     company_keyword: String(route.query.company_keyword || ''),
     source_keyword: String(route.query.source_keyword || ''),
     unqualified_item: String(route.query.unqualified_item || ''),
@@ -2015,6 +2022,7 @@ function applyRouteFilters() {
 
 const hasActiveFilters = computed(() => Boolean(
   filters.value.keyword
+  || filters.value.product_name
   || filters.value.company_keyword
   || filters.value.source_keyword
   || filters.value.unqualified_item
@@ -2272,6 +2280,7 @@ function mergeProvinceSelectOptions(items = []) {
     if (!raw) continue
     const canon = normalizeProvinceToStandard(raw)
     if (!canon) continue
+    if (!STANDARD_CN_PROVINCE_SET.has(canon)) continue
     if (!byCanon.has(canon)) {
       byCanon.set(canon, { value: canon, label: canon })
     }

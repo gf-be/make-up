@@ -30,6 +30,16 @@
               <div class="overview-key-toolbar section-header">
                 <h3>关键信息</h3>
                 <div v-if="canManageProductDetails" class="overview-key-actions">
+                  <!-- <el-button
+                    v-if="!overviewKeyEditMode"
+                    type="danger"
+                    plain
+                    size="small"
+                    :loading="deletingAnnouncement"
+                    @click="handleDeleteAnnouncement"
+                  >
+                    删除通告
+                  </el-button> -->
                   <template v-if="!overviewKeyEditMode">
                     <el-button type="primary" plain size="small" @click="startOverviewKeyEdit">
                       编辑
@@ -212,10 +222,10 @@
               </div>
 
               <el-form :model="productDetailFilters" inline class="detail-filter-form">
-                <el-form-item label="不符合规定项目">
+                <el-form-item label="产品名称">
                   <el-input
-                    v-model="productDetailFilters.unqualified_item"
-                    placeholder="输入项目关键字"
+                    v-model="productDetailFilters.product_name"
+                    placeholder="输入产品名称"
                     clearable
                     @keyup.enter="handleProductDetailSearch"
                   />
@@ -228,13 +238,37 @@
                     @keyup.enter="handleProductDetailSearch"
                   />
                 </el-form-item>
-                <el-form-item label="被抽样单位">
-                  <el-input
-                    v-model="productDetailFilters.sample_unit_keyword"
-                    placeholder="输入被抽样单位"
+                <el-form-item label="被抽检企业省份">
+                  <el-select
+                    v-model="productDetailFilters.sampled_province"
+                    placeholder="全部"
                     clearable
-                    @keyup.enter="handleProductDetailSearch"
-                  />
+                    filterable
+                    style="width: 160px"
+                  >
+                    <el-option
+                      v-for="item in provinceFilterOptions"
+                      :key="`sampled-${item.value}`"
+                      :label="item.label"
+                      :value="item.value"
+                    />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="生产企业省份">
+                  <el-select
+                    v-model="productDetailFilters.manufacturer_province"
+                    placeholder="全部"
+                    clearable
+                    filterable
+                    style="width: 160px"
+                  >
+                    <el-option
+                      v-for="item in provinceFilterOptions"
+                      :key="`manufacturer-${item.value}`"
+                      :label="item.label"
+                      :value="item.value"
+                    />
+                  </el-select>
                 </el-form-item>
                 <el-form-item label="是否涉嫌假冒">
                   <el-select v-model="productDetailFilters.is_counterfeit" style="width: 100px" clearable placeholder="全部">
@@ -311,14 +345,14 @@
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.sample_unit_address" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.sample_unit_address || '暂无' }}</span>
                            </el-descriptions-item>
-                          <!--<el-descriptions-item label="销售企业名称">
+                          <el-descriptions-item label="销售企业名称">
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.operator_name" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.operator_name || '暂无' }}</span>
                           </el-descriptions-item>
                           <el-descriptions-item label="销售企业地址">
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.operator_address" type="textarea" :rows="1" size="small" />
                             <span v-else>{{ row.operator_address || '暂无' }}</span>
-                          </el-descriptions-item> -->
+                          </el-descriptions-item>
                           <el-descriptions-item label="生产日期">
                             <el-input v-if="isEditingProductDetail(row)" v-model="productDetailForm.production_date" size="small" />
                             <span v-else>{{ row.production_date || '暂无' }}</span>
@@ -652,6 +686,7 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Download, Plus } from '@element-plus/icons-vue'
 import {
+  deleteAnnouncement,
   deleteAnnouncementProductDetail,
   getAnnouncementById,
   getAnnouncementProductDetails,
@@ -678,6 +713,48 @@ const PRODUCT_TYPE_LABELS = {
   unknown: '未分类'
 }
 
+const UNSPECIFIED_PROVINCE_VALUE = '__UNSPECIFIED_PROVINCE__'
+const STANDARD_PROVINCES = Object.freeze([
+  '北京市',
+  '天津市',
+  '上海市',
+  '重庆市',
+  '河北省',
+  '山西省',
+  '辽宁省',
+  '吉林省',
+  '黑龙江省',
+  '江苏省',
+  '浙江省',
+  '安徽省',
+  '福建省',
+  '江西省',
+  '山东省',
+  '河南省',
+  '湖北省',
+  '湖南省',
+  '广东省',
+  '海南省',
+  '四川省',
+  '贵州省',
+  '云南省',
+  '陕西省',
+  '甘肃省',
+  '青海省',
+  '台湾省',
+  '内蒙古自治区',
+  '广西壮族自治区',
+  '西藏自治区',
+  '宁夏回族自治区',
+  '新疆维吾尔自治区',
+  '香港特别行政区',
+  '澳门特别行政区'
+])
+const provinceFilterOptions = [
+  { value: UNSPECIFIED_PROVINCE_VALUE, label: '未标注省份' },
+  ...STANDARD_PROVINCES.map((name) => ({ value: name, label: name }))
+]
+
 const props = defineProps({
   announcementId: {
     type: [String, Number],
@@ -688,6 +765,7 @@ const props = defineProps({
     default: false
   }
 })
+const emit = defineEmits(['deleted'])
 
 const productTypeOptions = Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => ({
   value,
@@ -703,6 +781,7 @@ const productDetailsLoading = ref(false)
 const savingProductDetail = ref(false)
 const savingOverviewKeyInfo = ref(false)
 const savingContent = ref(false)
+const deletingAnnouncement = ref(false)
 const announcement = ref(null)
 const relatedInspections = ref([])
 const productDetails = ref([])
@@ -750,9 +829,12 @@ const {
 const canManageProductDetails = computed(() => canManageAnnouncementProducts())
 
 const productDetailFilters = ref({
+  product_name: '',
   unqualified_item: '',
   company_keyword: '',
   sample_unit_keyword: '',
+  sampled_province: '',
+  manufacturer_province: '',
   is_counterfeit: ''
 })
 const productDetailsSummary = ref(createEmptySummary())
@@ -1726,13 +1808,53 @@ const handleProductDetailSearch = () => {
 
 const resetProductDetailFilters = () => {
   productDetailFilters.value = {
-    unqualified_item: '',
+    product_name: '',
+    // unqualified_item: '',
     company_keyword: '',
     sample_unit_keyword: '',
+    sampled_province: '',
+    manufacturer_province: '',
     is_counterfeit: ''
   }
   handleProductDetailSearch()
 }
+
+// const handleDeleteAnnouncement = async () => {
+//   const announcementId = currentAnnouncementId.value
+//   if (!announcementId || deletingAnnouncement.value) return
+//   if (!canManageProductDetails.value) {
+//     ElMessage.warning('当前账号无删除权限')
+//     return
+//   }
+
+//   const title = announcement.value?.title || '该通告'
+//   try {
+//     await ElMessageBox.confirm(
+//       `确认删除“${title}”吗？删除后将同步清理该通告写入的产品、批次明细、企业关联，并删除不再被其他记录引用的企业。`,
+//       '删除通告确认',
+//       {
+//         type: 'warning',
+//         confirmButtonText: '删除',
+//         cancelButtonText: '取消'
+//       }
+//     )
+
+//     deletingAnnouncement.value = true
+//     await deleteAnnouncement(announcementId)
+//     ElMessage.success('通告删除成功')
+//     emit('deleted', announcementId)
+//     if (!props.embedded) {
+//       router.push('/announcements')
+//     }
+//   } catch (error) {
+//     if (error === 'cancel' || error === 'close') {
+//       return
+//     }
+//     ElMessage.error(error?.response?.data?.message || error?.message || '删除通告失败')
+//   } finally {
+//     deletingAnnouncement.value = false
+//   }
+// }
 
 const openEditProductDetail = async (row) => {
   if (!canManageProductDetails.value) {

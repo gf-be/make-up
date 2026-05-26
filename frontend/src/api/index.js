@@ -274,6 +274,10 @@ export const getCompanyDetail = (id, params = {}) => {
   return request.get(`/companies/${id}`, { params })
 }
 
+export const createCompanyComplaint = (id, data = {}) => {
+  return request.post(`/companies/${id}/complaints`, data)
+}
+
 export const getCompanyStats = () => {
   return request.get('/companies/stats/overview')
 }

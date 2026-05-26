@@ -63,7 +63,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="province" label="省份" width="100" />
-        <el-table-column prop="source_product_name" label="来源产品名称" width="180" show-overflow-tooltip />
+        <el-table-column label="来源产品名称" width="220" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ formatSourceProductNames(row.source_product_name) }}
+          </template>
+        </el-table-column>
         <!-- <el-table-column prop="city" label="城市" width="100" /> -->
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
@@ -100,7 +104,7 @@ import { currentUser } from '@/utils/auth'
 const router = useRouter()
 
 /** 普通用户可访问 /companies 路由但不展示企业列表模块（仍可访问 /companies/:id） */
-// const isCompaniesListBlockedForNormalUser = computed(() => currentUser.value?.role === 'normal_user')
+const isCompaniesListBlockedForNormalUser = computed(() => currentUser.value?.role === 'normal_user')
 const loading = ref(false)
 const tableData = ref([])
 const companyStats = ref({})
@@ -184,6 +188,25 @@ const getTypeType = (type) => {
 const getTypeText = (type) => {
   const map = { manufacturer: '生产企业', distributor: '经销商', seller: '销售商' }
   return map[type] || type
+}
+
+const parseSourceProductNames = (value) => {
+  if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean)
+  if (value == null || value === '') return []
+  const text = String(value).trim()
+  if (!text) return []
+  try {
+    const parsed = JSON.parse(text)
+    if (Array.isArray(parsed)) return parsed.map((item) => String(item || '').trim()).filter(Boolean)
+  } catch {
+    // Legacy scalar values are handled below.
+  }
+  return text.split(/[、,，;；|｜\n]+/).map((item) => item.trim()).filter(Boolean)
+}
+
+const formatSourceProductNames = (value) => {
+  const names = parseSourceProductNames(value)
+  return names.length ? names.join('、') : '-'
 }
 
 onMounted(() => {

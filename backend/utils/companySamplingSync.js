@@ -76,6 +76,85 @@ function mergeCompanyTypes(...values) {
   return merged.length ? merged : ['manufacturer'];
 }
 
+function parseSourceProductNames(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeText(item)).filter(Boolean);
+  }
+  const text = normalizeText(value);
+  if (!text) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => normalizeText(item)).filter(Boolean);
+    }
+  } catch {
+    // Legacy scalar values are handled below.
+  }
+  return text
+    .split(/[、,，;；|｜\n]+/)
+    .map((item) => normalizeText(item))
+    .filter(Boolean);
+}
+
+function mergeSourceProductNames(...values) {
+  const merged = [];
+  values.flatMap(parseSourceProductNames).forEach((name) => {
+    if (!merged.includes(name)) {
+      merged.push(name);
+    }
+  });
+  return merged;
+}
+
+async function ensureSourceProductNameJsonColumn(connection) {
+  const [sourceProductNameColumn] = await connection.query('SHOW COLUMNS FROM companies LIKE ?', ['source_product_name']);
+  const [productCategoryColumn] = await connection.query('SHOW COLUMNS FROM companies LIKE ?', ['product_category']);
+  if (productCategoryColumn.length > 0 && sourceProductNameColumn.length === 0) {
+    await connection.query(
+      "ALTER TABLE companies CHANGE COLUMN product_category source_product_name VARCHAR(255) NULL COMMENT '来源产品名称'"
+    );
+  } else if (sourceProductNameColumn.length === 0) {
+    await connection.query(
+      "ALTER TABLE companies ADD COLUMN source_product_name JSON NULL COMMENT '来源产品名称数组' AFTER city"
+    );
+    return;
+  }
+
+  const [currentColumnRows] = await connection.query('SHOW COLUMNS FROM companies LIKE ?', ['source_product_name']);
+  const currentType = String(currentColumnRows[0]?.Type || '').toLowerCase();
+  if (currentType.includes('json')) {
+    return;
+  }
+
+  await ensureColumnExists(connection, 'companies', 'source_product_name_json_tmp', "JSON NULL COMMENT '来源产品名称数组' AFTER source_product_name");
+  const [rows] = await connection.query('SELECT id, source_product_name FROM companies WHERE source_product_name IS NOT NULL AND TRIM(source_product_name) != ? ', ['']);
+  for (const row of rows) {
+    const names = mergeSourceProductNames(row.source_product_name);
+    await connection.query(
+      'UPDATE companies SET source_product_name_json_tmp = CAST(? AS JSON) WHERE id = ?',
+      [names.length ? JSON.stringify(names) : null, row.id]
+    );
+  }
+  await ensureIndexDropped(connection, 'companies', 'idx_companies_source_product_name');
+  await connection.query('ALTER TABLE companies DROP COLUMN source_product_name');
+  await connection.query('ALTER TABLE companies CHANGE COLUMN source_product_name_json_tmp source_product_name JSON NULL COMMENT \'来源产品名称数组\' AFTER city');
+}
+
+async function ensureIndexDropped(connection, tableName, indexName) {
+  const [rows] = await connection.query(`SHOW INDEX FROM ${tableName} WHERE Key_name = ?`, [indexName]);
+  if (rows.length > 0) {
+    try {
+      await connection.query(`ALTER TABLE ${tableName} DROP INDEX ${indexName}`);
+    } catch (error) {
+      if (error?.code !== 'ER_CANT_DROP_FIELD_OR_KEY') {
+        throw error;
+      }
+    }
+  }
+}
+
 async function ensureColumnExists(connection, tableName, columnName, definition) {
   const [rows] = await connection.query(`SHOW COLUMNS FROM ${tableName} LIKE ?`, [columnName]);
   if (rows.length === 0) {
@@ -115,24 +194,7 @@ async function ensureCompaniesSamplingSchema(connection) {
     await connection.query('ALTER TABLE companies ADD COLUMN last_sampled_at DATE NULL AFTER sampled_count');
   }
 
-  const [sourceProductNameColumn] = await connection.query('SHOW COLUMNS FROM companies LIKE ?', ['source_product_name']);
-  const [productCategoryColumn] = await connection.query('SHOW COLUMNS FROM companies LIKE ?', ['product_category']);
-  if (productCategoryColumn.length > 0 && sourceProductNameColumn.length === 0) {
-    await connection.query(
-      "ALTER TABLE companies CHANGE COLUMN product_category source_product_name VARCHAR(255) NULL COMMENT '来源产品名称'"
-    );
-  } else if (sourceProductNameColumn.length === 0) {
-    await connection.query(
-      "ALTER TABLE companies ADD COLUMN source_product_name VARCHAR(255) NULL COMMENT '来源产品名称' AFTER city"
-    );
-  } else {
-    const colType = String(sourceProductNameColumn[0].Type || '');
-    if (!colType.includes('255')) {
-      await connection.query(
-        "ALTER TABLE companies MODIFY COLUMN source_product_name VARCHAR(255) NULL COMMENT '来源产品名称'"
-      );
-    }
-  }
+  await ensureSourceProductNameJsonColumn(connection);
   const [oldCategoryIndex] = await connection.query('SHOW INDEX FROM companies WHERE Key_name = ?', ['idx_companies_product_category']);
   if (oldCategoryIndex.length > 0) {
     try {
@@ -143,19 +205,48 @@ async function ensureCompaniesSamplingSchema(connection) {
       }
     }
   }
-  await ensureIndexExists(
-    connection,
-    'companies',
-    'idx_companies_source_product_name',
-    'INDEX idx_companies_source_product_name (source_product_name)'
-  );
+  await ensureIndexDropped(connection, 'companies', 'idx_companies_source_product_name');
 
   await ensureColumnExists(connection, 'companies', 'credit_code', "VARCHAR(18) NULL COMMENT '统一社会信用代码' AFTER brand");
   await ensureColumnExists(connection, 'companies', 'types', "JSON NULL COMMENT '企业类型集合' AFTER type");
+  await ensureColumnExists(connection, 'companies', 'is_complained', "TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否被投诉' AFTER types");
   await connection.query(`
     UPDATE companies
     SET types = JSON_ARRAY(COALESCE(NULLIF(TRIM(type), ''), 'manufacturer'))
     WHERE types IS NULL
+  `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS company_complaints (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      company_id INT NOT NULL,
+      complaint_content TEXT NOT NULL,
+      complaint_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_company_complaints_company (company_id),
+      INDEX idx_company_complaints_date (complaint_date),
+      CONSTRAINT fk_company_complaints_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  await ensureColumnExists(connection, 'company_complaints', 'complaint_content', 'TEXT NOT NULL AFTER company_id');
+  await ensureColumnExists(connection, 'company_complaints', 'complaint_date', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER complaint_content');
+  await ensureIndexExists(
+    connection,
+    'company_complaints',
+    'idx_company_complaints_company',
+    'INDEX idx_company_complaints_company (company_id)'
+  );
+  await ensureIndexExists(
+    connection,
+    'company_complaints',
+    'idx_company_complaints_date',
+    'INDEX idx_company_complaints_date (complaint_date)'
+  );
+  await connection.query(`
+    UPDATE companies c
+    SET is_complained = EXISTS (
+      SELECT 1 FROM company_complaints cc WHERE cc.company_id = c.id
+    )
   `);
   await ensureIndexExists(
     connection,
@@ -435,6 +526,14 @@ async function deleteOrphanCompanies(connection, companyIds = []) {
     conditions.push('NOT EXISTS (SELECT 1 FROM company_supervision_records csr WHERE csr.company_id = c.id)');
   }
 
+  if (await tableExists(connection, 'unqualified_product_companies')) {
+    conditions.push('NOT EXISTS (SELECT 1 FROM unqualified_product_companies upc WHERE upc.company_id = c.id)');
+  }
+
+  if (await tableExists(connection, 'unqualified_products')) {
+    conditions.push('NOT EXISTS (SELECT 1 FROM unqualified_products up WHERE up.company_id = c.id)');
+  }
+
   if (await tableExists(connection, 'flight_inspection_detail')) {
     conditions.push("NOT EXISTS (SELECT 1 FROM flight_inspection_detail fid JOIN supervisions s2 ON s2.id = fid.supervision_id WHERE CONVERT(TRIM(COALESCE(fid.company_name, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_unicode_ci)");
   }
@@ -484,6 +583,66 @@ async function deleteOrphanCompanies(connection, companyIds = []) {
   };
 }
 
+async function refreshCompanySourceProductNamesAfterSamplingRemoval(connection, removedRows = []) {
+  const byCompany = new Map();
+  removedRows.forEach((row) => {
+    const companyId = Number(row.company_id);
+    const productName = normalizeText(row.product_name);
+    if (!companyId || !productName) {
+      return;
+    }
+    if (!byCompany.has(companyId)) {
+      byCompany.set(companyId, new Set());
+    }
+    byCompany.get(companyId).add(productName);
+  });
+
+  for (const [companyId, removedNames] of byCompany.entries()) {
+    const [companyRows] = await connection.query(
+      'SELECT source_product_name FROM companies WHERE id = ? LIMIT 1',
+      [companyId]
+    );
+    if (companyRows.length === 0) {
+      continue;
+    }
+
+    const [remainingRows] = await connection.query(
+      `
+        SELECT DISTINCT product_name
+        FROM company_sampling_records
+        WHERE company_id = ?
+          AND product_name IS NOT NULL
+          AND TRIM(product_name) != ''
+      `,
+      [companyId]
+    );
+    const remainingNames = mergeSourceProductNames(remainingRows.map((row) => row.product_name));
+    const remainingNameSet = new Set(remainingNames);
+    const existingNames = parseSourceProductNames(companyRows[0].source_product_name);
+    const nextNames = [];
+
+    existingNames.forEach((name) => {
+      if (!removedNames.has(name) || remainingNameSet.has(name)) {
+        nextNames.push(name);
+      }
+    });
+    remainingNames.forEach((name) => {
+      if (!nextNames.includes(name)) {
+        nextNames.push(name);
+      }
+    });
+
+    if (nextNames.length) {
+      await connection.query(
+        'UPDATE companies SET source_product_name = CAST(? AS JSON) WHERE id = ?',
+        [JSON.stringify(nextNames), companyId]
+      );
+    } else {
+      await connection.query('UPDATE companies SET source_product_name = NULL WHERE id = ?', [companyId]);
+    }
+  }
+}
+
 async function upsertCompany(
   connection,
   companyName,
@@ -509,16 +668,18 @@ async function upsertCompany(
     const existingMainType = COMPANY_TYPES.has(normalizeText(existing.type)) ? normalizeText(existing.type) : normalizedType;
     const mergedTypes = mergeCompanyTypes(existing.types, existing.type, normalizedType);
     const mergedTypesJson = JSON.stringify(mergedTypes);
+    const mergedSourceProductNames = mergeSourceProductNames(existing.source_product_name, sourceProductName);
+    const mergedSourceProductNamesJson = mergedSourceProductNames.length ? JSON.stringify(mergedSourceProductNames) : null;
     const shouldUpdateType = existing.type !== existingMainType;
     const shouldUpdateTypes = JSON.stringify(mergeCompanyTypes(existing.types, existing.type)) !== mergedTypesJson;
     const shouldUpdateAddress = (!existing.address && companyAddress);
     const shouldUpdateProvince = (!existing.province && province);
     const shouldUpdateCity = (!existing.city && city);
-    const shouldUpdateSourceProductName = (!existing.source_product_name && sourceProductName);
+    const shouldUpdateSourceProductName = JSON.stringify(mergeSourceProductNames(existing.source_product_name)) !== JSON.stringify(mergedSourceProductNames);
     if (shouldUpdateType || shouldUpdateTypes || shouldUpdateAddress || shouldUpdateProvince || shouldUpdateCity || shouldUpdateSourceProductName) {
       await connection.query(
-        'UPDATE companies SET type = ?, types = CAST(? AS JSON), address = COALESCE(address, ?), province = COALESCE(province, ?), city = COALESCE(city, ?), source_product_name = COALESCE(source_product_name, ?) WHERE id = ?',
-        [existingMainType, mergedTypesJson, companyAddress || null, province || null, city || null, sourceProductName || null, existing.id]
+        'UPDATE companies SET type = ?, types = CAST(? AS JSON), address = COALESCE(address, ?), province = COALESCE(province, ?), city = COALESCE(city, ?), source_product_name = CAST(? AS JSON) WHERE id = ?',
+        [existingMainType, mergedTypesJson, companyAddress || null, province || null, city || null, mergedSourceProductNamesJson, existing.id]
       );
     }
     return existing.id;
@@ -527,9 +688,9 @@ async function upsertCompany(
   const [result] = await connection.query(
     `
       INSERT INTO companies (name, type, types, address, province, city, source_product_name, sampled_count, last_sampled_at)
-      VALUES (?, ?, CAST(? AS JSON), ?, ?, ?, ?, 0, NULL)
+      VALUES (?, ?, CAST(? AS JSON), ?, ?, ?, CAST(? AS JSON), 0, NULL)
     `,
-    [normalizedName, normalizedType, JSON.stringify([normalizedType]), companyAddress || null, province || null, city || null, sourceProductName || null]
+    [normalizedName, normalizedType, JSON.stringify([normalizedType]), companyAddress || null, province || null, city || null, sourceProductName ? JSON.stringify([normalizeText(sourceProductName)]) : null]
   );
 
   return result.insertId;
@@ -813,13 +974,14 @@ async function removeAnnouncementCompanySampling(connection, announcementId) {
   await ensureCompaniesSamplingSchema(connection);
 
   const [rows] = await connection.query(
-    'SELECT DISTINCT company_id FROM company_sampling_records WHERE announcement_id = ?',
+    'SELECT DISTINCT company_id, product_name FROM company_sampling_records WHERE announcement_id = ?',
     [announcementId]
   );
   const companyIds = rows.map((item) => Number(item.company_id)).filter(Boolean);
 
   await connection.query('DELETE FROM company_sampling_records WHERE announcement_id = ?', [announcementId]);
   await recalculateCompanySampledCount(connection, companyIds);
+  await refreshCompanySourceProductNamesAfterSamplingRemoval(connection, rows);
 
   return deleteOrphanCompanies(connection, companyIds);
 }

@@ -496,6 +496,33 @@ async function syncAnnouncementDerivedData(connection, announcementId, fallbackI
   };
 }
 
+async function routeTableExists(connection, tableName) {
+  const [rows] = await connection.query('SHOW TABLES LIKE ?', [tableName]);
+  return rows.length > 0;
+}
+
+async function deleteByAnnouncementIdIfTableExists(connection, tableName, announcementId) {
+  if (!(await routeTableExists(connection, tableName))) {
+    return 0;
+  }
+
+  const [result] = await connection.query(`DELETE FROM ${tableName} WHERE announcement_id = ?`, [announcementId]);
+  return Number(result.affectedRows || 0);
+}
+
+async function deleteByProductIdsIfTableExists(connection, tableName, productIds = []) {
+  if (!productIds.length || !(await routeTableExists(connection, tableName))) {
+    return 0;
+  }
+
+  const placeholders = productIds.map(() => '?').join(', ');
+  const [result] = await connection.query(
+    `DELETE FROM ${tableName} WHERE unqualified_product_id IN (${placeholders})`,
+    productIds
+  );
+  return Number(result.affectedRows || 0);
+}
+
 
 async function parseAttachmentSafely(file, productType = 'cosmetics') {
 
@@ -676,9 +703,12 @@ router.get('/:announcementId/product-details', async (req, res) => {
     const { announcementId } = req.params;
 
     const {
+      product_name = '',
       unqualified_item = '',
       company_keyword = '',
       sample_unit_keyword = '',
+      sampled_province = '',
+      manufacturer_province = '',
       is_counterfeit = ''
     } = req.query;
 
@@ -726,10 +756,50 @@ router.get('/:announcementId/product-details', async (req, res) => {
 
     const conditions = ['announcement_id = ?'];
     const params = [announcementId];
+    const normalizedProductName = String(product_name).trim();
     const normalizedUnqualifiedItem = String(unqualified_item).trim();
     const normalizedCompanyKeyword = String(company_keyword).trim();
     const normalizedSampleUnitKeyword = String(sample_unit_keyword).trim();
+    const normalizedSampledProvince = String(sampled_province).trim();
+    const normalizedManufacturerProvince = String(manufacturer_province).trim();
     const hasCounterfeitFilter = is_counterfeit === '0' || is_counterfeit === '1';
+    const appendProvinceDetailFilter = (columnName, value) => {
+      if (!value) {
+        return;
+      }
+      const isUnspecified = value === '__UNSPECIFIED_PROVINCE__' || value === '未标注省份' || value === '未标注';
+      if (isUnspecified) {
+        conditions.push(`
+          EXISTS (
+            SELECT 1
+            FROM unqualified_products up_filter
+            WHERE up_filter.announcement_id = announcement_product_details.announcement_id
+              AND up_filter.announcement_detail_id = announcement_product_details.id
+              AND (
+                up_filter.${columnName} IS NULL
+                OR TRIM(up_filter.${columnName}) = ''
+                OR TRIM(up_filter.${columnName}) IN ('未标注', '未标注省份', '未标注城市')
+              )
+          )
+        `);
+        return;
+      }
+      conditions.push(`
+        EXISTS (
+          SELECT 1
+          FROM unqualified_products up_filter
+          WHERE up_filter.announcement_id = announcement_product_details.announcement_id
+            AND up_filter.announcement_detail_id = announcement_product_details.id
+            AND TRIM(up_filter.${columnName}) = ?
+        )
+      `);
+      params.push(value);
+    };
+
+    if (normalizedProductName) {
+      conditions.push('product_name LIKE ?');
+      params.push(`%${normalizedProductName}%`);
+    }
 
     if (normalizedUnqualifiedItem) {
       conditions.push('unqualified_items LIKE ?');
@@ -745,6 +815,9 @@ router.get('/:announcementId/product-details', async (req, res) => {
       conditions.push('sample_unit_name LIKE ?');
       params.push(`%${normalizedSampleUnitKeyword}%`);
     }
+
+    appendProvinceDetailFilter('sampled_province', normalizedSampledProvince);
+    appendProvinceDetailFilter('manufacturer_province', normalizedManufacturerProvince);
 
     if (hasCounterfeitFilter) {
       conditions.push('is_counterfeit = ?');
@@ -780,9 +853,12 @@ router.get('/:announcementId/product-details', async (req, res) => {
 
     const summary = await getAnnouncementProductDetailSummary(pool, announcementId);
     const hasFilters = Boolean(
+      normalizedProductName ||
       normalizedUnqualifiedItem ||
       normalizedCompanyKeyword ||
       normalizedSampleUnitKeyword ||
+      normalizedSampledProvince ||
+      normalizedManufacturerProvince ||
       hasCounterfeitFilter
     );
 
@@ -1528,7 +1604,7 @@ router.put('/:id', upload.single('attachment'), async (req, res) => {
 
 
 // 删除公告
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRoles(['developer', 'data_admin']), async (req, res) => {
   let connection;
 
   try {
@@ -1539,16 +1615,57 @@ router.delete('/:id', async (req, res) => {
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    await removeAnnouncementCompanySampling(connection, id);
+    const [announcementRows] = await connection.query('SELECT id FROM announcements WHERE id = ? LIMIT 1', [id]);
+    if (announcementRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: '通告不存在' });
+    }
+
+    const [companyRows] = await connection.query(
+      `
+        SELECT DISTINCT company_id
+        FROM company_sampling_records
+        WHERE announcement_id = ? AND company_id IS NOT NULL
+      `,
+      [id]
+    );
+    const affectedCompanyIds = companyRows.map((row) => Number(row.company_id)).filter(Boolean);
+
+    const [productRows] = await connection.query(
+      'SELECT id FROM unqualified_products WHERE announcement_id = ?',
+      [id]
+    );
+    const productIds = productRows.map((row) => Number(row.id)).filter(Boolean);
+
+    await deleteByProductIdsIfTableExists(connection, 'unqualified_product_usage_records', productIds);
+    await deleteByProductIdsIfTableExists(connection, 'unqualified_product_tree_rollups', productIds);
+    const deletedProductCompanyLinks = await deleteByAnnouncementIdIfTableExists(connection, 'unqualified_product_companies', id);
+    const deletedProductCategoryItems = await deleteByAnnouncementIdIfTableExists(connection, 'unqualified_product_category_items', id);
+    const deletedProductIssueItems = await deleteByAnnouncementIdIfTableExists(connection, 'unqualified_product_issue_items', id);
 
     await connection.query('DELETE FROM inspection_details WHERE inspection_id IN (SELECT id FROM inspections WHERE announcement_id = ?)', [id]);
     await connection.query('DELETE FROM inspections WHERE announcement_id = ?', [id]);
-    await connection.query('DELETE FROM unqualified_products WHERE announcement_id = ?', [id]);
-    await connection.query('DELETE FROM announcements WHERE id = ?', [id]);
+    const [deletedProducts] = await connection.query('DELETE FROM unqualified_products WHERE announcement_id = ?', [id]);
+    const companyCleanupResult = await removeAnnouncementCompanySampling(connection, id);
+    const [deletedDetails] = await connection.query('DELETE FROM announcement_product_details WHERE announcement_id = ?', [id]);
+    const [deletedAnnouncement] = await connection.query('DELETE FROM announcements WHERE id = ?', [id]);
 
 
     await connection.commit();
-    res.json({ success: true, message: '删除成功' });
+    res.json({
+      success: true,
+      message: '删除成功',
+      meta: {
+        deleted_announcement_count: Number(deletedAnnouncement.affectedRows || 0),
+        deleted_product_detail_count: Number(deletedDetails.affectedRows || 0),
+        deleted_unqualified_product_count: Number(deletedProducts.affectedRows || 0),
+        deleted_product_company_link_count: deletedProductCompanyLinks,
+        deleted_product_category_item_count: deletedProductCategoryItems,
+        deleted_product_issue_item_count: deletedProductIssueItems,
+        affected_company_count: affectedCompanyIds.length,
+        deleted_company_count: Number(companyCleanupResult?.deleted_count || 0)
+      }
+    });
   } catch (error) {
     if (connection) {
       await connection.rollback();

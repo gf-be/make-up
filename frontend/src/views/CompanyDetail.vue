@@ -4,7 +4,13 @@
       <template #header>
         <div class="card-header">
           <span>{{ detail.company.name }}</span>
-          <el-button @click="$router.back()">返回</el-button>
+          <div class="header-actions">
+            <!-- 新增被企业投诉内容 -->
+            <el-button type="primary" @click="showComplaintModal">
+              新增投诉
+            </el-button>
+            <el-button @click="$router.back()">返回</el-button>
+          </div>
         </div>
       </template>
 
@@ -22,6 +28,11 @@
         <el-descriptions-item label="类型">
           <el-tag :type="getTypeType(detail.company.type)">
             {{ getTypeText(detail.company.type) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="投诉状态">
+          <el-tag :type="detail.company.is_complained ? 'danger' : 'success'">
+            {{ detail.company.is_complained ? '已被投诉' : '暂无投诉' }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="省份">
@@ -82,18 +93,84 @@
           <el-table-column prop="unqualified_items" label="不合格项目" min-width="150" show-overflow-tooltip />
         </el-table>
       </div>
+
+
+      <!-- 投诉记录 -->
+      <div class="complaint-section">
+        <h3>投诉记录</h3>
+        <el-table :data="detail.complaints || []" stripe border>
+          <el-table-column type="index" label="序号" width="60" />
+          <el-table-column prop="complaint_date" label="投诉日期" width="120">
+            <template #default="{ row }">
+              {{ formatDate(row.complaint_date) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="complaint_content" label="投诉内容" min-width="150" show-overflow-tooltip />
+          <!-- <el-table-column prop="complaint_result" label="" width="90"/> -->
+        </el-table>
+      </div>
     </el-card>
+
+    <el-dialog
+      v-model="complaintDialogVisible"
+      title="新增投诉记录"
+      width="520px"
+      destroy-on-close
+    >
+      <el-form label-position="top">
+        <el-form-item label="投诉日期">
+          <el-date-picker
+            v-model="complaintForm.complaint_date"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="请选择投诉日期"
+            style="width: 100%"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item label="投诉内容" required>
+          <el-input
+            v-model="complaintForm.complaint_content"
+            type="textarea"
+            :rows="5"
+            maxlength="1000"
+            show-word-limit
+            placeholder="请输入投诉内容"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="complaintDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingComplaint" @click="submitComplaint">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getCompanyDetail } from '@/api/index'
+import { createCompanyComplaint, getCompanyDetail } from '@/api/index'
 
 const route = useRoute()
 const loading = ref(false)
 const detail = ref(null)
+const complaintDialogVisible = ref(false)
+const savingComplaint = ref(false)
+const complaintForm = ref({
+  complaint_content: '',
+  complaint_date: ''
+})
+
+function formatTodayDate() {
+  const date = new Date()
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
 
 
 const loadData = async () => {
@@ -106,6 +183,40 @@ const loadData = async () => {
     console.error('加载详情失败:', error)
   } finally {
     loading.value = false
+  }
+}
+
+const showComplaintModal = () => {
+  complaintForm.value = {
+    complaint_content: '',
+    complaint_date: formatTodayDate()
+  }
+  complaintDialogVisible.value = true
+}
+
+const submitComplaint = async () => {
+  const content = String(complaintForm.value.complaint_content || '').trim()
+  if (!content) {
+    ElMessage.warning('请输入投诉内容')
+    return
+  }
+
+  savingComplaint.value = true
+  try {
+    const payload = { complaint_content: content }
+    const complaintDate = String(complaintForm.value.complaint_date || '').trim()
+    if (complaintDate) {
+      payload.complaint_date = complaintDate
+    }
+
+    await createCompanyComplaint(route.params.id, payload)
+    ElMessage.success('投诉记录已保存')
+    complaintDialogVisible.value = false
+    await loadData()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || error?.message || '保存投诉记录失败')
+  } finally {
+    savingComplaint.value = false
   }
 }
 
@@ -171,6 +282,12 @@ onMounted(() => {
   align-items: center;
   font-size: 18px;
   font-weight: bold;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .history-truncated-tip {
@@ -267,8 +384,13 @@ onMounted(() => {
   margin-top: 30px;
 }
 
-.history-section h3 {
+.history-section h3,
+.complaint-section h3 {
   margin-bottom: 15px;
   color: #303133;
+}
+
+.complaint-section {
+  margin-top: 30px;
 }
 </style>
