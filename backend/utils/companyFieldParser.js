@@ -259,6 +259,7 @@ const MANUFACTURER_LABELS_COSMETICS = [
 
 const MANUFACTURER_LABELS_FOOD = [
   '生产商',
+  '生产者',
   '制造商',
   '制作商',
   '制作企业',
@@ -278,7 +279,7 @@ const OPERATOR_LABELS_COSMETICS = [
   '经营企业',
   '经营者'
 ];
-const COMPANY_LABELS_LOOD = [
+const COMPANY_LABELS_FOOD = [
   '委托商',
   '委托企业',
   '委托方'

@@ -46,7 +46,7 @@ const DB_FIELDS = [
 ];
 
 const ENTITY_LABEL_PATTERN = /(注册人|备案人|受托生产企业|委托生产企业|标称生产企业|生产企业|境内责任人|经销商|经营企业|经营者|被抽样单位)[：:]/g;
-const MANUFACTURER_LABELS = ['受托生产企业', '委托生产企业', '标称生产企业', '生产企业'];
+const MANUFACTURER_LABELS = ['受托生产企业', '委托生产企业', '标称生产企业', '生产企业','生产者'];
 const OPERATOR_LABELS = ['经营企业', '经营者', '经销商', '被抽样单位'];
 
 function normalizeToken(token) {
