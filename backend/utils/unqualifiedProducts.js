@@ -69,7 +69,10 @@ const UNQUALIFIED_PRODUCT_FIELDS = [
   'source_publish_date',
   'source_year',
   'province_display',
-  'company_id'
+  'company_id',
+  'manufacturer_company_ids',
+  'distributor_company_ids',
+  'sampled_company_ids'
 ];
 
 const SOURCE_LINK_FIELDS = [
@@ -250,6 +253,59 @@ function buildSearchHotFields(payload = {}) {
     province_display: buildProvinceDisplayValue(payload),
     company_id: payload.company_id ? Number(payload.company_id) : null
   };
+}
+
+const COMPANY_ROLES = new Set(['manufacturer', 'distributor', 'seller']);
+
+function normalizeCompanyRole(value) {
+  const normalized = String(value || '').trim();
+  return COMPANY_ROLES.has(normalized) ? normalized : 'manufacturer';
+}
+
+function createCompanyRoleBuckets() {
+  return {
+    manufacturer: [],
+    distributor: [],
+    seller: []
+  };
+}
+
+function addCompanyIdToRoleBucket(buckets, role, companyId) {
+  const id = Number(companyId);
+  if (!Number.isFinite(id) || id <= 0) {
+    return;
+  }
+  const normalizedRole = normalizeCompanyRole(role);
+  if (!buckets[normalizedRole].includes(id)) {
+    buckets[normalizedRole].push(id);
+  }
+}
+
+function encodeCompanyIds(ids = []) {
+  const normalized = Array.from(new Set((ids || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)));
+  return normalized.length ? JSON.stringify(normalized) : null;
+}
+
+function parseCompanyIds(value) {
+  if (Array.isArray(value)) {
+    return value.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0);
+  }
+  if (value == null || value === '') {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return parseCompanyIds(parsed);
+  } catch {
+    return String(value)
+      .split(/[,，;；|｜\s]+/)
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+  }
+}
+
+function pickPrimaryCompanyIdFromBuckets(buckets) {
+  return buckets.manufacturer[0] || buckets.distributor[0] || buckets.seller[0] || null;
 }
 
 
@@ -519,6 +575,38 @@ async function ensureUnqualifiedProductUsageRecordsTable(connection) {
   }
 }
 
+async function ensureUnqualifiedProductCompaniesTable(connection) {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS unqualified_product_companies (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      unqualified_product_id INT NOT NULL,
+      company_id INT NOT NULL,
+      role VARCHAR(50) NOT NULL,
+      announcement_id INT NULL,
+      announcement_detail_id INT NULL,
+      supervision_id INT NULL,
+      supervision_detail_id INT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_upc_product_company_role (unqualified_product_id, company_id, role),
+      INDEX idx_upc_product (unqualified_product_id),
+      INDEX idx_upc_company (company_id),
+      INDEX idx_upc_role (role),
+      INDEX idx_upc_announcement (announcement_id),
+      INDEX idx_upc_supervision (supervision_id),
+      CONSTRAINT fk_upc_unqualified_product
+        FOREIGN KEY (unqualified_product_id) REFERENCES unqualified_products(id) ON DELETE CASCADE,
+      CONSTRAINT fk_upc_company
+        FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await ensureTableColumn(connection, 'unqualified_product_companies', 'announcement_id', 'INT NULL AFTER role');
+  await ensureTableColumn(connection, 'unqualified_product_companies', 'announcement_detail_id', 'INT NULL AFTER announcement_id');
+  await ensureTableColumn(connection, 'unqualified_product_companies', 'supervision_id', 'INT NULL AFTER announcement_detail_id');
+  await ensureTableColumn(connection, 'unqualified_product_companies', 'supervision_detail_id', 'INT NULL AFTER supervision_id');
+  await ensureIndex(connection, 'unqualified_product_companies', 'idx_upc_company_role', 'INDEX idx_upc_company_role (company_id, role)');
+}
+
 /**
  * 一产品一行：按 (product_id, user_id) 已存在则仅累加 use_count、刷新 last_used_at，不新增行；无 user_id 时按 username 区分。
  */
@@ -704,6 +792,18 @@ async function ensureUnqualifiedProductAbstractCatalogTable(connection) {
 }
 
 function buildSourceCondition(filter = {}, params = []) {
+  if (filter.all === true) {
+    return '1 = 1';
+  }
+
+  if (Array.isArray(filter.productIds) && filter.productIds.length > 0) {
+    const ids = filter.productIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0);
+    if (ids.length > 0) {
+      params.push(...ids);
+      return `id IN (${ids.map(() => '?').join(', ')})`;
+    }
+  }
+
   if (filter.announcementId !== undefined && filter.announcementId !== null) {
     params.push(Number(filter.announcementId));
     return 'announcement_id = ?';
@@ -716,6 +816,67 @@ function buildSourceCondition(filter = {}, params = []) {
 
   params.push(0);
   return '1 = ?';
+}
+
+async function syncUnqualifiedProductCompaniesForSource(connection, filter = {}) {
+  await ensureUnqualifiedProductCompaniesTable(connection);
+
+  const sourceParams = [];
+  const sourceCondition = buildSourceCondition(filter, sourceParams);
+  const [rows] = await connection.query(
+    `
+      SELECT id, announcement_id, announcement_detail_id, supervision_id, supervision_detail_id,
+             manufacturer_company_ids, distributor_company_ids, sampled_company_ids
+      FROM unqualified_products
+      WHERE ${sourceCondition}
+    `,
+    sourceParams
+  );
+
+  const productIds = rows.map((row) => Number(row.id)).filter(Boolean);
+  if (productIds.length > 0) {
+    await connection.query(
+      `DELETE FROM unqualified_product_companies WHERE unqualified_product_id IN (${productIds.map(() => '?').join(', ')})`,
+      productIds
+    );
+  }
+
+  const insertValues = [];
+  rows.forEach((row) => {
+    [
+      ['manufacturer', row.manufacturer_company_ids],
+      ['distributor', row.distributor_company_ids],
+      ['seller', row.sampled_company_ids]
+    ].forEach(([role, rawIds]) => {
+      parseCompanyIds(rawIds).forEach((companyId) => {
+        insertValues.push([
+          row.id,
+          companyId,
+          role,
+          row.announcement_id || null,
+          row.announcement_detail_id || null,
+          row.supervision_id || null,
+          row.supervision_detail_id || null
+        ]);
+      });
+    });
+  });
+
+  if (insertValues.length === 0) {
+    return { synced_product_company_count: 0 };
+  }
+
+  await connection.query(
+    `
+      INSERT IGNORE INTO unqualified_product_companies (
+        unqualified_product_id, company_id, role, announcement_id, announcement_detail_id,
+        supervision_id, supervision_detail_id
+      ) VALUES ${insertValues.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')}
+    `,
+    insertValues.flat()
+  );
+
+  return { synced_product_company_count: insertValues.length };
 }
 
 async function syncProductCategoryItemsForSource(connection, filter = {}) {
@@ -907,7 +1068,12 @@ async function backfillSearchHotFields(connection) {
     'LEFT JOIN announcements a ON up.announcement_id = a.id',
     'LEFT JOIN supervisions s ON up.supervision_id = s.id'
   ];
-  const companyParts = ['up.company_id'];
+  const companyParts = [
+    'up.company_id',
+    "CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(up.manufacturer_company_ids, '$[0]')), '') AS UNSIGNED)",
+    "CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(up.distributor_company_ids, '$[0]')), '') AS UNSIGNED)",
+    "CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(up.sampled_company_ids, '$[0]')), '') AS UNSIGNED)"
+  ];
 
   if (hasSamplingRecords) {
     joinSql.push(`
@@ -921,7 +1087,7 @@ async function backfillSearchHotFields(connection) {
       ) csr ON csr.announcement_id = up.announcement_id
         AND csr.announcement_detail_id = up.announcement_detail_id
     `);
-    companyParts.unshift('csr.company_id');
+    companyParts.push('csr.company_id');
   }
 
   if (hasSupervisionRecords) {
@@ -936,7 +1102,7 @@ async function backfillSearchHotFields(connection) {
       ) csr2 ON csr2.supervision_id = up.supervision_id
         AND csr2.supervision_detail_key = COALESCE(up.supervision_detail_id, 0)
     `);
-    companyParts.unshift('csr2.company_id');
+    companyParts.push('csr2.company_id');
   }
 
   await connection.query(`
@@ -1200,6 +1366,9 @@ async function ensureUnqualifiedProductsTable(connection) {
       source_year INT NULL,
       province_display VARCHAR(100) NULL,
       company_id INT NULL,
+      manufacturer_company_ids JSON NULL,
+      distributor_company_ids JSON NULL,
+      sampled_company_ids JSON NULL,
       announcement_id INT NULL,
       announcement_detail_id INT NULL,
       supervision_id INT NULL,
@@ -1266,6 +1435,17 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureColumn(connection, 'source_year', 'INT NULL AFTER source_publish_date');
   await ensureColumn(connection, 'province_display', 'VARCHAR(100) NULL AFTER source_year');
   await ensureColumn(connection, 'company_id', 'INT NULL AFTER province_display');
+  await ensureColumn(connection, 'manufacturer_company_ids', 'JSON NULL AFTER company_id');
+  await ensureColumn(connection, 'distributor_company_ids', 'JSON NULL AFTER manufacturer_company_ids');
+  await ensureColumn(connection, 'sampled_company_ids', 'JSON NULL AFTER distributor_company_ids');
+  await connection.query(`
+    UPDATE unqualified_products
+    SET manufacturer_company_ids = JSON_ARRAY(company_id)
+    WHERE company_id IS NOT NULL
+      AND manufacturer_company_ids IS NULL
+      AND distributor_company_ids IS NULL
+      AND sampled_company_ids IS NULL
+  `);
   await ensureColumn(connection, 'announcement_id', 'INT NULL AFTER company_id');
   await ensureColumn(connection, 'announcement_detail_id', 'INT NULL AFTER announcement_id');
   await ensureColumn(connection, 'supervision_id', 'INT NULL AFTER announcement_detail_id');
@@ -1304,6 +1484,7 @@ async function ensureUnqualifiedProductsTable(connection) {
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_province_year', 'INDEX idx_unqualified_products_province_year (province_display, source_year)');
   await ensureIndex(connection, 'unqualified_products', 'idx_unqualified_products_source_order', 'INDEX idx_unqualified_products_source_order (source_publish_date, id)');
   await ensureMultiCompanyUniqueKey(connection);
+  await ensureUnqualifiedProductCompaniesTable(connection);
 
   if (await tableExists(connection, 'announcements')) {
     await ensureForeignKey(
@@ -1372,6 +1553,7 @@ async function ensureUnqualifiedProductsTable(connection) {
   await backfillDerivedFields(connection);
   await backfillProductCategoryIdIfNeeded(connection);
   await backfillSearchHotFields(connection);
+  await syncUnqualifiedProductCompaniesForSource(connection, { all: true });
   await backfillProductCategoryItemsIfNeeded(connection);
   await backfillIssueItemsIfNeeded(connection);
   await backfillUnqualifiedProductTreeRollupsIfNeeded(connection);
@@ -1488,7 +1670,7 @@ async function buildAnnouncementDetailPayloadRows(connection, detailRows, announ
     );
 
     const linkedCompanyIds = new Set();
-    let primaryCompanyId = null;
+    const companyRoleBuckets = createCompanyRoleBuckets();
 
     for (const entry of structured.company_entries) {
       if (!entry?.name || isInvalidCompanyValue(entry.name)) {
@@ -1523,12 +1705,10 @@ async function buildAnnouncementDetailPayloadRows(connection, detailRows, announ
       }
 
       linkedCompanyIds.add(Number(companyId));
-      if (!primaryCompanyId && structured.manufacturer_name && entry.name === structured.manufacturer_name) {
-        primaryCompanyId = Number(companyId);
-      }
+      addCompanyIdToRoleBucket(companyRoleBuckets, entry.type, companyId);
     }
 
-    if (!primaryCompanyId && structured.manufacturer_name) {
+    if (companyRoleBuckets.manufacturer.length === 0 && structured.manufacturer_name) {
       const derivedRegion = buildDerivedAnalyticsFields({
         manufacturer_address: structured.manufacturer_address,
         company_addresses: structured.manufacturer_address,
@@ -1542,7 +1722,7 @@ async function buildAnnouncementDetailPayloadRows(connection, detailRows, announ
         attachment_sampling_category: row.attachment_sampling_category
       });
       const sourceProductName = normalizeText(row.product_name) || null;
-      primaryCompanyId = await upsertCompany(
+      const fallbackCompanyId = await upsertCompany(
         connection,
         structured.manufacturer_name,
         structured.manufacturer_address,
@@ -1551,11 +1731,15 @@ async function buildAnnouncementDetailPayloadRows(connection, detailRows, announ
         sourceProductName,
         'manufacturer'
       );
+      if (fallbackCompanyId) {
+        linkedCompanyIds.add(Number(fallbackCompanyId));
+        addCompanyIdToRoleBucket(companyRoleBuckets, 'manufacturer', fallbackCompanyId);
+      }
     }
 
-    if (!primaryCompanyId && structured.company_names) {
-      primaryCompanyId = linkedCompanyIds.values().next().value || null;
-    }
+    const primaryCompanyId = pickPrimaryCompanyIdFromBuckets(companyRoleBuckets)
+      || linkedCompanyIds.values().next().value
+      || null;
 
     payloadRows.push(enrichPayload({
       batch_title: batchTitle,
@@ -1596,6 +1780,9 @@ async function buildAnnouncementDetailPayloadRows(connection, detailRows, announ
       source_title: announcement.title,
       source_publish_date: announcement.publish_date || null,
       company_id: primaryCompanyId,
+      manufacturer_company_ids: encodeCompanyIds(companyRoleBuckets.manufacturer),
+      distributor_company_ids: encodeCompanyIds(companyRoleBuckets.distributor),
+      sampled_company_ids: encodeCompanyIds(companyRoleBuckets.seller),
       is_counterfeit: row.is_counterfeit ? 1 : 0,
       _structured_company_fields: true
     }));
@@ -1687,6 +1874,7 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
 
   const productCategorySyncResult = await syncProductCategoryItemsForSource(connection, { announcementId });
   const issueSyncResult = await syncIssueItemsForSource(connection, { announcementId });
+  const companyLinkSyncResult = await syncUnqualifiedProductCompaniesForSource(connection, { announcementId });
   await backfillSearchHotFields(connection);
   const rollupSyncResult = await rebuildUnqualifiedProductTreeRollupsForSource(connection, { announcementId });
 
@@ -1697,6 +1885,7 @@ async function replaceUnqualifiedProductsFromAnnouncementDetails(connection, ann
     total_batches: totalBatches,
     synced_product_category_count: productCategorySyncResult.synced_product_category_count,
     synced_issue_item_count: issueSyncResult.synced_issue_item_count,
+    synced_product_company_count: companyLinkSyncResult.synced_product_company_count,
     synced_rollup_count: rollupSyncResult.synced_rollup_count
   };
 }
@@ -1816,6 +2005,7 @@ async function replaceUnqualifiedProductsFromFlightInspectionDetails(connection,
 
   const productCategorySyncResult = await syncProductCategoryItemsForSource(connection, { supervisionId });
   const issueSyncResult = await syncIssueItemsForSource(connection, { supervisionId });
+  const companyLinkSyncResult = await syncUnqualifiedProductCompaniesForSource(connection, { supervisionId });
   await backfillSearchHotFields(connection);
   const rollupSyncResult = await rebuildUnqualifiedProductTreeRollupsForSource(connection, { supervisionId });
 
@@ -1825,6 +2015,7 @@ async function replaceUnqualifiedProductsFromFlightInspectionDetails(connection,
     total_batches: totalBatches,
     synced_product_category_count: productCategorySyncResult.synced_product_category_count,
     synced_issue_item_count: issueSyncResult.synced_issue_item_count,
+    synced_product_company_count: companyLinkSyncResult.synced_product_company_count,
     synced_rollup_count: rollupSyncResult.synced_rollup_count
   };
 }
@@ -1839,6 +2030,8 @@ module.exports = {
   ensureUnqualifiedProductsTable,
   ensureUnqualifiedProductCategoryItemsTable,
   ensureUnqualifiedProductIssueItemsTable,
+  ensureUnqualifiedProductCompaniesTable,
+  syncUnqualifiedProductCompaniesForSource,
   getUnqualifiedProductCategoryOptions,
   getUnqualifiedProductIssueOptions,
   seedDefaultUnqualifiedProducts,

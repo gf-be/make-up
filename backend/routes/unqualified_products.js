@@ -17,7 +17,8 @@ const {
   getAnnouncementTypeOptions,
   normalizeProductType,
   normalizeAnnouncementType,
-  upsertUnqualifiedProductUsageRecord
+  upsertUnqualifiedProductUsageRecord,
+  syncUnqualifiedProductCompaniesForSource
 } = require('../utils/unqualifiedProducts');
 
 /** 企业管理页同款：开发与数据管理员可操作 unqualified_products 主档（含无主档来源的记录） */
@@ -64,6 +65,9 @@ const MANAGE_WRITABLE_COLUMNS = [
   'source_year',
   'province_display',
   'company_id',
+  'manufacturer_company_ids',
+  'distributor_company_ids',
+  'sampled_company_ids',
   'announcement_id',
   'announcement_detail_id',
   'supervision_id',
@@ -106,6 +110,26 @@ function normalizeRequiredInt(value, fieldLabel) {
     throw err;
   }
   return n;
+}
+
+function normalizeJsonIdArray(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  const rawItems = Array.isArray(value)
+    ? value
+    : (() => {
+        try {
+          const parsed = JSON.parse(String(value));
+          return Array.isArray(parsed) ? parsed : String(value).split(/[,，;；|｜\s]+/);
+        } catch {
+          return String(value).split(/[,，;；|｜\s]+/);
+        }
+      })();
+  const ids = Array.from(new Set(rawItems
+    .map((item) => Number.parseInt(String(item).trim(), 10))
+    .filter((item) => Number.isFinite(item) && item > 0)));
+  return ids.length ? JSON.stringify(ids) : null;
 }
 
 function normalizeIssueAndCategoryArrays(body) {
@@ -510,6 +534,12 @@ function assembleManageRowFromBody(body, { forCreate }) {
 
   }
 
+  for (const f of ['manufacturer_company_ids', 'distributor_company_ids', 'sampled_company_ids']) {
+    if (Object.prototype.hasOwnProperty.call(body, f) || forCreate) {
+      row[f] = normalizeJsonIdArray(body[f]);
+    }
+  }
+
 
 
   if (Object.prototype.hasOwnProperty.call(body, 'is_counterfeit') || forCreate) {
@@ -693,6 +723,7 @@ router.post('/manage', requireUnqualifiedProductManagers(), async (req, res) => 
 
 
     await syncIssueCategoryJunction(connection, productId, { issue_items, product_categories }, row);
+    await syncUnqualifiedProductCompaniesForSource(connection, { productIds: [productId] });
 
 
     await connection.commit();
@@ -798,6 +829,7 @@ router.put('/manage/:id', requireUnqualifiedProductManagers(), async (req, res) 
 
 
     await syncIssueCategoryJunction(connection, id, { issue_items, product_categories }, row);
+    await syncUnqualifiedProductCompaniesForSource(connection, { productIds: [id] });
 
 
     await connection.commit();
@@ -1024,6 +1056,15 @@ function buildSourceNumberExpr(announcementAlias = 'a', supervisionAlias = 's', 
 
 function buildCompanyIdExpr(alias = 'up') {
   return `COALESCE(
+    ${alias}.company_id,
+    CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(${alias}.manufacturer_company_ids, '$[0]')), '') AS UNSIGNED),
+    CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(${alias}.distributor_company_ids, '$[0]')), '') AS UNSIGNED),
+    CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(${alias}.sampled_company_ids, '$[0]')), '') AS UNSIGNED),
+    (
+      SELECT MIN(upc.company_id)
+      FROM unqualified_product_companies upc
+      WHERE upc.unqualified_product_id = ${alias}.id
+    ),
     (
       SELECT MIN(csr.company_id)
       FROM company_sampling_records csr

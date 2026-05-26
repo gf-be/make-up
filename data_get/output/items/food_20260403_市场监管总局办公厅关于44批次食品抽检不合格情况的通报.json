@@ -38,7 +38,7 @@
     {
       "attachment_name": "附件2 淀粉及淀粉制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/3087496c81894ae49685297b65ca20aa.xlsx?fileName=附件2 淀粉及淀粉制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件2 淀粉及淀粉制品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件2 淀粉及淀粉制品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -101,7 +101,7 @@
     {
       "attachment_name": "附件3 蔬菜制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/cae91d639535480d88e520b855ce641b.xlsx?fileName=附件3 蔬菜制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件3 蔬菜制品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件3 蔬菜制品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -324,6 +324,13 @@
                 "address": "浙江省宁波市余姚市黄家埠镇横塘村四塘江北125号",
                 "type": "manufacturer",
                 "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "宁波农聚坊科技有限公司",
+                "address": "浙江省宁波市余姚市黄家埠镇横塘村四塘江北125号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕30号\\6.png"
@@ -336,7 +343,7 @@
     {
       "attachment_name": "附件4 炒货食品及坚果制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/c881c012c1194ea49cec492bb4112867.xlsx?fileName=附件4 炒货食品及坚果制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件4 炒货食品及坚果制品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件4 炒货食品及坚果制品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -442,7 +449,7 @@
     {
       "attachment_name": "附件5 饮料监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/00ca275fd15f4042bb5b44f46129588d.xlsx?fileName=附件5 饮料监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件5 饮料监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件5 饮料监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -677,7 +684,7 @@
     {
       "attachment_name": "附件6 豆制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/b3c379abbe694e529c74ef5c3e89b834.xlsx?fileName=附件6 豆制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件6 豆制品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件6 豆制品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -783,7 +790,7 @@
     {
       "attachment_name": "附件7 水果制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/1e543699fff440d3a7ed570213a0a6fe.xlsx?fileName=附件7 水果制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件7 水果制品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件7 水果制品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -834,6 +841,13 @@
                 "address": "新疆维吾尔自治区和田地区策勒县策勒乡十四大队西部",
                 "type": "manufacturer",
                 "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "通力宜选（陕西）科技有限公司",
+                "address": "陕西省西安市高新区科技一路中交通力大厦211室",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕30号\\16.png"
@@ -975,7 +989,7 @@
     {
       "attachment_name": "附件8 餐饮食品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/118931aeb14b4df8ae46524fadcd8fe1.xlsx?fileName=附件8 餐饮食品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件8 餐饮食品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件8 餐饮食品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1175,7 +1189,7 @@
     {
       "attachment_name": "附件9 调味品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/0e0af3c6e90e4a46b9d2a44e496dfd4b.xlsx?fileName=附件9 调味品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件9 调味品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件9 调味品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1382,7 +1396,7 @@
     {
       "attachment_name": "附件10 糕点监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/28d054190259491e9e28bd75b99857b3.xlsx?fileName=附件10 糕点监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件10 糕点监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件10 糕点监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1581,7 +1595,7 @@
     {
       "attachment_name": "附件11 方便食品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/1bd0a68b2d364045b00c6544088778ae.xlsx?fileName=附件11 方便食品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件11 方便食品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件11 方便食品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1694,7 +1708,7 @@
     {
       "attachment_name": "附件12 茶叶及相关制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/ef7da3d416c641c18079d4079b8dac60.xlsx?fileName=附件12 茶叶及相关制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件12 茶叶及相关制品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件12 茶叶及相关制品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1757,7 +1771,7 @@
     {
       "attachment_name": "附件13 食用油、油脂及其制品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/932c721042b14e97b1de20fcfade57bc.xlsx?fileName=附件13 食用油、油脂及其制品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件13 食用油、油脂及其制品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件13 食用油、油脂及其制品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1851,6 +1865,13 @@
                 "address": "宁夏回族自治区石嘴山市平罗县高庄乡远景村四队16号",
                 "type": "distributor",
                 "type_label": "经销商"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "宁夏十谷子食品商贸有限公司",
+                "address": "宁夏回族自治区银川市西夏区盈北家园小区4号楼10号营业房",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕30号\\38.png"
@@ -1863,7 +1884,7 @@
     {
       "attachment_name": "附件14 饼干监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/bdb95a4b30594b59a7d20e1ddae9cb0d.xlsx?fileName=附件14 饼干监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件14 饼干监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件14 饼干监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -1926,7 +1947,7 @@
     {
       "attachment_name": "附件15 特殊膳食食品监督抽检不合格产品信息.xlsx",
       "attachment_url": "http://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20263/08699f68f10c4fa4ba004940ac5320ee.xlsx?fileName=附件15 特殊膳食食品监督抽检不合格产品信息.xlsx",
-      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件15 特殊膳食食品监督抽检不合格产品信息_5.xlsx",
+      "local_path": "F:\\daoke\\化妆品\\data_get\\downloads\\samr_food\\20260403__市监食检发〔2026〕30号__art_98bfbb529066447db26c1107351acf51__市场监管总局办公厅关于44批次食品抽检不合格情况的通报\\附件15 特殊膳食食品监督抽检不合格产品信息_6.xlsx",
       "file_ext": ".xlsx",
       "download": {
         "success": true,
@@ -2170,6 +2191,13 @@
                 "address": "安徽省阜阳市太和县经济开发区和谐大道中科国际精准医学产业园A3栋",
                 "type": "manufacturer",
                 "type_label": "生产企业"
+              },
+              {
+                "label": "被抽样单位",
+                "name": "河南省乳牛贝斯乳业有限公司",
+                "address": "河南省周口市太康县毛庄镇产业集聚区少康大道119号",
+                "type": "seller",
+                "type_label": "销售商"
               }
             ],
             "picture_url": "backend\\public\\upload\\products\\市监食检发〔2026〕30号\\44.png"

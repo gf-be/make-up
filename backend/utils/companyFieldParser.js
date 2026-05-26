@@ -12,9 +12,11 @@ const SKIP_COMPANY_LABELS = new Set([
   '原产国',
   '原产地',
   '产地',
+  '产地国',
   '国别',
   '国家',
-  '地区'
+  '地区',
+  '国家/地区'
 ]);
 
 function stripEdgeSeparators(value) {
@@ -253,12 +255,21 @@ const MANUFACTURER_LABELS_COSMETICS = [
   '受托生产企业',
   '委托生产企业',
   '标称生产企业',
+  '标称生产企业名称',
   '生产企业',
+  '生产企业名称',
+  '生产商',
+  '生产商名称',
+  '生产者',
+  '制造商',
+  '制作商',
+  '制作企业',
   '生产厂商'
 ];
 
 const MANUFACTURER_LABELS_FOOD = [
   '生产商',
+  '生产商名称',
   '生产者',
   '制造商',
   '制作商',
@@ -266,6 +277,9 @@ const MANUFACTURER_LABELS_FOOD = [
   '制作厂商',
   '生产厂商',
   '生产企业',
+  '生产企业名称',
+  '标称生产企业',
+  '标称生产企业名称',
   '受委托方',
   '供应商',
   '生产商（分装）'
@@ -275,9 +289,16 @@ const OPERATOR_LABELS_COSMETICS = [
   '总经销',
   '总经销商',
   '经销商',
+  '销售商',
+  '销售企业',
+  '销售单位',
+  '进口商',
+  '代理商',
+  '委托商',
+  '委托企业',
+  '委托方',
   '境内责任人',
-  '经营企业',
-  '经营者'
+  '经营企业'
 ];
 const COMPANY_LABELS_FOOD = [
   '委托商',
@@ -286,6 +307,9 @@ const COMPANY_LABELS_FOOD = [
 ];
 const OPERATOR_LABELS_FOOD = [
   '销售商',
+  '销售者',
+  '销售企业',
+  '销售单位',
   '总经销',
   '总经销商',
   '经销商',
@@ -297,7 +321,16 @@ const OPERATOR_LABELS_FOOD = [
  
 ];
 
-const SAMPLE_UNIT_LABELS = ['被抽样单位'];
+const SAMPLE_UNIT_LABELS = [
+  '被抽样单位',
+  '被抽样单位名称',
+  '抽样单位',
+  '经营者',
+  '经营者名称',
+  '销售门店',
+  '网店',
+  '门店'
+];
 const COMPANY_TYPE_LABELS = {
   manufacturer: '生产企业',
   distributor: '经销商',
@@ -324,7 +357,7 @@ function resolveCompanyEntryType(label, fallbackType = 'manufacturer') {
   if (!normalized) {
     return fallbackType;
   }
-  if (labelMatchesGroup(normalized, SAMPLE_UNIT_LABELS) || /被抽样|抽样单位|经营者|销售单位|销售门店|网店/.test(normalized)) {
+  if (labelMatchesGroup(normalized, SAMPLE_UNIT_LABELS) || /被抽样|抽样单位|经营者|销售门店|网店|门店/.test(normalized)) {
     return 'seller';
   }
   if (labelMatchesGroup(normalized, MANUFACTURER_LABELS_FOOD)
@@ -332,12 +365,9 @@ function resolveCompanyEntryType(label, fallbackType = 'manufacturer') {
     || /生产|制造|制作|供应/.test(normalized)) {
     return 'manufacturer';
   }
-  if (/销售商|销售者/.test(normalized)) {
-    return 'seller';
-  }
   if (labelMatchesGroup(normalized, OPERATOR_LABELS_FOOD)
     || labelMatchesGroup(normalized, OPERATOR_LABELS_COSMETICS)
-    || /经销|代理|进口|委托|受托|总经销/.test(normalized)) {
+    || /销售商|销售者|销售企业|销售单位|经销|代理|进口|委托|受托|总经销/.test(normalized)) {
     return 'distributor';
   }
   return fallbackType;
@@ -416,6 +446,37 @@ function formatLabeledAddressText(entries = [], nameEntries = []) {
  * 化妆品：备案人/注册人 → company_names；生产企业 → manufacturer_*；总经销等 → operator_*
  * 食品：生产商 → manufacturer_*；销售商/经销 → operator_*
  */
+function normalizeCompanyEntry(entry, fallbackType = 'manufacturer') {
+  if (!entry?.name || isInvalidCompanyValue(entry.name)) {
+    return null;
+  }
+  if (entry.label && shouldSkipCompanyLabel(entry.label)) {
+    return null;
+  }
+  return enrichCompanyEntryType(
+    {
+      label: entry.label || null,
+      name: normalizeText(entry.name),
+      address: normalizeText(entry.address) || null
+    },
+    fallbackType
+  );
+}
+
+function appendCompanyEntry(entries, entry, fallbackType = 'manufacturer') {
+  const normalized = normalizeCompanyEntry(entry, fallbackType);
+  if (!normalized) {
+    return entries;
+  }
+  const list = Array.isArray(entries) ? entries : [];
+  const key = `${normalized.name}__${normalized.address || ''}__${normalized.type}`;
+  const exists = list.some((item) => `${item.name}__${item.address || ''}__${item.type}` === key);
+  if (!exists) {
+    list.push(normalized);
+  }
+  return list;
+}
+
 function buildStructuredCompanyFields(productType, namesValue, addressesValue = '', extras = {}) {
   const normalizedProductType = String(productType || 'cosmetics').trim() === 'food' ? 'food' : 'cosmetics';
   const rawNameParts = parseLabeledParts(namesValue);
@@ -436,9 +497,7 @@ function buildStructuredCompanyFields(productType, namesValue, addressesValue = 
   const manufacturerRawAddressPart = manufacturerRawPart?.label
     ? pickLabeledPart(rawAddressParts, [manufacturerRawPart.label], true)
     : null;
-  const explicitEmptyManufacturer = normalizedProductType === 'food'
-    ? normalizeExplicitEmptyCompanyValue(manufacturerRawPart?.value)
-    : null;
+  const explicitEmptyManufacturer = normalizeExplicitEmptyCompanyValue(manufacturerRawPart?.value);
 
   const result = {
     company_names: registrant?.name || null,
@@ -452,7 +511,7 @@ function buildStructuredCompanyFields(productType, namesValue, addressesValue = 
     operator_address: operator?.address || normalizeText(extras.operator_address) || null,
     sample_unit_name: normalizeText(extras.sample_unit_name) || sampleUnit?.name || null,
     sample_unit_address: normalizeText(extras.sample_unit_address) || sampleUnit?.address || null,
-    company_entries: entries
+    company_entries: [...entries]
   };
 
   if (!result.company_names && normalizedProductType === 'cosmetics' && entries.length === 1 && !entries[0].label) {
@@ -509,13 +568,21 @@ function buildStructuredCompanyFields(productType, namesValue, addressesValue = 
     result.operator_address = normalizeText(extras.operator_address) || result.operator_address || null;
   }
 
-  if (normalizedProductType === 'food') {
-    result.company_entries = appendSampleUnitCompanyEntry(
-      result.company_entries,
-      result.sample_unit_name,
-      result.sample_unit_address
-    );
-  }
+  result.company_entries = appendCompanyEntry(result.company_entries, {
+    label: '生产企业',
+    name: result.manufacturer_name,
+    address: result.manufacturer_address
+  }, 'manufacturer');
+  result.company_entries = appendCompanyEntry(result.company_entries, {
+    label: '经销商',
+    name: result.operator_name,
+    address: result.operator_address
+  }, 'distributor');
+  result.company_entries = appendSampleUnitCompanyEntry(
+    result.company_entries,
+    result.sample_unit_name,
+    result.sample_unit_address
+  );
 
   return result;
 }
@@ -527,8 +594,8 @@ function appendSampleUnitCompanyEntry(entries, sampleUnitName, sampleUnitAddress
     return list;
   }
   const address = normalizeText(sampleUnitAddress) || null;
-  const key = `${name}__${address || ''}`;
-  const exists = list.some((entry) => `${entry.name}__${entry.address || ''}` === key);
+  const key = `${name}__${address || ''}__seller`;
+  const exists = list.some((entry) => `${entry.name}__${entry.address || ''}__${entry.type}` === key);
   if (exists) {
     return list;
   }

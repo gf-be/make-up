@@ -44,6 +44,38 @@ function normalizeCompanyType(value) {
   return COMPANY_TYPES.has(normalized) ? normalized : 'manufacturer';
 }
 
+function parseCompanyTypes(value) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeCompanyType).filter(Boolean);
+  }
+  const text = normalizeText(value);
+  if (!text) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.map(normalizeCompanyType).filter(Boolean);
+    }
+  } catch {
+    // Legacy scalar or CSV values are handled below.
+  }
+  return text
+    .split(/[,，;；|｜\s]+/)
+    .map(normalizeCompanyType)
+    .filter(Boolean);
+}
+
+function mergeCompanyTypes(...values) {
+  const merged = [];
+  values.flatMap(parseCompanyTypes).forEach((type) => {
+    if (!merged.includes(type)) {
+      merged.push(type);
+    }
+  });
+  return merged.length ? merged : ['manufacturer'];
+}
+
 async function ensureColumnExists(connection, tableName, columnName, definition) {
   const [rows] = await connection.query(`SHOW COLUMNS FROM ${tableName} LIKE ?`, [columnName]);
   if (rows.length === 0) {
@@ -119,6 +151,12 @@ async function ensureCompaniesSamplingSchema(connection) {
   );
 
   await ensureColumnExists(connection, 'companies', 'credit_code', "VARCHAR(18) NULL COMMENT '统一社会信用代码' AFTER brand");
+  await ensureColumnExists(connection, 'companies', 'types', "JSON NULL COMMENT '企业类型集合' AFTER type");
+  await connection.query(`
+    UPDATE companies
+    SET types = JSON_ARRAY(COALESCE(NULLIF(TRIM(type), ''), 'manufacturer'))
+    WHERE types IS NULL
+  `);
   await ensureIndexExists(
     connection,
     'companies',
@@ -462,21 +500,25 @@ async function upsertCompany(
   const normalizedType = normalizeCompanyType(companyType);
 
   const [existingRows] = await connection.query(
-    'SELECT id, type, address, province, city, source_product_name FROM companies WHERE name = ? LIMIT 1',
+    'SELECT id, type, types, address, province, city, source_product_name FROM companies WHERE name = ? LIMIT 1',
     [normalizedName]
   );
 
   if (existingRows.length > 0) {
     const existing = existingRows[0];
-    const shouldUpdateType = existing.type !== normalizedType;
+    const existingMainType = COMPANY_TYPES.has(normalizeText(existing.type)) ? normalizeText(existing.type) : normalizedType;
+    const mergedTypes = mergeCompanyTypes(existing.types, existing.type, normalizedType);
+    const mergedTypesJson = JSON.stringify(mergedTypes);
+    const shouldUpdateType = existing.type !== existingMainType;
+    const shouldUpdateTypes = JSON.stringify(mergeCompanyTypes(existing.types, existing.type)) !== mergedTypesJson;
     const shouldUpdateAddress = (!existing.address && companyAddress);
     const shouldUpdateProvince = (!existing.province && province);
     const shouldUpdateCity = (!existing.city && city);
     const shouldUpdateSourceProductName = (!existing.source_product_name && sourceProductName);
-    if (shouldUpdateType || shouldUpdateAddress || shouldUpdateProvince || shouldUpdateCity || shouldUpdateSourceProductName) {
+    if (shouldUpdateType || shouldUpdateTypes || shouldUpdateAddress || shouldUpdateProvince || shouldUpdateCity || shouldUpdateSourceProductName) {
       await connection.query(
-        'UPDATE companies SET type = ?, address = COALESCE(address, ?), province = COALESCE(province, ?), city = COALESCE(city, ?), source_product_name = COALESCE(source_product_name, ?) WHERE id = ?',
-        [normalizedType, companyAddress || null, province || null, city || null, sourceProductName || null, existing.id]
+        'UPDATE companies SET type = ?, types = CAST(? AS JSON), address = COALESCE(address, ?), province = COALESCE(province, ?), city = COALESCE(city, ?), source_product_name = COALESCE(source_product_name, ?) WHERE id = ?',
+        [existingMainType, mergedTypesJson, companyAddress || null, province || null, city || null, sourceProductName || null, existing.id]
       );
     }
     return existing.id;
@@ -484,10 +526,10 @@ async function upsertCompany(
 
   const [result] = await connection.query(
     `
-      INSERT INTO companies (name, type, address, province, city, source_product_name, sampled_count, last_sampled_at)
-      VALUES (?, ?, ?, ?, ?, ?, 0, NULL)
+      INSERT INTO companies (name, type, types, address, province, city, source_product_name, sampled_count, last_sampled_at)
+      VALUES (?, ?, CAST(? AS JSON), ?, ?, ?, ?, 0, NULL)
     `,
-    [normalizedName, normalizedType, companyAddress || null, province || null, city || null, sourceProductName || null]
+    [normalizedName, normalizedType, JSON.stringify([normalizedType]), companyAddress || null, province || null, city || null, sourceProductName || null]
   );
 
   return result.insertId;

@@ -497,7 +497,7 @@ async function syncAnnouncementDerivedData(connection, announcementId, fallbackI
 }
 
 
-async function parseAttachmentSafely(file) {
+async function parseAttachmentSafely(file, productType = 'cosmetics') {
 
   if (!file) {
     return {
@@ -511,7 +511,7 @@ async function parseAttachmentSafely(file) {
   }
 
   try {
-    return await parseAnnouncementAttachment(file.path);
+    return await parseAnnouncementAttachment(file.path, { productType });
   } catch (error) {
     console.error('解析公告附件失败:', error);
     return {
@@ -713,7 +713,7 @@ router.get('/:announcementId/product-details', async (req, res) => {
           const parsedAttachment = await parseAttachmentSafely({
             path: attachmentFilePath,
             originalname: announcement.attachment_name
-          });
+          }, announcement.product_type);
 
           if (parsedAttachment.rows.length > 0) {
             await replaceAnnouncementProductDetails(pool, announcementId, parsedAttachment.rows);
@@ -985,7 +985,7 @@ router.post('/', upload.single('attachment'), async (req, res) => {
     const normalizedAnnouncementType = normalizeAnnouncementType(announcement_type || 'sampling');
     const extractedInfo = extractAnnouncementInfo(content);
 
-    const parsedAttachment = await parseAttachmentSafely(req.file);
+    const parsedAttachment = await parseAttachmentSafely(req.file, normalizedProductType);
     const parsedInspectionCount = parsedAttachment.parsedCount > 0 ? parsedAttachment.parsedCount : 0;
 
     const finalInspectionUnit = inspection_unit || extractedInfo.inspection_unit;
@@ -1426,7 +1426,7 @@ router.put('/:id', upload.single('attachment'), async (req, res) => {
 
     const extractedInfo = extractAnnouncementInfo(content);
 
-    const parsedAttachment = await parseAttachmentSafely(req.file);
+    const parsedAttachment = await parseAttachmentSafely(req.file, normalizedProductType);
 
     const parsedInspectionCount = parsedAttachment.parsedCount > 0 ? parsedAttachment.parsedCount : 0;
     const finalInspectionUnit = inspection_unit || extractedInfo.inspection_unit;

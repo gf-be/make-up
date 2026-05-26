@@ -1,6 +1,7 @@
 const path = require('path');
 const WordExtractor = require('word-extractor');
 const XLSX = require('xlsx');
+const { buildStructuredCompanyFields: buildCompanyFields } = require('./companyFieldParser');
 
 const extractor = new WordExtractor();
 
@@ -45,10 +46,6 @@ const DB_FIELDS = [
   'is_counterfeit'
 ];
 
-const ENTITY_LABEL_PATTERN = /(注册人|备案人|受托生产企业|委托生产企业|标称生产企业|生产企业|境内责任人|经销商|经营企业|经营者|被抽样单位)[：:]/g;
-const MANUFACTURER_LABELS = ['受托生产企业', '委托生产企业', '标称生产企业', '生产企业','生产者'];
-const OPERATOR_LABELS = ['经营企业', '经营者', '经销商', '被抽样单位'];
-
 function normalizeToken(token) {
   return String(token || '')
     .replace(/\u0007/g, ' ')
@@ -77,67 +74,6 @@ function finalizeDetailText(primaryValue, extraValues, formatter = normalizeToke
     .filter(Boolean)
     .join('\n');
 }
-
-function stripEdgeSeparators(value) {
-  return normalizeToken(value).replace(/^[，,；;\s]+|[，,；;\s]+$/g, '');
-}
-
-function parseLabeledEntityParts(value) {
-  const text = normalizeToken(value);
-  if (!text) {
-    return [];
-  }
-
-  const matches = [];
-  let match = ENTITY_LABEL_PATTERN.exec(text);
-  while (match) {
-    matches.push({
-      label: match[1],
-      start: match.index,
-      valueStart: ENTITY_LABEL_PATTERN.lastIndex
-    });
-    match = ENTITY_LABEL_PATTERN.exec(text);
-  }
-  ENTITY_LABEL_PATTERN.lastIndex = 0;
-
-  return matches.map((item, index) => {
-    const next = matches[index + 1];
-    return {
-      label: item.label,
-      value: stripEdgeSeparators(text.slice(item.valueStart, next ? next.start : text.length))
-    };
-  }).filter((item) => item.value);
-}
-
-function getFirstEntityValue(value, labels) {
-  const parts = parseLabeledEntityParts(value);
-  for (const label of labels) {
-    const item = parts.find((part) => part.label === label);
-    if (item?.value) {
-      return item.value;
-    }
-  }
-  return '';
-}
-
-function buildStructuredCompanyFields(record) {
-  const manufacturerName = getFirstEntityValue(record.company_names, MANUFACTURER_LABELS)
-    || normalizeToken(record.company_names);
-  const manufacturerAddress = getFirstEntityValue(record.company_addresses, MANUFACTURER_LABELS)
-    || normalizeToken(record.company_addresses);
-  const operatorName = normalizeToken(record.sample_unit_name)
-    || getFirstEntityValue(record.company_names, OPERATOR_LABELS);
-  const operatorAddress = normalizeToken(record.sample_unit_address)
-    || getFirstEntityValue(record.company_addresses, OPERATOR_LABELS);
-
-  return {
-    manufacturer_name: manufacturerName || null,
-    manufacturer_address: manufacturerAddress || null,
-    operator_name: operatorName || null,
-    operator_address: operatorAddress || null
-  };
-}
-
 
 function buildCounterfeitFlag(remarks) {
   return /假冒|真实性异议|未生产或者进口过该批次抽检不符合规定产品/.test(remarks || '') ? 1 : 0;
@@ -188,7 +124,7 @@ async function extractAttachmentText(filePath) {
   };
 }
 
-function parseAnnouncementProductDetails(rawText) {
+function parseAnnouncementProductDetails(rawText, productType = 'cosmetics') {
   const tokens = String(rawText || '')
     .split('\t')
     .map(normalizeToken)
@@ -263,7 +199,10 @@ function parseAnnouncementProductDetails(rawText) {
 
     record.remarks = normalizeToken(record.remarks || '/');
     record.is_counterfeit = buildCounterfeitFlag(record.remarks);
-    Object.assign(record, buildStructuredCompanyFields(record));
+    Object.assign(record, buildCompanyFields(productType, record.company_names, record.company_addresses, {
+      sample_unit_name: record.sample_unit_name,
+      sample_unit_address: record.sample_unit_address
+    }));
 
     records.push(record);
   }
@@ -271,7 +210,7 @@ function parseAnnouncementProductDetails(rawText) {
   return records;
 }
 
-async function parseAnnouncementAttachment(filePath) {
+async function parseAnnouncementAttachment(filePath, options = {}) {
   const extracted = await extractAttachmentText(filePath);
 
   if (!extracted.supported) {
@@ -285,7 +224,7 @@ async function parseAnnouncementAttachment(filePath) {
     };
   }
 
-  const rows = parseAnnouncementProductDetails(extracted.rawText);
+  const rows = parseAnnouncementProductDetails(extracted.rawText, options.productType || options.product_type || 'cosmetics');
   const counterfeitCount = rows.filter((item) => item.is_counterfeit === 1).length;
 
   return {

@@ -16,6 +16,41 @@ const US_EIN_DIGITS_RE = /^\d{9}$/;
 
 const CREDIT_CODE_TYPE_ERROR =
   '须为中国 18 位统一社会信用代码、日本 13 位法人番号、或美国 9 位 EIN（可含连字符）';
+const COMPANY_TYPES = new Set(['manufacturer', 'distributor', 'seller']);
+
+function normalizeCompanyType(value) {
+  const normalized = String(value || '').trim();
+  return COMPANY_TYPES.has(normalized) ? normalized : 'manufacturer';
+}
+
+function parseCompanyTypes(value) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeCompanyType).filter(Boolean);
+  }
+  const text = String(value || '').trim();
+  if (!text) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.map(normalizeCompanyType).filter(Boolean);
+    }
+  } catch {
+    // Legacy scalar values are split below.
+  }
+  return text.split(/[,，;；|｜\s]+/).map(normalizeCompanyType).filter(Boolean);
+}
+
+function mergeCompanyTypes(...values) {
+  const merged = [];
+  values.flatMap(parseCompanyTypes).forEach((type) => {
+    if (!merged.includes(type)) {
+      merged.push(type);
+    }
+  });
+  return merged.length ? merged : ['manufacturer'];
+}
 
 function normalizeUsEinDigits(raw) {
   const compact = String(raw || '').replace(/\s+/g, '').replace(/-/g, '');
@@ -270,7 +305,7 @@ router.get('/', async (req, res) => {
 
     let query = `
       SELECT
-        c.id, c.name, c.brand, c.credit_code, c.type, c.province, c.city, c.address,
+        c.id, c.name, c.brand, c.credit_code, c.type, c.types, c.province, c.city, c.address,
         c.source_product_name, c.created_at, c.updated_at,
         COALESCE(c.sampled_count, 0) AS sampled_count,
         COALESCE(c.last_sampled_at, NULL) AS last_sampled_at
@@ -778,6 +813,7 @@ router.post('/bulk-credit-codes', requireCompanyManagers(), async (req, res) => 
             brand,
             credit_code,
             type,
+            types,
             address,
             province,
             city,
@@ -785,9 +821,9 @@ router.post('/bulk-credit-codes', requireCompanyManagers(), async (req, res) => 
             sampled_count,
             last_sampled_at
           )
-          VALUES (?, NULL, ?, 'manufacturer', NULL, NULL, NULL, NULL, 0, NULL)
+          VALUES (?, NULL, ?, 'manufacturer', CAST(? AS JSON), NULL, NULL, NULL, NULL, 0, NULL)
         `,
-          [nameRaw, code]
+          [nameRaw, code, JSON.stringify(['manufacturer'])]
         );
         const newId = result.insertId;
         codeToTarget.set(code, newId);
@@ -1089,10 +1125,7 @@ router.post('/', requireCompanyManagers(), async (req, res) => {
       : 'manufacturer';
 
 
-    const allowedTypes = new Set(['manufacturer', 'distributor', 'seller']);
-
-
-    if (!allowedTypes.has(normalizedType)) {
+    if (!COMPANY_TYPES.has(normalizedType)) {
 
 
       return res.status(400).json({ success: false, message: '企业类型无效' });
@@ -1116,6 +1149,7 @@ router.post('/', requireCompanyManagers(), async (req, res) => {
         brand,
         credit_code,
         type,
+        types,
         address,
         province,
         city,
@@ -1123,12 +1157,13 @@ router.post('/', requireCompanyManagers(), async (req, res) => {
         sampled_count,
         last_sampled_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
+      VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?, ?, 0, NULL)
     `, [
       normalizedName,
       brand || null,
       creditResolved.value,
       normalizedType,
+      JSON.stringify([normalizedType]),
       address || null,
       province || null,
       city || null,
@@ -1222,10 +1257,6 @@ router.put('/:id', requireCompanyManagers(), async (req, res) => {
 
 
 
-    const allowedTypes = new Set(['manufacturer', 'distributor', 'seller']);
-
-
-
     if (!name) {
 
 
@@ -1236,7 +1267,7 @@ router.put('/:id', requireCompanyManagers(), async (req, res) => {
     }
 
 
-    if (!allowedTypes.has(type)) {
+    if (!COMPANY_TYPES.has(type)) {
 
 
       return res.status(400).json({ success: false, message: '企业类型无效，请使用 manufacturer / distributor / seller' });
@@ -1254,10 +1285,21 @@ router.put('/:id', requireCompanyManagers(), async (req, res) => {
       await pool.query(
         `
       UPDATE companies
-      SET name = ?, brand = ?, credit_code = ?, type = ?, address = ?, province = ?, city = ?, source_product_name = ?
+      SET name = ?, brand = ?, credit_code = ?, type = ?, types = CAST(? AS JSON), address = ?, province = ?, city = ?, source_product_name = ?
       WHERE id = ?
     `,
-        [name, brand, creditResolved.value, type, address, province, city, source_product_name, id]
+        [
+          name,
+          brand,
+          creditResolved.value,
+          type,
+          JSON.stringify(mergeCompanyTypes(existingRows[0].types, existingRows[0].type, type)),
+          address,
+          province,
+          city,
+          source_product_name,
+          id
+        ]
       );
     } catch (updateErr) {
       if (updateErr.code === 'ER_DUP_ENTRY') {
